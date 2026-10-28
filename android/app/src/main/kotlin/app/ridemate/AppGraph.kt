@@ -16,6 +16,17 @@ import app.ridemate.data.PurgeWorker
 import app.ridemate.data.RetentionPurger
 import app.ridemate.data.RideMateDb
 import app.ridemate.data.StorageHealth
+import app.ridemate.launch.AndroidDropClipboard
+import app.ridemate.launch.AndroidLaunchNotifier
+import app.ridemate.launch.AppLauncher
+import app.ridemate.launch.BubbleVisibility
+import app.ridemate.launch.ContextActivityStarter
+import app.ridemate.launch.InstalledApps
+import app.ridemate.launch.LegOpenedSink
+import app.ridemate.launch.PackageManagerApps
+import app.ridemate.launch.ProcessForeground
+import app.ridemate.launch.RemoteLaunchTemplates
+import app.ridemate.launch.RoomLegOpenedSink
 import app.ridemate.net.ApiClient
 import app.ridemate.net.OkHttpApiClient
 import app.ridemate.outbox.OutboxDriver
@@ -26,6 +37,10 @@ import app.ridemate.privacy.EraseUseCase
 import app.ridemate.privacy.LocalDataWiper
 import app.ridemate.privacy.MyDataProvider
 import app.ridemate.privacy.SignInKind
+import app.ridemate.precheck.AndroidPrecheckProbes
+import app.ridemate.precheck.PreSessionCheck
+import app.ridemate.precheck.RideWatchStatus
+import app.ridemate.trip.RecentPlacesStore
 import app.ridemate.update.UpdateChecker
 import app.ridemate.util.BuildInfo
 import app.ridemate.util.Clock
@@ -55,6 +70,8 @@ import java.util.concurrent.CopyOnWriteArrayList
  * - [crashReporter] sanitized crash reporting
  * - [updateChecker] update banner state
  * - [sessionActivity] whether a ride session's foreground service runs (the session service sets it)
+ * - [appLauncher], [preSessionCheck], [installedApps], [recentPlaces] trip input / launch / pre-session check; the
+ *   bubble, RideWatch and guardian bind [bubbleVisibility], [rideWatchStatus] and [legOpenedSink]
  */
 class AppGraph(
     val app: Application,
@@ -148,6 +165,52 @@ class AppGraph(
         )
     }
 
+    // ---- trip / launch / pre-session check (app.ridemate.trip, .launch, .precheck) ----
+    /** Bound by the bubble area: whether the overlay bubble is visible (Android 15 background-start rule). */
+    @Volatile
+    var bubbleVisibility: BubbleVisibility = BubbleVisibility.Hidden
+
+    /** Bound by RideWatch: answers the pre-session ping; null = read the enabled-listener list instead. */
+    @Volatile
+    var rideWatchStatus: RideWatchStatus? = null
+
+    /** Bound by the guardian: records SELECTED → OPENED; null = AppLauncher moves the Room leg row itself. */
+    @Volatile
+    var legOpenedSink: LegOpenedSink? = null
+
+    val installedApps: InstalledApps by lazy { PackageManagerApps(app) }
+
+    val appLauncher: AppLauncher by lazy {
+        val roomSink = RoomLegOpenedSink(db.legDao())
+        AppLauncher(
+            templates = RemoteLaunchTemplates(configRepository),
+            apps = installedApps,
+            starter = ContextActivityStarter(app),
+            notifier = AndroidLaunchNotifier(app),
+            clipboard = AndroidDropClipboard(app),
+            bubble = object : BubbleVisibility {
+                override val isShowing: Boolean get() = bubbleVisibility.isShowing
+            },
+            foreground = ProcessForeground(),
+            legOpened = LegOpenedSink { legId, provider, at -> (legOpenedSink ?: roomSink).legOpened(legId, provider, at) },
+            clock = clock,
+            onRecordFailure = { e -> crashReporter.recordNonFatal(e, CrashSite.OTHER) },
+        )
+    }
+
+    val preSessionCheck: PreSessionCheck by lazy {
+        PreSessionCheck(AndroidPrecheckProbes(app, installedApps), { rideWatchStatus }, clock)
+    }
+
+    /** Recent destinations (24 h, phone only); Erase wipes them. */
+    val recentPlaces: RecentPlacesStore by lazy {
+        RecentPlacesStore(app.getSharedPreferences(RecentPlacesStore.PREFS_NAME, Context.MODE_PRIVATE), clock)
+    }
+
+    init {
+        localWipers.add(LocalDataWiper { recentPlaces.clear() })
+    }
+
     @Volatile
     private var started = false
 
@@ -188,6 +251,11 @@ class AppGraph(
         appScope.launch(dispatchers.io) {
             try {
                 retentionPurger.purge()
+            } catch (e: Exception) {
+                crashReporter.recordNonFatal(e, CrashSite.PURGE)
+            }
+            try {
+                recentPlaces.purgeExpired() // recent destinations follow ride data's 24 h retention
             } catch (e: Exception) {
                 crashReporter.recordNonFatal(e, CrashSite.PURGE)
             }

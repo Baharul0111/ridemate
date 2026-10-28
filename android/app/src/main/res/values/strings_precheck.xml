@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Pre-session check (app.ridemate.precheck): one fix-it card per result. Every body says what to do next. -->
+<resources>
+    <string name="precheck_severity_blocking">Fix this to compare</string>
+    <string name="precheck_severity_warning">Warning</string>
+    <string name="precheck_severity_info">Note</string>
+
+    <string name="precheck_listener_off_title">Turn on notification access</string>
+    <string name="precheck_listener_off_body">RideMate can\'t see Uber, Ola or Rapido notifications, so it wouldn\'t notice when a driver accepts or a booking is cancelled. Turn on notification access for RideMate, then come back.</string>
+    <string name="precheck_listener_silent_title">RideMate\'s ride guardian isn\'t connected</string>
+    <string name="precheck_listener_silent_body">Android disconnected RideMate from your notifications. Open notification access, switch RideMate off and on again, then come back.</string>
+    <string name="precheck_no_app_title">No ride app found</string>
+    <string name="precheck_no_app_body">Uber, Ola and Rapido aren\'t installed on this phone. Try the demo to see how RideMate works, or install a ride app.</string>
+    <string name="precheck_none_selected_title">Pick a ride app</string>
+    <string name="precheck_none_selected_body">Choose at least one installed app to compare.</string>
+    <string name="precheck_notifications_title">Notifications are off</string>
+    <string name="precheck_notifications_body">RideMate can\'t remind you to cancel extra bookings or ask you to open the next app. Turn on notifications for RideMate.</string>
+    <string name="precheck_overlay_title">Floating button is off</string>
+    <string name="precheck_overlay_body">RideMate can\'t show its floating button over the ride apps. Allow \"Display over other apps\", or use the RideMate notification instead.</string>
+    <string name="precheck_battery_title">Battery saving may delay reminders</string>
+    <string name="precheck_battery_body">Let RideMate run without battery limits so cancel reminders arrive on time.</string>
+    <string name="precheck_offline_title">You\'re offline</string>
+    <string name="precheck_offline_body">RideMate can still open the apps and watch your rides. Type the prices yourself, or connect to the internet to read them automatically.</string>
+    <string name="precheck_location_title">Pickup is the address you typed</string>
+    <string name="precheck_location_body">Location is off for RideMate, so it uses the pickup you typed. Check it\'s right, or allow location.</string>
+    <string name="precheck_no_fares_title">No prices found on this screen</string>
+    <string name="precheck_no_fares_body">Open the screen that lists the prices and read the fares again, or type the price yourself.</string>
+    <string name="precheck_no_ondc_title">No rides on the open network</string>
+    <string name="precheck_no_ondc_body">The open network has no rides for this trip right now. Carry on with the other apps.</string>
+
+    <string name="precheck_fix_notification_access">Open notification access</string>
+    <string name="precheck_fix_overlay">Allow floating button</string>
+    <string name="precheck_fix_battery">Remove battery limits</string>
+    <string name="precheck_fix_notifications">Turn on notifications</string>
+    <string name="precheck_fix_internet">Internet settings</string>
+    <string name="precheck_fix_location">Allow location</string>
+    <string name="precheck_fix_demo">Try the demo</string>
+    <string name="precheck_fix_choose_apps">Choose apps</string>
+    <string name="precheck_fix_retry_read">Read fares again</string>
+    <string name="precheck_fix_type_price">Type the price</string>
+    <string name="precheck_fix_without_ondc">Continue without the open network</string>
+
+    <string name="precheck_fix_description">%1$s: %2$s</string>
+    <string name="precheck_settings_missing">This phone has no such settings screen. Open Settings, find RideMate and change it there.</string>
+</resources>

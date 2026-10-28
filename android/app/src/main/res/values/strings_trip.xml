@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Trip input (app.ridemate.trip): pickup, drop, voice, apps, vehicles, Compare. -->
+<resources>
+    <string name="trip_title">Where are you going?</string>
+
+    <!-- Pickup -->
+    <string name="trip_pickup_heading">Pickup</string>
+    <string name="trip_current_location">Current location</string>
+    <string name="trip_pickup_locating">Finding where you are…</string>
+    <string name="trip_pickup_permission">Allow location so RideMate can use where you are as the pickup. It\'s only used while you\'re on this screen.</string>
+    <string name="trip_pickup_allow">Allow location</string>
+    <string name="trip_pickup_type">Type pickup</string>
+    <string name="trip_pickup_denied">Location is off for RideMate. Type your pickup address.</string>
+    <string name="trip_pickup_unavailable">Couldn\'t find where you are. Turn on location, or type your pickup address.</string>
+    <string name="trip_pickup_field">Pickup address</string>
+    <string name="trip_pickup_change">Change</string>
+    <string name="trip_pickup_change_description">Change pickup</string>
+    <string name="trip_pickup_use_location">Use my location</string>
+    <string name="trip_pickup_current_label">Current location: %1$s</string>
+    <string name="trip_pickup_summary_description">Pickup: %1$s</string>
+
+    <!-- Drop -->
+    <string name="trip_drop_heading">Drop</string>
+    <string name="trip_drop_field">Drop address</string>
+    <string name="trip_drop_hint">Type a place, area or address</string>
+    <string name="trip_drop_change">Change</string>
+    <string name="trip_drop_change_description">Change drop</string>
+    <string name="trip_drop_summary_description">Drop: %1$s</string>
+    <string name="trip_drop_no_pin">This address has no map pin, so the apps open without the route. Paste the drop in each app.</string>
+    <string name="trip_view_on_map">View on map</string>
+    <string name="trip_view_on_map_description">View %1$s on the map</string>
+
+    <string name="trip_confirm_heading">Is this the right place?</string>
+    <string name="trip_confirm_yes">Yes, go here</string>
+    <string name="trip_confirm_yes_description">Confirm drop %1$s</string>
+    <string name="trip_confirm_other">Pick another</string>
+    <string name="trip_confirm_typed_note">RideMate couldn\'t find this address on the map. The apps will open without the route, and you can paste the drop in each one.</string>
+
+    <string name="trip_searching">Searching…</string>
+    <string name="trip_no_results">No places found for \"%1$s\". Check the spelling, or use it as typed.</string>
+    <string name="trip_geocoder_unavailable">Address search isn\'t available on this phone. Use the address as you typed it; the apps will open without the route.</string>
+    <string name="trip_search_failed">Couldn\'t search right now. Check your connection and try again, or use the address as typed.</string>
+    <string name="trip_retry">Try again</string>
+    <string name="trip_use_as_typed">Use \"%1$s\"</string>
+    <string name="trip_use_as_typed_description">Use %1$s as the address, as typed</string>
+    <string name="trip_suggestion_description">Choose %1$s</string>
+    <string name="trip_recent_heading">Recent</string>
+    <string name="trip_choices_heading">Which one did you mean?</string>
+
+    <!-- Voice -->
+    <string name="trip_voice_start">Say your destination</string>
+    <string name="trip_voice_stop">Stop listening</string>
+    <string name="trip_voice_language">Voice language: %1$s</string>
+    <string name="trip_voice_language_description">Change voice language, now %1$s</string>
+    <string name="trip_voice_listening">Listening in %1$s… say where you\'re going.</string>
+    <string name="trip_voice_heard">Heard: \"%1$s\"</string>
+    <string name="trip_voice_matching">Finding \"%1$s\"…</string>
+    <string name="trip_voice_lang_en">English</string>
+    <string name="trip_voice_lang_hi">Hindi</string>
+    <string name="trip_voice_lang_bn">Bengali</string>
+    <string name="trip_voice_lang_as">Assamese</string>
+
+    <!-- Notices (each says what to do next) -->
+    <string name="trip_notice_dismiss">Dismiss message</string>
+    <string name="trip_voice_no_match">Didn\'t catch that. Tap the mic and say the place again, or type it.</string>
+    <string name="trip_voice_language_unsupported">Voice typing in %1$s isn\'t available on this phone. Try another language, or type the address.</string>
+    <string name="trip_voice_network">Voice typing needs a connection right now. Type the address instead.</string>
+    <string name="trip_voice_busy">Voice typing is busy. Wait a moment and tap the mic again.</string>
+    <string name="trip_voice_unavailable">Voice typing isn\'t available on this phone. Type the address instead.</string>
+    <string name="trip_voice_failed">Voice typing stopped. Tap the mic to try again, or type the address.</string>
+    <string name="trip_mic_denied">RideMate needs the microphone for voice. Allow it in Settings, or type the address.</string>
+    <string name="trip_nothing_found">No places found for \"%1$s\". Try saying it differently, or type it.</string>
+    <string name="trip_pick_from_list">Which of these did you mean? Tap one to check it.</string>
+    <string name="trip_pick_ai_paused">Automatic matching resumes at %1$s (IST). Pick your destination from the list.</string>
+    <string name="trip_pick_ai_unavailable">Couldn\'t match it automatically. Pick your destination from the list.</string>
+    <string name="trip_lookup_failed">Couldn\'t look up that place. Check your connection and try again, or use it as typed.</string>
+    <string name="trip_no_maps_app">No maps app found on this phone. Install one to see the place on a map.</string>
+
+    <!-- Apps, vehicles, ONDC -->
+    <string name="trip_apps_heading">Apps to compare</string>
+    <string name="trip_app_not_installed">%1$s · not installed</string>
+    <string name="trip_no_apps">Uber, Ola and Rapido aren\'t installed on this phone. Try the demo to see how RideMate works.</string>
+    <string name="trip_ondc">Open network (ONDC) · demo seller</string>
+    <string name="trip_ondc_needs_pins">The open network needs a map pin for both pickup and drop. Pick both from the suggestions to include it.</string>
+    <string name="trip_vehicles_heading">Vehicle types</string>
+    <string name="trip_vehicle_bike">Bike</string>
+    <string name="trip_vehicle_auto">Auto</string>
+    <string name="trip_vehicle_cab">Cab</string>
+
+    <!-- Compare -->
+    <string name="trip_compare">Compare prices</string>
+    <string name="trip_checking">Checking RideMate is ready…</string>
+    <string name="trip_continue_anyway">Continue anyway</string>
+    <string name="trip_check_again">Check again</string>
+    <string name="trip_fix_first">Fix the items above, then tap Check again.</string>
+    <string name="trip_need_pickup">Set your pickup to continue.</string>
+    <string name="trip_need_drop">Choose and confirm your drop address to continue.</string>
+    <string name="trip_need_confirm">Confirm the drop address above to continue.</string>
+    <string name="trip_need_app">Pick at least one app to continue.</string>
+    <string name="trip_need_vehicle">Pick at least one vehicle type to continue.</string>
+    <string name="trip_try_demo">Try the demo</string>
+</resources>

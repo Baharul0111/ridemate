@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- AppLauncher (app.ridemate.launch): opening ride apps, the heads-up fallback and the "Paste drop" chip. -->
+<resources>
+    <string name="launch_channel_name">Open ride apps</string>
+    <string name="launch_channel_description">Asks you to tap when RideMate needs to open the next ride app for you.</string>
+    <string name="launch_heads_up_title">Open %1$s</string>
+    <string name="launch_heads_up_text">Tap to open %1$s for your trip to %2$s.</string>
+    <string name="launch_heads_up_action">Open %1$s</string>
+
+    <string name="launch_paste_chip">Paste drop</string>
+    <string name="launch_paste_chip_description">Drop address copied: %1$s. In %2$s, long-press the drop box and tap Paste.</string>
+    <string name="launch_paste_copied">Drop address copied. In %1$s, long-press the drop box and tap Paste.</string>
+    <string name="launch_opened_paste_hint">Your drop address is copied. In %1$s, long-press the drop box and tap Paste.</string>
+
+    <string name="launch_tap_notification">Tap the RideMate notification to open %1$s.</string>
+    <string name="launch_blocked">RideMate can\'t open %1$s right now. Open %1$s from your home screen, or turn on RideMate\'s notifications so it can ask you.</string>
+    <string name="launch_not_installed">%1$s isn\'t installed on this phone. Pick another app, or try the demo.</string>
+    <string name="launch_open_failed">Couldn\'t open %1$s. Open it from your home screen.</string>
+</resources>

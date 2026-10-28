@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="trip_title">आप कहाँ जा रहे हैं?</string>
+
+    <!-- Pickup -->
+    <string name="trip_pickup_heading">पिकअप</string>
+    <string name="trip_current_location">आपकी मौजूदा जगह</string>
+    <string name="trip_pickup_locating">आपकी जगह ढूँढ रहे हैं…</string>
+    <string name="trip_pickup_permission">लोकेशन की अनुमति दें ताकि RideMate आपकी मौजूदा जगह को पिकअप बना सके। यह सिर्फ़ तब इस्तेमाल होती है जब आप इस स्क्रीन पर हों।</string>
+    <string name="trip_pickup_allow">लोकेशन की अनुमति दें</string>
+    <string name="trip_pickup_type">पिकअप लिखें</string>
+    <string name="trip_pickup_denied">RideMate के लिए लोकेशन बंद है। अपना पिकअप पता लिखें।</string>
+    <string name="trip_pickup_unavailable">आपकी जगह नहीं मिली। लोकेशन चालू करें, या अपना पिकअप पता लिखें।</string>
+    <string name="trip_pickup_field">पिकअप पता</string>
+    <string name="trip_pickup_change">बदलें</string>
+    <string name="trip_pickup_change_description">पिकअप बदलें</string>
+    <string name="trip_pickup_use_location">मेरी लोकेशन इस्तेमाल करें</string>
+    <string name="trip_pickup_current_label">मौजूदा जगह: %1$s</string>
+    <string name="trip_pickup_summary_description">पिकअप: %1$s</string>
+
+    <!-- Drop -->
+    <string name="trip_drop_heading">ड्रॉप</string>
+    <string name="trip_drop_field">ड्रॉप पता</string>
+    <string name="trip_drop_hint">कोई जगह, इलाका या पता लिखें</string>
+    <string name="trip_drop_change">बदलें</string>
+    <string name="trip_drop_change_description">ड्रॉप बदलें</string>
+    <string name="trip_drop_summary_description">ड्रॉप: %1$s</string>
+    <string name="trip_drop_no_pin">इस पते का मैप पिन नहीं है, इसलिए ऐप बिना रास्ते के खुलेंगे। हर ऐप में ड्रॉप पेस्ट करें।</string>
+    <string name="trip_view_on_map">मैप पर देखें</string>
+    <string name="trip_view_on_map_description">%1$s को मैप पर देखें</string>
+
+    <string name="trip_confirm_heading">क्या यही सही जगह है?</string>
+    <string name="trip_confirm_yes">हाँ, यहीं जाना है</string>
+    <string name="trip_confirm_yes_description">ड्रॉप %1$s पक्का करें</string>
+    <string name="trip_confirm_other">दूसरी चुनें</string>
+    <string name="trip_confirm_typed_note">RideMate को यह पता मैप पर नहीं मिला। ऐप बिना रास्ते के खुलेंगे, और आप हर ऐप में ड्रॉप पेस्ट कर सकते हैं।</string>
+
+    <string name="trip_searching">खोज रहे हैं…</string>
+    <string name="trip_no_results">\"%1$s\" के लिए कोई जगह नहीं मिली। स्पेलिंग जाँचें, या जैसा लिखा है वैसा ही इस्तेमाल करें।</string>
+    <string name="trip_geocoder_unavailable">इस फ़ोन पर पता खोजने की सुविधा नहीं है। पता जैसा लिखा है वैसा ही इस्तेमाल करें; ऐप बिना रास्ते के खुलेंगे।</string>
+    <string name="trip_search_failed">अभी खोज नहीं हो सकी। अपना कनेक्शन जाँचें और फिर कोशिश करें, या पता जैसा लिखा है वैसा ही इस्तेमाल करें।</string>
+    <string name="trip_retry">फिर कोशिश करें</string>
+    <string name="trip_use_as_typed">\"%1$s\" इस्तेमाल करें</string>
+    <string name="trip_use_as_typed_description">%1$s को लिखे हुए पते की तरह इस्तेमाल करें</string>
+    <string name="trip_suggestion_description">%1$s चुनें</string>
+    <string name="trip_recent_heading">हाल के</string>
+    <string name="trip_choices_heading">आपका मतलब इनमें से कौन-सी जगह थी?</string>
+
+    <!-- Voice -->
+    <string name="trip_voice_start">अपनी मंज़िल बोलें</string>
+    <string name="trip_voice_stop">सुनना बंद करें</string>
+    <string name="trip_voice_language">आवाज़ की भाषा: %1$s</string>
+    <string name="trip_voice_language_description">आवाज़ की भाषा बदलें, अभी %1$s है</string>
+    <string name="trip_voice_listening">%1$s में सुन रहे हैं… बोलें कि आप कहाँ जा रहे हैं।</string>
+    <string name="trip_voice_heard">सुना: \"%1$s\"</string>
+    <string name="trip_voice_matching">\"%1$s\" ढूँढ रहे हैं…</string>
+    <string name="trip_voice_lang_en">अंग्रेज़ी</string>
+    <string name="trip_voice_lang_hi">हिन्दी</string>
+    <string name="trip_voice_lang_bn">बांग्ला</string>
+    <string name="trip_voice_lang_as">असमिया</string>
+
+    <!-- Notices -->
+    <string name="trip_notice_dismiss">संदेश हटाएँ</string>
+    <string name="trip_voice_no_match">समझ नहीं आया। माइक पर टैप करके जगह फिर से बोलें, या लिखें।</string>
+    <string name="trip_voice_language_unsupported">इस फ़ोन पर %1$s में आवाज़ से लिखना उपलब्ध नहीं है। कोई दूसरी भाषा आज़माएँ, या पता लिखें।</string>
+    <string name="trip_voice_network">अभी आवाज़ से लिखने के लिए इंटरनेट चाहिए। इसकी जगह पता लिखें।</string>
+    <string name="trip_voice_busy">आवाज़ से लिखना अभी व्यस्त है। थोड़ा रुककर माइक पर फिर टैप करें।</string>
+    <string name="trip_voice_unavailable">इस फ़ोन पर आवाज़ से लिखना उपलब्ध नहीं है। इसकी जगह पता लिखें।</string>
+    <string name="trip_voice_failed">आवाज़ से लिखना रुक गया। फिर कोशिश करने के लिए माइक पर टैप करें, या पता लिखें।</string>
+    <string name="trip_mic_denied">आवाज़ के लिए RideMate को माइक्रोफ़ोन चाहिए। Settings में अनुमति दें, या पता लिखें।</string>
+    <string name="trip_nothing_found">\"%1$s\" के लिए कोई जगह नहीं मिली। अलग तरह से बोलकर देखें, या लिखें।</string>
+    <string name="trip_pick_from_list">आपका मतलब इनमें से कौन-सी जगह थी? जाँचने के लिए किसी एक पर टैप करें।</string>
+    <string name="trip_pick_ai_paused">अपने आप मिलान %1$s (IST) पर फिर शुरू होगा। सूची में से अपनी मंज़िल चुनें।</string>
+    <string name="trip_pick_ai_unavailable">अपने आप मिलान नहीं हो सका। सूची में से अपनी मंज़िल चुनें।</string>
+    <string name="trip_lookup_failed">वह जगह नहीं खोजी जा सकी। अपना कनेक्शन जाँचें और फिर कोशिश करें, या जैसा लिखा है वैसा ही इस्तेमाल करें।</string>
+    <string name="trip_no_maps_app">इस फ़ोन पर कोई मैप ऐप नहीं मिला। जगह मैप पर देखने के लिए कोई मैप ऐप इंस्टॉल करें।</string>
+
+    <!-- Apps, vehicles, ONDC -->
+    <string name="trip_apps_heading">तुलना के लिए ऐप</string>
+    <string name="trip_app_not_installed">%1$s · इंस्टॉल नहीं है</string>
+    <string name="trip_no_apps">इस फ़ोन पर Uber, Ola और Rapido इंस्टॉल नहीं हैं। RideMate कैसे काम करता है यह देखने के लिए डेमो आज़माएँ।</string>
+    <string name="trip_ondc">ओपन नेटवर्क (ONDC) · डेमो विक्रेता</string>
+    <string name="trip_ondc_needs_pins">ओपन नेटवर्क के लिए पिकअप और ड्रॉप दोनों का मैप पिन चाहिए। इसे शामिल करने के लिए दोनों सुझावों में से चुनें।</string>
+    <string name="trip_vehicles_heading">गाड़ी का प्रकार</string>
+    <string name="trip_vehicle_bike">बाइक</string>
+    <string name="trip_vehicle_auto">ऑटो</string>
+    <string name="trip_vehicle_cab">कैब</string>
+
+    <!-- Compare -->
+    <string name="trip_compare">किराए की तुलना करें</string>
+    <string name="trip_checking">जाँच रहे हैं कि RideMate तैयार है…</string>
+    <string name="trip_continue_anyway">फिर भी आगे बढ़ें</string>
+    <string name="trip_check_again">फिर से जाँचें</string>
+    <string name="trip_fix_first">ऊपर दी गई चीज़ें ठीक करें, फिर \"फिर से जाँचें\" पर टैप करें।</string>
+    <string name="trip_need_pickup">आगे बढ़ने के लिए अपना पिकअप चुनें।</string>
+    <string name="trip_need_drop">आगे बढ़ने के लिए अपना ड्रॉप पता चुनें और पक्का करें।</string>
+    <string name="trip_need_confirm">आगे बढ़ने के लिए ऊपर दिया ड्रॉप पता पक्का करें।</string>
+    <string name="trip_need_app">आगे बढ़ने के लिए कम से कम एक ऐप चुनें।</string>
+    <string name="trip_need_vehicle">आगे बढ़ने के लिए कम से कम एक गाड़ी का प्रकार चुनें।</string>
+    <string name="trip_try_demo">डेमो आज़माएँ</string>
+</resources>
