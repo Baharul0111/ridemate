@@ -66,7 +66,9 @@ android {
 
     sourceSets {
         // Room schema JSON doubles as test assets for MigrationTestHelper (Robolectric + device).
-        getByName("test").assets.srcDirs(files("$projectDir/schemas"))
+        // Robolectric only sees the variant's merged assets (AGP does not package src/test assets for local tests),
+        // so the schemas are debug-variant assets too; release APKs never contain them.
+        getByName("debug").assets.srcDirs(files("$projectDir/schemas"))
         getByName("androidTest").assets.srcDirs(files("$projectDir/schemas"))
     }
 

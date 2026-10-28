@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="platform_ai_paused_until">AI से पढ़ना %1$s (IST) पर फिर शुरू होगा। तब तक आप किराया खुद लिख सकते हैं।</string>
+    <string name="platform_ai_paused">AI से पढ़ना अभी रुका हुआ है। तब तक आप किराया खुद लिख सकते हैं।</string>
+    <string name="platform_sign_in_needed">AI से पढ़ने के लिए फिर से साइन इन करें। तब तक आप किराया खुद लिख सकते हैं।</string>
+    <string name="platform_google_required">AI से पढ़ने के लिए Google साइन-इन ज़रूरी है। तब तक आप किराया खुद लिख सकते हैं।</string>
+    <string name="platform_rate_limited">इस नेटवर्क से बहुत ज़्यादा अनुरोध आए हैं। एक मिनट बाद फिर कोशिश करें, या किराया खुद लिखें।</string>
+    <string name="platform_offline">आप ऑफ़लाइन हैं। किराया खुद लिखें, या कनेक्ट होने पर फिर कोशिश करें।</string>
+    <string name="platform_timeout">इसमें बहुत समय लग गया। फिर कोशिश करें, या किराया खुद लिखें।</string>
+    <string name="platform_not_configured">RideMate का सर्वर अभी सेट नहीं है। तब तक आप किराया खुद लिख सकते हैं।</string>
+    <string name="platform_server_error">RideMate के सर्वर पर कुछ गड़बड़ हुई। फिर कोशिश करें, या किराया खुद लिखें।</string>
+    <string name="platform_too_large">यह स्क्रीनशॉट पढ़ने के लिए बहुत बड़ा है। फिर कोशिश करें।</string>
+
+    <string name="platform_storage_full">आपके फ़ोन की स्टोरेज भर गई है। RideMate चलते रहने तक रिमाइंडर काम करेंगे; रीस्टार्ट के बाद भी चलें, इसके लिए जगह खाली करें।</string>
+    <string name="platform_storage_write_failed">RideMate स्टोरेज में सेव नहीं कर सका। RideMate चलते रहने तक रिमाइंडर काम करेंगे।</string>
+
+    <string name="platform_update_available">अपडेट उपलब्ध है: वर्ज़न %1$s</string>
+    <string name="platform_update_forced">RideMate का यह वर्ज़न अब समर्थित नहीं है। कृपया अपडेट इंस्टॉल करें।</string>
+    <string name="platform_update_checksum">SHA-256: %1$s</string>
+
+    <string name="platform_erase_done">आपका RideMate डेटा और अकाउंट मिटा दिया गया।</string>
+    <string name="platform_erase_waiting">इस फ़ोन का आपका डेटा मिटा दिया गया। RideMate जैसे ही अपने सर्वर तक पहुँचेगा, सर्वर का डेटा और अकाउंट भी मिटा दिया जाएगा।</string>
+    <string name="platform_erase_reauth">अकाउंट पूरी तरह मिटाने के लिए एक बार फिर Google से साइन इन करें।</string>
+    <string name="platform_erase_failed">हम आपका अकाउंट पूरी तरह नहीं मिटा सके। %1$s पर ईमेल करें, हम 30 दिनों में मिटा देंगे।</string>
+
+    <string name="platform_my_data_sessions">किराया तुलनाएँ</string>
+    <string name="platform_my_data_legs">ट्रैक की गई राइड बुकिंग</string>
+    <string name="platform_my_data_quotes">देखे गए किराए</string>
+    <string name="platform_my_data_evidence">कैंसिल होने के सबूत</string>
+    <string name="platform_my_data_pending_actions">रिमाइंडर और जाँचें</string>
+    <string name="platform_my_data_fingerprints">राइड नोटिफ़िकेशन चिह्न</string>
+    <string name="platform_my_data_classifier">नोटिफ़िकेशन की पढ़ाई</string>
+    <string name="platform_my_data_snapshots">सहेजी गई गार्डियन स्थितियाँ</string>
+    <string name="platform_my_data_recorder">डेवलपर रिकॉर्डर प्रविष्टियाँ</string>
+    <string name="platform_my_data_signed_in_as">Google से %1$s के रूप में साइन इन</string>
+    <string name="platform_my_data_anonymous">मैनुअल मोड (Google साइन-इन नहीं)</string>
+    <string name="platform_my_data_signed_out">साइन इन नहीं</string>
+    <string name="platform_my_data_last_session">पिछली तुलना: %1$s</string>
+    <string name="platform_my_data_config">सेटिंग वर्ज़न %1$s, %2$s पर लाया गया</string>
+    <string name="platform_my_data_config_bundled">बिल्ट-इन सेटिंग इस्तेमाल हो रही हैं</string>
+    <string name="platform_my_data_erase_pending">सर्वर से मिटाना बाकी है</string>
+</resources>
