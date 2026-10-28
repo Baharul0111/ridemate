@@ -1,0 +1,109 @@
+# Weekly, grouped dependency updates. Gradle bumps also need tools/update_dependency_verification.sh run on
+# the PR branch (dependency verification fails CI until the new checksums are reviewed and committed).
+# Backend uv bumps also need backend/requirements.lock regenerated on the PR branch (backend.yml checks it):
+#   cd backend && uv export --frozen --no-dev --no-emit-project --format requirements.txt -o requirements.lock
+# The backend base image (python:3.12-slim pinned by digest in backend/modal_app.py) is not visible to
+# Dependabot; .github/workflows/base-image.yml flags it monthly instead (C4).
+version: 2
+updates:
+  - package-ecosystem: gradle
+    directory: /android
+    schedule:
+      interval: weekly
+      day: monday
+      time: "04:00"
+      timezone: Asia/Kolkata
+    open-pull-requests-limit: 5
+    labels: [dependencies, android]
+    cooldown:
+      default-days: 5
+    groups:
+      kotlin:
+        patterns:
+          - "org.jetbrains.kotlin*"
+          - "com.google.devtools.ksp*"
+          - "org.jetbrains.kotlinx*"
+      androidx:
+        patterns:
+          - "androidx.*"
+      google:
+        patterns:
+          - "com.google.firebase*"
+          - "com.google.gms*"
+          - "com.google.android.gms*"
+          - "com.google.mlkit*"
+          - "com.google.android.libraries*"
+          - "com.android.tools.build*"
+          - "com.android.application"
+      test:
+        patterns:
+          - "junit*"
+          - "org.robolectric*"
+      other:
+        patterns:
+          - "*"
+
+  - package-ecosystem: uv
+    directory: /backend
+    schedule:
+      interval: weekly
+      day: monday
+      time: "04:00"
+      timezone: Asia/Kolkata
+    open-pull-requests-limit: 5
+    labels: [dependencies, backend]
+    cooldown:
+      default-days: 5
+    groups:
+      backend-runtime:
+        dependency-type: production
+      backend-dev:
+        dependency-type: development
+
+  - package-ecosystem: uv
+    directory: /eval
+    schedule:
+      interval: weekly
+      day: monday
+      time: "04:00"
+      timezone: Asia/Kolkata
+    open-pull-requests-limit: 3
+    labels: [dependencies, eval]
+    cooldown:
+      default-days: 5
+    groups:
+      eval:
+        patterns:
+          - "*"
+
+  - package-ecosystem: npm
+    directory: /firebase/tests
+    schedule:
+      interval: weekly
+      day: monday
+      time: "04:00"
+      timezone: Asia/Kolkata
+    open-pull-requests-limit: 3
+    labels: [dependencies, firebase]
+    cooldown:
+      default-days: 5
+    groups:
+      firebase-tests:
+        patterns:
+          - "*"
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "04:00"
+      timezone: Asia/Kolkata
+    open-pull-requests-limit: 3
+    labels: [dependencies, ci]
+    cooldown:
+      default-days: 5
+    groups:
+      actions:
+        patterns:
+          - "*"

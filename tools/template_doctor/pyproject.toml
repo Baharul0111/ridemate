@@ -1,0 +1,34 @@
+[project]
+name = "ridemate-template-doctor"
+version = "1.0.0"
+description = "Owner tool: proposes RE2 notification templates and fare-parser fixes from masked Recorder exports and golden captures (human-approved PRs)."
+requires-python = ">=3.12,<3.13"
+license = { text = "MIT" }
+dependencies = [
+    "google-re2>=1.1",
+    "jsonschema>=4.23",
+    "ridemate-api",
+]
+
+[tool.uv]
+package = false
+
+[tool.uv.sources]
+ridemate-api = { path = "../../backend", editable = true }
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+    "ruff>=0.7",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+filterwarnings = ["ignore::DeprecationWarning"]
+
+[tool.ruff]
+line-length = 110
+target-version = "py312"

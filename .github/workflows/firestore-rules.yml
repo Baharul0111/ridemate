@@ -1,0 +1,73 @@
+# Firestore security rules (A2: deny by default, owner-only reads on ondc_*, no client writes) tested on the
+# local emulator. A "demo-" project id keeps the emulator fully offline: no real project, no credentials.
+name: Firestore rules
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "firebase/**"
+      - ".github/workflows/firestore-rules.yml"
+  pull_request:
+    paths:
+      - "firebase/**"
+      - ".github/workflows/firestore-rules.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  emulator-tests:
+    name: Rules tests on the Firestore emulator
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Rules test project is present
+        run: |
+          for f in firebase/tests/package.json firebase/tests/package-lock.json; do
+            [[ -f "$f" ]] || { echo "::error file=$f::Missing: the rules tests need $f (npm ci uses the lock file)."; exit 1; }
+          done
+          # The emulator CLI must come from the lock file (pinned), never an ad-hoc npx download.
+          grep -q '"node_modules/firebase-tools"' firebase/tests/package-lock.json || {
+            echo "::error file=firebase/tests/package.json::Add firebase-tools to devDependencies (pinned via package-lock.json)."
+            exit 1
+          }
+
+      - name: Set up JDK
+        uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          # JDK 17 for parity with the Android build, plus 21 (last = default on PATH): current firebase-tools
+          # refuses to start the emulators on Java < 21 (MIN_SUPPORTED_JAVA_MAJOR_VERSION = 21).
+          java-version: |
+            17
+            21
+
+      - name: Set up Node 22
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: firebase/tests/package-lock.json
+
+      - name: Install
+        working-directory: firebase/tests
+        run: npm ci
+
+      - name: Run rules tests on the emulator
+        working-directory: firebase/tests
+        run: npx --no-install firebase emulators:exec --only firestore --project demo-ridemate "npm test"

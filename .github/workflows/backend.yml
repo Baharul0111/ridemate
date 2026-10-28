@@ -1,0 +1,83 @@
+# Backend (ridemate-api): pytest, ruff, bandit. Model and Firestore calls are faked in tests; no secrets.
+name: Backend
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - "config/remote_config/**" # bundled Remote Config defaults the backend loads (remote_config.py)
+      - ".github/workflows/backend.yml"
+  pull_request:
+    paths:
+      - "backend/**"
+      - "config/remote_config/**" # bundled Remote Config defaults the backend loads (remote_config.py)
+      - ".github/workflows/backend.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+    working-directory: backend
+
+jobs:
+  test:
+    name: pytest, ruff, bandit
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: "0.12.3"
+          python-version: "3.12"
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+
+      - name: Lock file matches pyproject.toml
+        run: uv lock --check
+
+      - name: requirements.lock (installed into the Modal image) matches uv.lock
+        # modal_app.py installs backend/requirements.lock with --require-hashes; a uv.lock bump (e.g. from
+        # Dependabot) must regenerate it, or the deployed image would run different versions than CI tested.
+        run: |
+          if [[ ! -f requirements.lock ]]; then
+            echo "requirements.lock not present; nothing to compare"
+            exit 0
+          fi
+          expected="$(mktemp)"
+          uv export --frozen --no-dev --no-emit-project --no-header --format requirements.txt -q > "$expected"
+          if ! diff -u <(grep -v '^#' requirements.lock) "$expected"; then
+            echo "::error file=backend/requirements.lock::Out of date with uv.lock. Regenerate in backend/: uv export --frozen --no-dev --no-emit-project --format requirements.txt -o requirements.lock"
+            exit 1
+          fi
+
+      - name: Install (frozen lock)
+        id: install
+        if: ${{ !cancelled() }} # a stale lock check above still fails the job, but the tests below run
+        run: uv sync --frozen
+
+      # pytest, ruff and bandit each run whenever the install worked, so one run reports every finding.
+      - name: pytest
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: uv run --frozen pytest -q
+
+      - name: ruff
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: uv run --frozen ruff check .
+
+      - name: bandit
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: uv run --frozen bandit -c pyproject.toml -r ridemate_api

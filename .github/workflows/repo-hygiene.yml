@@ -1,0 +1,52 @@
+# Runs on every push and pull request: no secrets tracked by git, and the CI/release tooling's own tests.
+name: Repo hygiene
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  secrets:
+    name: No secrets tracked
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Scan tracked files
+        run: bash tools/ci/check_no_secrets.sh
+
+  tooling:
+    name: Release and CI tooling tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Shell syntax and shellcheck
+        run: |
+          mapfile -t scripts < <(git ls-files 'tools/*.sh' 'tools/**/*.sh')
+          for s in "${scripts[@]}"; do bash -n "$s"; done
+          shellcheck --severity=warning "${scripts[@]}"
+
+      - name: Unit tests (stdlib only)
+        run: python3 -m unittest discover -s tools/ci/tests -v

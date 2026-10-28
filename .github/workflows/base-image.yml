@@ -1,0 +1,54 @@
+# Monthly base-image rebuild trigger (architecture §4.18 C4). backend/modal_app.py pins python:3.12-slim by
+# digest; the scheduled run fails (GitHub emails the owner) once Docker Hub has a newer build of that tag, so
+# the owner updates the pin and redeploys. Read-only registry lookups; no secrets; CI never deploys.
+name: Base image freshness
+
+on:
+  schedule:
+    - cron: "17 5 1 * *" # monthly, 1st at 05:17 UTC
+  push:
+    branches: [main]
+    paths:
+      - "backend/modal_app.py"
+      - "tools/ci/check_base_image.py"
+      - ".github/workflows/base-image.yml"
+  pull_request:
+    paths:
+      - "backend/modal_app.py"
+      - "tools/ci/check_base_image.py"
+      - ".github/workflows/base-image.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  check:
+    name: Pinned base image is current
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Compare the pinned digest with Docker Hub
+        # On code changes a stale pin is only a warning (the image must still be digest-pinned); the monthly
+        # and manual runs fail on it, which is the rebuild reminder.
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          if [[ "$EVENT_NAME" == "push" || "$EVENT_NAME" == "pull_request" ]]; then
+            python3 tools/ci/check_base_image.py --allow-stale
+          else
+            python3 tools/ci/check_base_image.py
+          fi
