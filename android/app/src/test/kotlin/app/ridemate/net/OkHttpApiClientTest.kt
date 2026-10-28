@@ -507,9 +507,9 @@ class OkHttpApiClientTest {
     fun `phone deadlines follow the architecture`() {
         val t = ApiTiming.PRODUCTION
         assertEquals(17_000, t.phoneDeadlineMs(Endpoint.READ_SCREEN))
-        assertEquals(11_000, t.phoneDeadlineMs(Endpoint.PARSE_NOTIFICATION))
-        assertEquals(11_000, t.phoneDeadlineMs(Endpoint.PLACE_PICK))
-        assertEquals(14_000, t.phoneDeadlineMs(Endpoint.POINT))
+        assertEquals(15_000, t.phoneDeadlineMs(Endpoint.PARSE_NOTIFICATION))
+        assertEquals(15_000, t.phoneDeadlineMs(Endpoint.PLACE_PICK))
+        assertEquals(17_000, t.phoneDeadlineMs(Endpoint.POINT))
         Endpoint.entries.filter { it.serverDeadlineMs == 5_000L }.forEach { assertEquals(10_000, t.phoneDeadlineMs(it)) }
         assertEquals(20_000, TapBudget.TOTAL_MS)
         assertEquals(1_000, t.jitterMinMs)

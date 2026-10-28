@@ -15,6 +15,9 @@ object ConfigKeys {
     const val AI_READER_ENABLED = "ai_reader_enabled"
     const val ONDC_ENABLED = "ondc_enabled"
     const val DEMO_ENABLED = "demo_enabled"
+
+    /** Whether `/v1/point` grounding ("Show me") is served (day-1 spike: true). */
+    const val POINT_SUPPORTED = "point_supported"
     const val MODEL_ROUTE = "model_route"
     const val LATEST_VERSION = "latest_version"
     const val MIN_SUPPORTED_VERSION = "min_supported_version"
@@ -44,6 +47,7 @@ object BuiltInDefaults {
         Provider.LIVE_APPS.forEach { put(ConfigKeys.readerEnabled(it), "true") }
         put(ConfigKeys.ONDC_ENABLED, "true")
         put(ConfigKeys.DEMO_ENABLED, "true")
+        put(ConfigKeys.POINT_SUPPORTED, "true")
         put(ConfigKeys.MODEL_ROUTE, """{"schema":"1.0","read":"modal_spark_open","parse":"modal_spark_open"}""")
         put(
             ConfigKeys.LATEST_VERSION,

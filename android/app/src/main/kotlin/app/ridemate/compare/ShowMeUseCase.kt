@@ -240,8 +240,8 @@ class ShowMeUseCase(
     }
 
     companion object {
-        /** Hard deadline of one tap: consent excluded, capture + OCR + masking + `/v1/point` (phone timeout 14 s). */
-        const val DEADLINE_MS: Long = 20_000
+        /** Hard deadline of one tap: consent excluded, capture + OCR + masking + `/v1/point` (phone timeout 17 s). */
+        const val DEADLINE_MS: Long = 22_000
     }
 }
 

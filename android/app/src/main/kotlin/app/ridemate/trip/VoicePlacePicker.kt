@@ -71,7 +71,7 @@ class VoicePlacePicker(
     }
 
     companion object {
-        /** The phone deadline for place-pick is 11 s (server 6 s + 5 s); this guard sits just above it. */
-        const val PICK_TIMEOUT_MS: Long = 12_000
+        /** The phone deadline for place-pick is 15 s (server 10 s + 5 s, day-1 spike); this guard sits just above it. */
+        const val PICK_TIMEOUT_MS: Long = 16_000
     }
 }

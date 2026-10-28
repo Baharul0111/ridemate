@@ -50,6 +50,10 @@
         <value>true</value>
     </entry>
     <entry>
+        <key>point_supported</key>
+        <value>true</value>
+    </entry>
+    <entry>
         <key>model_route</key>
         <value>{"schema":"1.0","read":"modal_spark_open","parse":"modal_spark_open"}</value>
     </entry>

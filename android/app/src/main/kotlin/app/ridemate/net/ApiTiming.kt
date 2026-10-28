@@ -25,9 +25,10 @@ enum class Endpoint(
 ) {
     READ_SCREEN("v1/read-screen", "POST", 12_000, usesTapBudget = true),
     REREAD("v1/reread", "POST", 12_000, usesTapBudget = true),
-    POINT("v1/point", "POST", 9_000),
-    PARSE_NOTIFICATION("v1/parse-notification", "POST", 6_000),
-    PLACE_PICK("v1/place-pick", "POST", 6_000),
+    // Day-1 spike (docs/spikes.md): reasoning tokens cannot be switched off, so these got longer server deadlines.
+    POINT("v1/point", "POST", 12_000),
+    PARSE_NOTIFICATION("v1/parse-notification", "POST", 10_000),
+    PLACE_PICK("v1/place-pick", "POST", 10_000),
     EVENT("v1/event", "POST", 5_000),
     ERASE("v1/erase", "POST", 5_000),
     CONFIG_CHECK("v1/config-check", "GET", 5_000),
@@ -61,7 +62,7 @@ data class ApiTiming(
 
     fun serverDeadlineMs(endpoint: Endpoint): Long = serverDeadlineOverridesMs[endpoint] ?: endpoint.serverDeadlineMs
 
-    /** read-screen 17 s alone (but it shares the 20 s tap budget), parse/place-pick 11 s, point 14 s, others 10 s. */
+    /** read-screen 17 s alone (but it shares the 20 s tap budget), parse/place-pick 15 s, point 17 s, others 10 s. */
     fun phoneDeadlineMs(endpoint: Endpoint): Long = serverDeadlineMs(endpoint) + phoneMarginMs
 
     companion object {
