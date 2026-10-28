@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Platform layer (net, auth, storage, update, erase, My data). Owned by app.ridemate.{net,data,update,privacy}. -->
+<resources>
+    <!-- API outcomes: every AI failure means "type the price" while the guardian keeps working. -->
+    <string name="platform_ai_paused_until">AI reading resumes at %1$s (IST). You can type the price meanwhile.</string>
+    <string name="platform_ai_paused">AI reading is paused for now. You can type the price meanwhile.</string>
+    <string name="platform_sign_in_needed">Sign in again to use AI reading. You can type the price meanwhile.</string>
+    <string name="platform_google_required">AI reading needs Google sign-in. You can type the price meanwhile.</string>
+    <string name="platform_rate_limited">Too many requests from this network. Try again in a minute, or type the price.</string>
+    <string name="platform_offline">You\'re offline. Type the price, or try again when you\'re connected.</string>
+    <string name="platform_timeout">That took too long. Try again, or type the price.</string>
+    <string name="platform_not_configured">RideMate\'s server isn\'t set up yet. You can type the price meanwhile.</string>
+    <string name="platform_server_error">Something went wrong on RideMate\'s server. Try again, or type the price.</string>
+    <string name="platform_too_large">That screenshot is too large to read. Try again.</string>
+
+    <!-- Storage (ActionOutbox fallback). -->
+    <string name="platform_storage_full">Your phone\'s storage is full. Reminders keep working while RideMate runs; free up space so they survive a restart.</string>
+    <string name="platform_storage_write_failed">RideMate couldn\'t save to storage. Reminders keep working while RideMate runs.</string>
+
+    <!-- Updates (F5). -->
+    <string name="platform_update_available">Update available: version %1$s</string>
+    <string name="platform_update_forced">This version of RideMate is no longer supported. Please install the update.</string>
+    <string name="platform_update_checksum">SHA-256: %1$s</string>
+
+    <!-- Erase (§4.11). -->
+    <string name="platform_erase_done">Your RideMate data and account were erased.</string>
+    <string name="platform_erase_waiting">Your data on this phone is erased. Your server data and account will be erased as soon as RideMate can reach its server.</string>
+    <string name="platform_erase_reauth">Sign in with Google once more to finish deleting your account.</string>
+    <string name="platform_erase_failed">We couldn\'t finish erasing your account. Email %1$s and we\'ll do it within 30 days.</string>
+
+    <!-- My data. -->
+    <string name="platform_my_data_sessions">Ride comparisons</string>
+    <string name="platform_my_data_legs">Ride app bookings tracked</string>
+    <string name="platform_my_data_quotes">Prices seen</string>
+    <string name="platform_my_data_evidence">Cancellation proofs</string>
+    <string name="platform_my_data_pending_actions">Reminders and checks</string>
+    <string name="platform_my_data_fingerprints">Ride notification markers</string>
+    <string name="platform_my_data_classifier">Notification readings</string>
+    <string name="platform_my_data_snapshots">Saved guardian states</string>
+    <string name="platform_my_data_recorder">Developer recorder entries</string>
+    <string name="platform_my_data_signed_in_as">Signed in with Google as %1$s</string>
+    <string name="platform_my_data_anonymous">Manual mode (no Google sign-in)</string>
+    <string name="platform_my_data_signed_out">Not signed in</string>
+    <string name="platform_my_data_last_session">Last comparison: %1$s</string>
+    <string name="platform_my_data_config">Settings version %1$s, fetched %2$s</string>
+    <string name="platform_my_data_config_bundled">Using built-in settings</string>
+    <string name="platform_my_data_erase_pending">Server erase pending</string>
+</resources>
