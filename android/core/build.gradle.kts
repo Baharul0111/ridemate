@@ -17,6 +17,14 @@ dependencies {
 
 tasks.test {
     // The accuracy and replay suites read fixtures from the repo's eval/ folder.
-    systemProperty("ridemate.repoRoot", rootProject.projectDir.parentFile.absolutePath)
+    val repoRoot = rootProject.projectDir.parentFile
+    systemProperty("ridemate.repoRoot", repoRoot.absolutePath)
+    // -PrequireFixtures=true turns a missing eval fixture into a failure instead of a skip (CI with fixtures).
+    systemProperty("ridemate.requireFixtures", (findProperty("requireFixtures") as String?) ?: "false")
+    // Declared as inputs so changed fixtures or bundled configs re-run the suites instead of hitting the cache.
+    inputs.files(fileTree(repoRoot.resolve("eval")) { include("**/*.json"); exclude("out/**", "private/**") })
+        .withPropertyName("evalFixtures").withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.files(fileTree(repoRoot.resolve("config/remote_config")) { include("*.json") })
+        .withPropertyName("bundledConfig").withPathSensitivity(PathSensitivity.RELATIVE)
     testLogging { events("failed"); exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL }
 }
