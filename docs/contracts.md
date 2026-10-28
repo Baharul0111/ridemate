@@ -88,7 +88,9 @@ propose SEARCHING/ASSIGNED — never CANCEL_CONFIRMED, never to end a leg.
 
 **`POST /v1/event`** — one per session, Google token (anonymous → 202 no-op). JSON
 `{"session_id": "…", "app": "uber", "version_code": 1234, "outcome": "confirmed_all|dismissed|abandoned|demo",
-"time_to_confirm_bucket": "lt_1m|1_3m|3_10m|gt_10m|none", "android_version": 34}` → 202.
+"time_to_confirm_bucket": "lt_1m|1_3m|3_10m|gt_10m|none", "android_version": 34,
+"reads": 4, "verified_rows": 9, "unreadable_rows": 1, "rule_hits": 6, "rule_misses": 1, "misses_unclassified": 0,
+"demo": false}` → 202. The counters feed the VERIFIED-rate and rule-miss alerts (metadata only, no text).
 
 **`POST /v1/erase`** — Google token. Deletes the caller's server data (ONDC docs, events by uid hash, owner
 device registration); marks the usage counter `erased_at` (deleted by cleanup after 48 h). → `{"erased": true}`.
@@ -305,3 +307,32 @@ their own string files `res/values/strings_<area>.xml` + `res/values-hi/strings_
 Assets: `android/app/src/main/assets/demo/<provider>/<screen>.png` + `eval/demo_labels.json` (ground truth),
 `eval/recorded/channel_a/<sha256>.json` (recorded Spark Open outputs), `eval/recorded/ocr/<sha256>.json`
 (recorded ML Kit tokens from the owner's phone). Demo notification script: `android/app/src/main/assets/demo/script.json`.
+
+---------------------------------------------------------------------------------------------------------------
+
+## 6. Eval fixtures (shared by the Kotlin accuracy test and the Python harness)
+All images are identified by the SHA-256 (lower-case hex) of the exact bytes uploaded.
+
+`eval/demo_labels.json` (ground truth; the private golden repo uses the same format in `labels.json`):
+```json
+{"schema": "1.0", "screens": [
+  {"file": "android/app/src/main/assets/demo/kestrel/fare_options.png", "sha256": "…", "app": "demo_kestrel",
+   "screen_type": "fare_options", "frame_w": 1080, "frame_h": 2400, "trip_km": 6.2,
+   "rows": [{"vehicle_class": "auto", "label": "Auto", "price_min": 110, "price_max": 110, "eta_min": 3,
+             "struck_price": 140}],
+   "driver_eta_min": null, "driver_distance_text": null, "tags": ["strikethrough", "eta"]}]}
+```
+`eval/synthetic/ocr/<sha256>.json` — ideal OCR from the generator (exact text boxes), plus noisy variants;
+`eval/recorded/ocr/<sha256>.json` — real ML Kit output recorded on the owner's phone. Same shape:
+```json
+{"image_sha256": "…", "width": 1080, "height": 2400, "engine": "synthetic|mlkit-text-v2", "recorded_at": "…",
+ "tokens": [{"text": "₹110", "box": [l, t, r, b], "line": 12, "block": 3}]}
+```
+Boxes are pixels in the image, `line` groups tokens ML Kit put on one line.
+`eval/recorded/channel_a/<sha256>.json` — real Muse Spark Open output recorded through the metered gateway:
+```json
+{"image_sha256": "…", "model": "meta-models/Muse-Spark-Open-816B-A42B", "recorded_at": "…",
+ "read": <ChannelARead>, "usage": {"input_tokens": 1500, "cached_input_tokens": 0, "output_tokens": 300}, "cost_usd": 0.003}
+```
+`eval/synthetic/channel_a/<sha256>.json` — same shape, produced from labels (a "perfect reader") plus adversarial
+variants under `eval/synthetic/channel_a_adversarial/<sha256>.<variant>.json`.
