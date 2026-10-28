@@ -1,0 +1,44 @@
+# Secrets — never commit
+.env
+.env.*
+*.jks
+*.keystore
+service-account*.json
+*-sa-key.json
+keys/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+*.egg-info/
+
+# Android / Gradle
+.gradle/
+build/
+local.properties
+.idea/
+*.iml
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Node / Firebase
+node_modules/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+.firebase/
+
+# OS
+.DS_Store
+
+# Build outputs / private data
+dist/
+release/
+eval/out/
+eval/private/
+golden/

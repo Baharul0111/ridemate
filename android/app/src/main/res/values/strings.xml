@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name" translatable="false">RideMate</string>
+    <string name="ridewatch_label">RideMate ride guardian</string>
+    <string name="built_with_spark" translatable="false">Built with Muse Spark Open</string>
+</resources>

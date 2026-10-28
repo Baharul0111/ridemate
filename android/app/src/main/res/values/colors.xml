@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="rm_background">#FFFBF7F2</color>
+    <color name="rm_brand">#FF0F6E5A</color>
+    <color name="rm_on_brand">#FFFFFFFF</color>
+    <color name="ic_launcher_background">#FF0F6E5A</color>
+</resources>

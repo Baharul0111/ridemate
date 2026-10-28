@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Two crossing route lines and a pin: "one trip, many apps". -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <path android:fillColor="#FFFFFF"
+        android:pathData="M54,30c-8.8,0 -16,7.2 -16,16c0,11.5 16,30 16,30s16,-18.5 16,-30c0,-8.8 -7.2,-16 -16,-16zM54,52a6,6 0,1 1,0 -12a6,6 0,1 1,0 12z" />
+    <path android:fillColor="#FFD9A441"
+        android:pathData="M34,80h40v4h-40z" />
+</vector>
