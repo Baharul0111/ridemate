@@ -45,3 +45,6 @@ golden/
 
 # Claude Code agent worktrees and local settings
 .claude/
+
+# Built Remote Config template (carries the deployed API URL)
+firebase/remoteconfig.template.json

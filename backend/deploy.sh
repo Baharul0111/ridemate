@@ -66,8 +66,8 @@ FIRESTORE_LOCATION="asia-south1"
 OWNER_EMAILS_DEFAULT="ibaharul567@gmail.com"
 FREE_APIS=(firestore.googleapis.com iam.googleapis.com iamcredentials.googleapis.com
   firebaseremoteconfig.googleapis.com fcm.googleapis.com)
-WEB_ROLES=(roles/datastore.user roles/firebaseremoteconfig.viewer)
-OPS_ROLES=(roles/datastore.user roles/firebasecloudmessaging.admin roles/firebaseremoteconfig.viewer)
+WEB_ROLES=(roles/datastore.user roles/cloudconfig.viewer)
+OPS_ROLES=(roles/datastore.user roles/firebasecloudmessaging.admin roles/cloudconfig.viewer)
 HELPER=(uv run --project "$BACKEND_DIR" --frozen --quiet python "$BACKEND_DIR/scripts/modal_secrets.py")
 MODAL=(uv run --project "$BACKEND_DIR" --frozen --quiet modal)
 
@@ -310,10 +310,14 @@ else
   done
   run uv run --project "$REPO_DIR/eval" --frozen --quiet python "$RC_BUILDER" \
     --api-base-url "${WEB_URL:-<web URL from step d>}" "${owner_hashes[@]+"${owner_hashes[@]}"}"
-  run firebase deploy --only remoteconfig --project "$FIREBASE_DEV_PROJECT_ID" --config "$FIREBASE_CONFIG" \
-    --non-interactive
+  # The Firebase CLI only reads files inside the firebase/ project directory.
+  run cp "$REPO_DIR/config/remoteconfig.template.json" "$REPO_DIR/firebase/remoteconfig.template.json"
+  # The CLI resolves the template path against the working directory, so deploy from inside firebase/.
+  (cd "$REPO_DIR/firebase" && run firebase deploy --only remoteconfig --project "$FIREBASE_DEV_PROJECT_ID" \
+    --config "$FIREBASE_CONFIG" --non-interactive)
   if [[ "$ENV_NAME" == "main" ]]; then
-    run firebase deploy --only remoteconfig --project "$P" --config "$FIREBASE_CONFIG" --non-interactive
+    (cd "$REPO_DIR/firebase" && run firebase deploy --only remoteconfig --project "$P" --config "$FIREBASE_CONFIG" \
+      --non-interactive)
   else
     note "prod Remote Config left unchanged for a dev deploy"
   fi
