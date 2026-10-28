@@ -65,7 +65,7 @@
     <string name="demo_source_none">AI पठन नहीं</string>
     <string name="demo_rows_label">%1$s · डेमो · %2$s</string>
 
-    <string name="demo_issue_ai_switched_off">AI पठन बंद है, इसलिए डेमो रिकॉर्ड किया गया पठन इस्तेमाल करता है।</string>
+    <string name="demo_issue_ai_switched_off">AI पठन बंद है और RideMate के सर्वर तक नहीं पहुँच सके, इसलिए डेमो ने ऐप में रखा रिकॉर्ड किया गया पठन इस्तेमाल किया।</string>
     <string name="demo_issue_ai_unavailable">AI पठन उपलब्ध नहीं है और कोई रिकॉर्ड किया गया पठन साथ नहीं है, इसलिए कीमतें \"पढ़ नहीं सके\" दिखती हैं। ऑनलाइन होने पर दोबारा कोशिश करें।</string>
     <string name="demo_issue_not_a_fare_screen">यह किराये की स्क्रीन नहीं लगती, इसलिए कुछ नहीं भेजा गया। किराये की स्क्रीन खोलकर दोबारा कोशिश करें।</string>
     <string name="demo_issue_ocr_failed">आपका फ़ोन स्क्रीन का टेक्स्ट नहीं पढ़ सका। \"किराया पढ़ें\" फिर से दबाएँ।</string>
@@ -77,7 +77,9 @@
     <string name="demo_row_eta_unknown">पहुँचने का समय: ऐप में देखें</string>
     <string name="demo_row_seen_at">%1$s में %2$s पर देखा</string>
     <string name="demo_row_stale">पुराना · ताज़ा करने के लिए \"किराया पढ़ें\" दबाएँ</string>
+    <string name="demo_row_stale_booked">पुराना · बुक करने से पहले पढ़ा गया</string>
     <string name="demo_row_cheapest">सबसे सस्ता</string>
+    <string name="demo_row_description_with_app">%1$s · %2$s</string>
     <string name="demo_row_description">%1$s: %2$s</string>
     <string name="demo_class_bike">बाइक</string>
     <string name="demo_class_auto">ऑटो</string>

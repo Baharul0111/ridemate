@@ -109,19 +109,63 @@ class DemoFareReaderTest {
     }
 
     @Test
-    fun `AI switched off - no upload, the recorded read is used`() = runTest {
+    fun `AI switched off - the demo still asks the server, whose demo cache and recorded reads cost nothing (M9)`() = runTest {
         aiEnabled = false
+        api.answerDemoReads(source = "recorded")
+        val result = read(DEMO_PEPPER)
+        val sent = api.readRequests.single()
+        assertTrue(sent.demo)
+        assertEquals(DemoImages.sha256(BundledAssets.bytes("demo/pepper/fare_options.png")), DemoImages.sha256(sent.image))
+        assertEquals(ReadSource.RECORDED, result.source)
+        assertFalse(result.recordedOnPhone)
+        assertEquals(DemoReadIssue.NONE, result.issue)
+        assertTrue(result.rows.isNotEmpty() && result.rows.all { it.status == QuoteStatus.VERIFIED })
+    }
+
+    @Test
+    fun `AI switched off and the server unreachable - the phone's recorded copy, else Couldn't read with matching words`() = runTest {
+        aiEnabled = false
+        api.readScreen = { ApiResult.Offline }
         assets.bundleAllRecorded()
         val result = read(DEMO_PEPPER)
-        assertTrue(api.readRequests.isEmpty())
         assertEquals(ReadSource.RECORDED, result.source)
+        assertTrue(result.recordedOnPhone)
         assertEquals(DemoReadIssue.AI_SWITCHED_OFF, result.issue)
         assertTrue(result.rows.all { it.status == QuoteStatus.VERIFIED })
 
         assets.recorded.clear()
         val none = read(DEMO_PEPPER)
         assertEquals(ReadSource.NONE, none.source)
-        assertEquals(DemoReadIssue.AI_SWITCHED_OFF, none.issue)
+        assertEquals("no read at all: the wording must match rows that say Couldn't read", DemoReadIssue.AI_UNAVAILABLE, none.issue)
+        assertTrue(none.rows.all { it.status == QuoteStatus.UNREADABLE && it.price == null })
+    }
+
+    @Test
+    fun `a stuck OCR engine ends the read at its time limit, nothing uploaded`() = runTest {
+        api.answerDemoReads()
+        val stuck = DemoOcr { kotlinx.coroutines.awaitCancellation() }
+        val started = testScheduler.currentTime
+        val result = reader.read(DEMO_PEPPER, script.provider(DEMO_PEPPER), DemoScreens.FARE_OPTIONS, "s", script.trip.tripKm, stuck, TapBudget.start(clock))
+        assertEquals(DemoReadIssue.OCR_FAILED, result.issue)
+        assertEquals(DemoFareReader.OCR_TIMEOUT_MS, testScheduler.currentTime - started)
+        assertTrue(api.readRequests.isEmpty())
+    }
+
+    @Test
+    fun `a hung anonymous sign-in is cut off and the read still finishes`() = runTest {
+        val inner = FakeAuthBackend(user = null)
+        val hanging = object : app.ridemate.auth.AuthBackend by inner {
+            override suspend fun signInAnonymously(): app.ridemate.auth.AuthUser = kotlinx.coroutines.awaitCancellation()
+        }
+        val gateway = app.ridemate.auth.DefaultAuthGateway(hanging, app.ridemate.testing.FakeGoogleCredentialSource(), clock)
+        val r = DemoFareReader(assets.bundleAllRecorded(), api, gateway, clock, { true }, { parsers }, { BundledAssets.sanityBands })
+        api.readScreen = { ApiResult.AuthNeeded }
+        val started = testScheduler.currentTime
+        val result = r.read(DEMO_KESTREL, script.provider(DEMO_KESTREL), DemoScreens.FARE_OPTIONS, "s", script.trip.tripKm, ocr, TapBudget.start(clock))
+        assertEquals(DemoFareReader.SIGN_IN_TIMEOUT_MS, testScheduler.currentTime - started)
+        assertEquals(1, api.readRequests.size)
+        assertEquals(ReadSource.RECORDED, result.source)
+        assertEquals(ApiResult.AuthNeeded, result.apiFailure)
     }
 
     @Test

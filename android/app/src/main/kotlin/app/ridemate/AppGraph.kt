@@ -28,6 +28,7 @@ import app.ridemate.messaging.FirebaseFcmTokenSource
 import app.ridemate.messaging.OwnerAccess
 import app.ridemate.messaging.OwnerAlertNotifier
 import app.ridemate.messaging.OwnerMessaging
+import app.ridemate.messaging.OwnerSignInWatcher
 import app.ridemate.messaging.OwnerTokenRegistrar
 import app.ridemate.net.ApiClient
 import app.ridemate.net.OkHttpApiClient
@@ -200,17 +201,26 @@ class AppGraph(
         )
     }
 
-    /** Owner alert pushes and the owner's FCM token registration ([app.ridemate.messaging.OwnerMessagingService]). */
-    val ownerMessaging: OwnerMessaging by lazy {
-        val owner = OwnerAccess(
+    /** Whether the signed-in user is the owner (`owner_emails_sha256`; fails closed). */
+    val ownerAccess: OwnerAccess by lazy {
+        OwnerAccess(
             authState = { authGateway.state.value },
             ownerEmailHashes = { OwnerAccess.parseHashes(configRepository.string(ConfigKeys.OWNER_EMAILS_SHA256)) },
         )
+    }
+
+    /** Owner alert pushes and the owner's FCM token registration ([app.ridemate.messaging.OwnerMessagingService]). */
+    val ownerMessaging: OwnerMessaging by lazy {
         OwnerMessaging(
-            registrar = OwnerTokenRegistrar(apiClient, owner, FirebaseFcmTokenSource),
-            owner = owner,
+            registrar = OwnerTokenRegistrar(apiClient, ownerAccess, FirebaseFcmTokenSource),
+            owner = ownerAccess,
             notify = OwnerAlertNotifier(app)::show,
         )
+    }
+
+    /** Registers the owner's FCM token when the owner signs in ([start] runs it; [ownerMessaging] is built only then). */
+    val ownerSignInWatcher: OwnerSignInWatcher by lazy {
+        OwnerSignInWatcher(isOwner = ownerAccess::isOwner, register = { ownerMessaging.registerCurrentToken() })
     }
 
     @Volatile
@@ -238,6 +248,8 @@ class AppGraph(
         })
 
         eraseUseCase // registers the ERASE_SERVER outbox handler
+
+        appScope.launch { ownerSignInWatcher.run(authGateway.state, configRepository.epoch) }
 
         appScope.launch {
             authGateway.state.collect { state ->
