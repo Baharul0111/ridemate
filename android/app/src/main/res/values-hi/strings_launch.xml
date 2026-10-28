@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="launch_channel_name">राइड ऐप खोलें</string>
+    <string name="launch_channel_description">जब RideMate को अगला राइड ऐप खोलना हो, तब यह आपसे टैप करने को कहता है।</string>
+    <string name="launch_heads_up_title">%1$s खोलें</string>
+    <string name="launch_heads_up_text">%2$s की यात्रा के लिए %1$s खोलने को टैप करें।</string>
+    <string name="launch_heads_up_action">%1$s खोलें</string>
+
+    <string name="launch_paste_chip">ड्रॉप पेस्ट करें</string>
+    <string name="launch_paste_chip_description">ड्रॉप पता कॉपी हो गया: %1$s। %2$s में ड्रॉप वाले बॉक्स को देर तक दबाएँ और Paste पर टैप करें।</string>
+    <string name="launch_paste_copied">ड्रॉप पता कॉपी हो गया। %1$s में ड्रॉप वाले बॉक्स को देर तक दबाएँ और Paste पर टैप करें।</string>
+    <string name="launch_opened_paste_hint">आपका ड्रॉप पता कॉपी हो गया है। %1$s में ड्रॉप वाले बॉक्स को देर तक दबाएँ और Paste पर टैप करें।</string>
+
+    <string name="launch_tap_notification">%1$s खोलने के लिए RideMate की सूचना पर टैप करें।</string>
+    <string name="launch_blocked">RideMate अभी %1$s नहीं खोल सकता। %1$s को होम स्क्रीन से खोलें, या RideMate की सूचनाएँ चालू करें ताकि यह आपसे पूछ सके।</string>
+    <string name="launch_not_installed">%1$s इस फ़ोन पर इंस्टॉल नहीं है। कोई दूसरा ऐप चुनें, या डेमो आज़माएँ।</string>
+    <string name="launch_open_failed">%1$s नहीं खुल सका। इसे होम स्क्रीन से खोलें।</string>
+</resources>

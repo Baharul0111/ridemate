@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="precheck_severity_blocking">तुलना से पहले इसे ठीक करें</string>
+    <string name="precheck_severity_warning">चेतावनी</string>
+    <string name="precheck_severity_info">ध्यान दें</string>
+
+    <string name="precheck_listener_off_title">सूचना एक्सेस चालू करें</string>
+    <string name="precheck_listener_off_body">RideMate को Uber, Ola या Rapido की सूचनाएँ नहीं दिख रहीं, इसलिए उसे पता नहीं चलेगा कि ड्राइवर ने राइड ली या बुकिंग रद्द हुई। RideMate के लिए सूचना एक्सेस चालू करें, फिर वापस आएँ।</string>
+    <string name="precheck_listener_silent_title">RideMate का राइड गार्डियन जुड़ा नहीं है</string>
+    <string name="precheck_listener_silent_body">Android ने RideMate को आपकी सूचनाओं से अलग कर दिया है। सूचना एक्सेस खोलें, RideMate को बंद करके फिर चालू करें, फिर वापस आएँ।</string>
+    <string name="precheck_no_app_title">कोई राइड ऐप नहीं मिला</string>
+    <string name="precheck_no_app_body">इस फ़ोन पर Uber, Ola और Rapido इंस्टॉल नहीं हैं। RideMate कैसे काम करता है यह देखने के लिए डेमो आज़माएँ, या कोई राइड ऐप इंस्टॉल करें।</string>
+    <string name="precheck_none_selected_title">कोई राइड ऐप चुनें</string>
+    <string name="precheck_none_selected_body">तुलना के लिए कम से कम एक इंस्टॉल किया हुआ ऐप चुनें।</string>
+    <string name="precheck_notifications_title">सूचनाएँ बंद हैं</string>
+    <string name="precheck_notifications_body">RideMate आपको अतिरिक्त बुकिंग रद्द करने की याद नहीं दिला सकता, न ही अगला ऐप खोलने को कह सकता है। RideMate के लिए सूचनाएँ चालू करें।</string>
+    <string name="precheck_overlay_title">फ़्लोटिंग बटन बंद है</string>
+    <string name="precheck_overlay_body">RideMate राइड ऐप के ऊपर अपना फ़्लोटिंग बटन नहीं दिखा सकता। \"दूसरे ऐप के ऊपर दिखाएँ\" की अनुमति दें, या इसकी जगह RideMate की सूचना इस्तेमाल करें।</string>
+    <string name="precheck_battery_title">बैटरी बचत से याद दिलाने में देर हो सकती है</string>
+    <string name="precheck_battery_body">RideMate को बिना बैटरी सीमा के चलने दें, ताकि रद्द करने की याद समय पर आए।</string>
+    <string name="precheck_offline_title">आप ऑफ़लाइन हैं</string>
+    <string name="precheck_offline_body">RideMate फिर भी ऐप खोल सकता है और आपकी राइड पर नज़र रख सकता है। किराया खुद लिखें, या अपने आप पढ़ने के लिए इंटरनेट से जुड़ें।</string>
+    <string name="precheck_location_title">पिकअप वही पता है जो आपने लिखा</string>
+    <string name="precheck_location_body">RideMate के लिए लोकेशन बंद है, इसलिए यह आपका लिखा पिकअप इस्तेमाल करता है। जाँच लें कि वह सही है, या लोकेशन की अनुमति दें।</string>
+    <string name="precheck_no_fares_title">इस स्क्रीन पर कोई किराया नहीं मिला</string>
+    <string name="precheck_no_fares_body">वह स्क्रीन खोलें जिसमें किराए दिखते हैं और फिर से किराया पढ़ें, या किराया खुद लिखें।</string>
+    <string name="precheck_no_ondc_title">ओपन नेटवर्क पर कोई राइड नहीं</string>
+    <string name="precheck_no_ondc_body">इस यात्रा के लिए अभी ओपन नेटवर्क पर कोई राइड नहीं है। बाकी ऐप के साथ आगे बढ़ें।</string>
+
+    <string name="precheck_fix_notification_access">सूचना एक्सेस खोलें</string>
+    <string name="precheck_fix_overlay">फ़्लोटिंग बटन की अनुमति दें</string>
+    <string name="precheck_fix_battery">बैटरी सीमा हटाएँ</string>
+    <string name="precheck_fix_notifications">सूचनाएँ चालू करें</string>
+    <string name="precheck_fix_internet">इंटरनेट सेटिंग</string>
+    <string name="precheck_fix_location">लोकेशन की अनुमति दें</string>
+    <string name="precheck_fix_demo">डेमो आज़माएँ</string>
+    <string name="precheck_fix_choose_apps">ऐप चुनें</string>
+    <string name="precheck_fix_retry_read">फिर से किराया पढ़ें</string>
+    <string name="precheck_fix_type_price">किराया खुद लिखें</string>
+    <string name="precheck_fix_without_ondc">ओपन नेटवर्क के बिना आगे बढ़ें</string>
+
+    <string name="precheck_fix_description">%1$s: %2$s</string>
+    <string name="precheck_settings_missing">इस फ़ोन पर यह सेटिंग स्क्रीन नहीं है। Settings खोलें, RideMate ढूँढें और वहीं बदलें।</string>
+</resources>

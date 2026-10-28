@@ -72,6 +72,15 @@
             android:taskAffinity=""
             android:theme="@style/Theme.RideMate.Transparent" />
 
+        <!-- AppLauncher: target of the heads-up "Open <app>" notification; opens the ride app on the user's tap. -->
+        <activity
+            android:name=".launch.OpenRideAppActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:taskAffinity=""
+            android:theme="@style/Theme.RideMate.Transparent" />
+
         <!-- Fallback when capture is blocked: share a screenshot of a fare screen to RideMate. -->
         <activity
             android:name=".capture.ShareReceiverActivity"
