@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="ui_back">वापस</string>
+    <string name="ui_demo_badge">डेमो</string>
+    <string name="ui_demo_badge_cd">डेमो: काल्पनिक नमूना स्क्रीन</string>
+    <string name="ui_go_home">होम स्क्रीन पर जाएँ</string>
+    <string name="ui_open_settings">सेटिंग्स खोलें</string>
+
+    <string name="ui_feature_trip">यात्रा</string>
+    <string name="ui_feature_compare">किराए की तुलना</string>
+    <string name="ui_feature_guardian">राइड गार्डियन</string>
+    <string name="ui_feature_demo">डेमो आज़माएँ</string>
+    <string name="ui_feature_missing_title">यह हिस्सा अभी इस संस्करण में नहीं है</string>
+    <string name="ui_feature_missing_body">यह स्क्रीन RideMate के अगले अपडेट में आएगी।</string>
+    <string name="ui_feature_missing_next">होम स्क्रीन पर वापस जाएँ और सेटिंग्स → RideMate के बारे में में अपडेट देखें।</string>
+
+    <string name="ui_update_required_title">RideMate अपडेट करें</string>
+    <string name="ui_update_required_body">यह संस्करण अब किराए की तुलना या राइड पर सुरक्षित नज़र नहीं रख सकता। RideMate इस्तेमाल करते रहने के लिए नीचे से अपडेट डाउनलोड करें। तब तक आपकी गोपनीयता सेटिंग्स उपलब्ध रहेंगी।</string>
+</resources>

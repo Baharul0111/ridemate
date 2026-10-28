@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Settings and About (app.ridemate.settings). -->
+<resources>
+    <string name="set_title">Settings</string>
+    <string name="set_ok">OK</string>
+    <string name="set_cancel">Cancel</string>
+    <string name="set_later">Later</string>
+    <string name="set_loading">Loading…</string>
+
+    <string name="set_section_privacy">Privacy</string>
+    <string name="set_privacy_notice">Privacy notice</string>
+    <string name="set_my_data">My data</string>
+    <string name="set_my_data_summary">See what RideMate holds on this phone</string>
+    <string name="set_my_data_intro">This is everything RideMate keeps on this phone. Ride data is deleted a day after the ride.</string>
+    <string name="set_my_data_server">RideMate\'s server keeps only metadata about requests and rides (no text, places or prices). Email us for a copy.</string>
+    <string name="set_my_data_failed">RideMate couldn\'t read its data just now. Go back and open My data again.</string>
+    <string name="set_erase">Erase my data</string>
+    <string name="set_erase_summary">Deletes your account and your RideMate data</string>
+    <string name="set_contact">Privacy contact</string>
+    <string name="set_contact_summary">%1$s · we reply within 30 days</string>
+    <string name="set_contact_button">Email the privacy contact</string>
+    <string name="set_contact_subject">RideMate privacy request</string>
+    <string name="set_no_email_app">No email app found. Write to %1$s from any email account.</string>
+
+    <string name="set_erase_confirm_title">Erase your data?</string>
+    <string name="set_erase_k1">Erase deletes your account, your RideMate data on this phone and on our server, except metadata logs (1 year, required by law) and an anonymous usage counter (48 h, abuse prevention).</string>
+    <string name="set_erase_irreversible">This can\'t be undone. RideMate will start again from the beginning.</string>
+    <string name="set_erase_confirm">Erase</string>
+    <string name="set_erase_working">Erasing…</string>
+    <string name="set_erase_working_body">Deleting your data. Keep RideMate open for a moment.</string>
+    <string name="set_erase_result_title">Erase</string>
+    <string name="set_erase_reauth">Sign in with Google</string>
+
+    <string name="set_section_language">Language</string>
+    <string name="set_language_system">Phone\'s language</string>
+    <string name="set_language_english" translatable="false">English</string>
+    <string name="set_language_hindi" translatable="false">हिन्दी</string>
+
+    <string name="set_section_rides">Rides</string>
+    <string name="set_keep_searching">Keep searching after a driver is found</string>
+    <string name="set_keep_searching_summary">Off by default. When on, RideMate tells you if a much closer driver turns up, and changes nothing unless you say yes.</string>
+    <string name="set_keep_searching_warning_title">Play fair with drivers</string>
+    <string name="set_keep_searching_warning">Keeping more than one booking means drivers may drive towards you and then be cancelled, which costs them time and fuel. Ride apps may also charge a cancellation fee (up to ₹100 under India\'s rules). Turn this on only if you\'ll cancel extra bookings quickly.</string>
+    <string name="set_keep_searching_confirm">Turn on</string>
+
+    <string name="set_section_status">Status</string>
+    <string name="set_status_body">RideMate\'s owner can switch features off remotely if a ride app changes. When AI reading is off, you type prices and the guardian keeps working.</string>
+
+    <string name="set_section_app">App</string>
+    <string name="set_about">About RideMate</string>
+    <string name="set_about_summary">Version %1$s · Built with Muse Spark Open</string>
+    <string name="set_report">Report a problem</string>
+    <string name="set_report_summary">Sends only app and Android versions and settings states. No screenshots or text.</string>
+    <string name="set_report_intro">Describe what happened here. RideMate added only the technical details below (versions and on/off states); please don\'t add phone numbers or OTPs.</string>
+
+    <string name="set_version_label">Version</string>
+    <string name="set_version_value" translatable="false">%1$s (%2$d)</string>
+    <plurals name="set_dev_taps_left">
+        <item quantity="one">%d more tap to open developer mode</item>
+        <item quantity="other">%d more taps to open developer mode</item>
+    </plurals>
+    <string name="set_dev_on">Developer mode is on.</string>
+    <string name="set_dev_sign_in">Developer mode is only for RideMate\'s owner. Sign in with the owner\'s Google account first.</string>
+    <string name="set_dev_not_owner">Developer mode is only for RideMate\'s owner.</string>
+    <string name="set_developer">Developer mode</string>
+    <string name="set_updates">Updates</string>
+    <string name="set_up_to_date">You have the latest version</string>
+    <string name="set_check_updates">Check for updates</string>
+    <string name="set_certificate">Signing certificate (SHA-256)</string>
+    <string name="set_certificate_body">Compare this with the fingerprint in RideMate\'s README to check that your copy is genuine.</string>
+    <string name="set_certificate_unavailable">Android didn\'t report a signing certificate for this build.</string>
+    <string name="set_built_with_body">RideMate reads fare screens with Meta\'s open-weights Muse Spark Open model, running on Modal.</string>
+    <string name="set_licences">Open-source licences</string>
+    <string name="set_licences_intro">RideMate is open source and uses these components.</string>
+    <string name="set_source">Source code</string>
+    <string name="set_source_summary" translatable="false">github.com/%1$s</string>
+
+    <!-- Licences: component names and licence names are proper names. -->
+    <string name="lic_ridemate" translatable="false">RideMate</string>
+    <string name="lic_androidx" translatable="false">AndroidX, Jetpack Compose, Room, WorkManager, Navigation</string>
+    <string name="lic_kotlin" translatable="false">Kotlin, kotlinx.coroutines, kotlinx.serialization</string>
+    <string name="lic_okhttp" translatable="false">OkHttp</string>
+    <string name="lic_re2j" translatable="false">RE2/J</string>
+    <string name="lic_firebase" translatable="false">Firebase Android SDKs</string>
+    <string name="lic_credentials" translatable="false">Credential Manager, Sign in with Google</string>
+    <string name="lic_mlkit" translatable="false">Google ML Kit Text Recognition v2</string>
+    <string name="lic_play_location" translatable="false">Google Play services Location</string>
+    <string name="lic_spark" translatable="false">Muse Spark Open (Meta)</string>
+    <string name="lic_mit" translatable="false">MIT License</string>
+    <string name="lic_apache" translatable="false">Apache License 2.0</string>
+    <string name="lic_go" translatable="false">The Go License (BSD 3-Clause)</string>
+    <string name="lic_mlkit_terms">ML Kit Terms of Service</string>
+    <string name="lic_play_terms">Android SDK and Google APIs Terms of Service</string>
+    <string name="lic_spark_terms">Muse Spark Open licence (runs on RideMate\'s server, not in the app)</string>
+</resources>

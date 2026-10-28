@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="dev_title">डेवलपर मोड</string>
+    <string name="dev_intro">मालिक के टूल। यहाँ की हर चीज़ इस फ़ोन पर ही रहती है, जब तक आप स्वयं साझा न करें। RideMate राइड ऐप्स के अंदर कभी कोई कार्य नहीं करता।</string>
+    <string name="dev_off_title">डेवलपर मोड बंद है</string>
+    <string name="dev_off_body">डेवलपर मोड केवल RideMate के मालिक के लिए है। मालिक के Google खाते से साइन इन करें और \"RideMate के बारे में\" में संस्करण पर सात बार टैप करें।</string>
+    <string name="dev_ok">ठीक है</string>
+    <string name="dev_yes">हाँ</string>
+    <string name="dev_no">नहीं</string>
+    <string name="dev_close">बंद करें</string>
+    <string name="dev_choose">चुनें…</string>
+    <string name="dev_share_title">एक्सपोर्ट साझा करें</string>
+
+    <string name="dev_recorder">रिकॉर्डर</string>
+    <string name="dev_recorder_body">Uber, Ola और Rapido की हर सूचना और उसके हटने को मास्क किए टेक्स्ट के साथ दर्ज करता है: पैकेज, चैनल, श्रेणी, जारी (ongoing) स्थिति, id और tag, रिडैक्शन और हटने का कारण।</string>
+    <string name="dev_recorder_switch">राइड ऐप्स की सूचनाएँ रिकॉर्ड करें</string>
+    <plurals name="dev_recorder_recent">
+        <item quantity="one">%d हाल की प्रविष्टि</item>
+        <item quantity="other">%d हाल की प्रविष्टियाँ</item>
+    </plurals>
+    <string name="dev_recorder_posted">आई</string>
+    <string name="dev_recorder_removed">हटी (%1$s)</string>
+    <string name="dev_recorder_meta">चैनल %1$s · श्रेणी %2$s · जारी %3$s · id %4$d · रिडैक्टेड %5$s</string>
+    <string name="dev_recorder_export">JSON के रूप में एक्सपोर्ट करें</string>
+    <string name="dev_recorder_clear">रिकॉर्डर लॉग साफ़ करें</string>
+
+    <string name="dev_capture_test">कैप्चर परीक्षण</string>
+    <string name="dev_capture_test_body">कोई राइड ऐप स्क्रीन खोलें, वापस आएँ और एक कैप्चर चलाएँ। Android पहले अनुमति माँगता है। यह दिखाता है कि फ़्रेम काला था (ऐप कैप्चर रोकता है) या नहीं, और बबल दिख रहा था या नहीं।</string>
+    <string name="dev_capture_test_run">कैप्चर परीक्षण चलाएँ</string>
+    <string name="dev_capture_test_running">कैप्चर हो रहा है…</string>
+    <string name="dev_capture_black_frame">काला फ़्रेम</string>
+    <string name="dev_capture_bubble_visible">बबल दिखा</string>
+    <string name="dev_capture_denied">कैप्चर की अनुमति नहीं दी गई। परीक्षण फिर चलाएँ और अनुमति दें।</string>
+    <string name="dev_capture_unavailable">स्क्रीन कैप्चर अभी इस संस्करण में उपलब्ध नहीं है।</string>
+
+    <string name="dev_golden">गोल्डन कैप्चर</string>
+    <string name="dev_golden_body">मास्क की हुई स्क्रीन कैप्चर करें, हर पंक्ति का सही किराया और ETA दर्ज करें, फिर निजी गोल्डन सेट के लिए labels.json और तस्वीरें एक्सपोर्ट करें।</string>
+    <string name="dev_golden_capture">मास्क की हुई स्क्रीन कैप्चर करें</string>
+    <string name="dev_golden_item">कैप्चर %1$d</string>
+    <string name="dev_golden_image_cd">मास्क किया हुआ कैप्चर %1$d</string>
+    <string name="dev_golden_no_image">तस्वीर नहीं मिली</string>
+    <string name="dev_golden_app">ऐप</string>
+    <string name="dev_golden_screen_type">स्क्रीन का प्रकार</string>
+    <string name="dev_golden_trip_km">यात्रा की दूरी (किमी, वैकल्पिक)</string>
+    <string name="dev_golden_row">पंक्ति %1$d</string>
+    <string name="dev_golden_vehicle">वाहन श्रेणी</string>
+    <string name="dev_golden_label">स्क्रीन पर लिखा नाम</string>
+    <string name="dev_golden_price_min">किराया (₹, न्यूनतम)</string>
+    <string name="dev_golden_price_max">किराया (₹, अधिकतम)</string>
+    <string name="dev_golden_eta">पिकअप ETA (मिनट)</string>
+    <string name="dev_golden_struck">कटा हुआ किराया (₹)</string>
+    <string name="dev_golden_remove_row">पंक्ति %1$d हटाएँ</string>
+    <string name="dev_golden_add_row">पंक्ति जोड़ें</string>
+    <string name="dev_golden_driver_eta">ड्राइवर ETA (मिनट)</string>
+    <string name="dev_golden_driver_distance">ड्राइवर की दूरी (जैसे 1.2 km)</string>
+    <string name="dev_golden_tags">टैग (कॉमा से अलग)</string>
+    <string name="dev_golden_complete">एक्सपोर्ट के लिए तैयार</string>
+    <string name="dev_golden_incomplete">चाहिए</string>
+    <string name="dev_golden_save">लेबल सहेजें</string>
+    <string name="dev_golden_delete">यह कैप्चर हटाएँ</string>
+    <string name="dev_golden_ready">%2$d में से %1$d कैप्चर एक्सपोर्ट के लिए तैयार</string>
+    <string name="dev_golden_export">लेबल और तस्वीरें एक्सपोर्ट करें</string>
+    <string name="dev_golden_p_app">ऐप</string>
+    <string name="dev_golden_p_type">स्क्रीन का प्रकार</string>
+    <string name="dev_golden_p_rows">कम से कम एक पंक्ति</string>
+    <string name="dev_golden_p_label">हर पंक्ति में नाम</string>
+    <string name="dev_golden_p_price">हर पंक्ति में किराया</string>
+    <string name="dev_golden_p_order">न्यूनतम किराया अधिकतम से ज़्यादा नहीं</string>
+    <string name="dev_golden_p_class">हर पंक्ति में वाहन श्रेणी</string>
+    <string name="dev_golden_p_number">ऐसी संख्याएँ जो ऋणात्मक न हों</string>
+
+    <string name="dev_budget">Modal क्रेडिट बजट</string>
+    <string name="dev_budget_idle">RideMate के सर्वर से बजट लोड करें।</string>
+    <string name="dev_budget_loading">लोड हो रहा है…</string>
+    <string name="dev_budget_load">बजट लोड करें</string>
+    <string name="dev_budget_failed">बजट लोड नहीं हो सका</string>
+    <string name="dev_budget_not_owner">सर्वर बजट केवल मालिक के खातों को दिखाता है। मालिक के Google खाते से साइन इन करें।</string>
+    <string name="dev_budget_of">%2$s में से %1$s (%3$d%%)</string>
+    <string name="dev_budget_unknown">नहीं बताया गया</string>
+    <string name="dev_budget_ai">AI खर्च</string>
+    <string name="dev_budget_compute">सर्वर कंप्यूट खर्च</string>
+    <string name="dev_budget_today">आज (दैनिक सीमा)</string>
+    <string name="dev_budget_horizon">बजट अवधि समाप्त</string>
+    <string name="dev_budget_profile">सीमा प्रोफ़ाइल</string>
+    <string name="dev_budget_ai_state">AI से पढ़ना</string>
+    <string name="dev_budget_ai_on">चालू</string>
+    <string name="dev_budget_ai_off">बंद</string>
+
+    <string name="dev_owner_alerts">मालिक अलर्ट</string>
+    <string name="dev_owner_alerts_switch">मालिक अलर्ट इस फ़ोन पर भेजें</string>
+    <string name="dev_owner_alerts_body">इस फ़ोन का पुश टोकन RideMate के सर्वर पर दर्ज करता है, ताकि पढ़ने की सटीकता गिरने जैसे अलर्ट मिलें।</string>
+    <string name="dev_owner_alerts_working">अपडेट हो रहा है…</string>
+    <string name="dev_owner_alerts_registered">इस फ़ोन पर मालिक अलर्ट आएँगे।</string>
+    <string name="dev_owner_alerts_off">इस फ़ोन के लिए मालिक अलर्ट बंद हैं।</string>
+    <string name="dev_owner_alerts_no_token">पुश टोकन नहीं मिला। जाँचें कि Google Play services अपडेट है, फिर दोबारा कोशिश करें।</string>
+
+    <string name="dev_leave">डेवलपर मोड छोड़ें</string>
+    <string name="dev_disable">डेवलपर मोड बंद करें</string>
+
+    <string name="dev_msg_recorder_empty">रिकॉर्डर लॉग खाली है। पहले रिकॉर्डिंग चालू करें और कोई राइड ऐप इस्तेमाल करें।</string>
+    <string name="dev_msg_recorder_cleared">रिकॉर्डर लॉग साफ़ कर दिया गया।</string>
+    <string name="dev_msg_golden_saved">लेबल सहेजे गए।</string>
+    <string name="dev_msg_golden_nothing">अभी कोई कैप्चर पूरी तरह लेबल नहीं है। लेबल पूरे करें, फिर एक्सपोर्ट करें।</string>
+    <string name="dev_msg_golden_denied">कैप्चर की अनुमति नहीं दी गई। फिर कोशिश करें और अनुमति दें।</string>
+    <string name="dev_msg_golden_black">वह ऐप स्क्रीन कैप्चर रोकता है (काला फ़्रेम)। कुछ भी सहेजा नहीं गया।</string>
+    <string name="dev_msg_golden_unavailable">स्क्रीन कैप्चर अभी इस संस्करण में उपलब्ध नहीं है।</string>
+    <string name="dev_msg_golden_captured">मास्क किया हुआ कैप्चर सहेजा गया। नीचे उसके लेबल जोड़ें।</string>
+    <string name="dev_msg_export_failed">एक्सपोर्ट नहीं लिखा जा सका। थोड़ी जगह खाली करें और फिर कोशिश करें।</string>
+</resources>

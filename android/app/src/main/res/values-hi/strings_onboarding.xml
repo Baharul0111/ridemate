@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="onb_step_of">चरण %1$d / %2$d</string>
+    <string name="onb_continue">आगे बढ़ें</string>
+    <string name="onb_not_now">अभी नहीं</string>
+    <string name="onb_status_allowed">अनुमति है</string>
+    <string name="onb_status_not_allowed">अभी अनुमति नहीं</string>
+
+    <string name="onb_perm_notifications">सूचनाएँ</string>
+    <string name="onb_perm_notification_access">सूचना-पहुँच</string>
+    <string name="onb_perm_overlay">तैरता बटन</string>
+    <string name="onb_perm_location">लोकेशन</string>
+    <string name="onb_perm_battery">बैकग्राउंड में चलना</string>
+
+    <string name="onb_age_title">क्या आपकी उम्र 18 वर्ष या उससे अधिक है?</string>
+    <string name="onb_age_why">RideMate केवल वयस्कों के लिए है। भारत का डेटा संरक्षण कानून और RideMate जिस AI मॉडल का उपयोग करता है उसका लाइसेंस, दोनों इस जाँच को ज़रूरी बनाते हैं।</string>
+    <string name="onb_age_yes">हाँ, मेरी उम्र 18 या उससे अधिक है</string>
+    <string name="onb_age_no">नहीं, मेरी उम्र 18 से कम है</string>
+    <string name="onb_blocked_title">RideMate केवल वयस्कों के लिए है</string>
+    <string name="onb_blocked_card_title">आप अभी RideMate इस्तेमाल नहीं कर सकते</string>
+    <string name="onb_blocked_body">RideMate इस्तेमाल करने के लिए आपकी उम्र 18 वर्ष या उससे अधिक होनी चाहिए। आपके फ़ोन से कुछ भी सहेजा या भेजा नहीं गया।</string>
+    <string name="onb_blocked_close">RideMate बंद करें</string>
+
+    <string name="onb_notice_title">आपकी गोपनीयता</string>
+    <string name="onb_notice_why">कृपया पढ़ें कि RideMate आपके डेटा का उपयोग कैसे करता है। आप इसे कभी भी सेटिंग्स → गोपनीयता सूचना में फिर से पढ़ सकते हैं।</string>
+    <string name="onb_notice_accept">मैं सहमत हूँ, आगे बढ़ें</string>
+    <string name="onb_notice_decline">मैं सहमत नहीं हूँ, RideMate बंद करें</string>
+    <string name="onb_notice_version">संस्करण 1.0 · प्रभावी तिथि 28 अक्टूबर 2026</string>
+    <string name="onb_notice_usa_callout">AI प्रोसेसिंग अमेरिका (USA) में Modal के सर्वरों पर होती है।</string>
+    <string name="onb_notice_usa_callout_body">मास्क किए हुए स्क्रीनशॉट, वे सूचनाएँ जिन्हें RideMate नहीं पहचानता, आपके गंतव्य का टेक्स्ट और आवाज़ का लिखित टेक्स्ट भारत से बाहर प्रोसेस हो सकते हैं।</string>
+    <string name="onb_notice_who_title">हम कौन हैं</string>
+    <string name="onb_notice_who_body">RideMate को बहारुल इस्लाम (Baharul Islam) ने बनाया है, जो बारपेटा, असम, भारत के एक स्वतंत्र डेवलपर हैं। गोपनीयता संपर्क और शिकायत अधिकारी: %1$s। हम 30 दिनों के भीतर जवाब देते हैं।</string>
+    <string name="onb_notice_adults_title">केवल वयस्कों के लिए (18+)</string>
+    <string name="onb_notice_adults_body">RideMate इस्तेमाल करने के लिए आपकी उम्र 18 वर्ष या उससे अधिक होनी चाहिए। यदि हमें पता चलता है कि 18 वर्ष से कम उम्र का कोई व्यक्ति इसे इस्तेमाल कर रहा है, तो हम उसका डेटा हटा देते हैं।</string>
+    <string name="onb_notice_does_title">RideMate क्या करता है</string>
+    <string name="onb_notice_does_body">जब आप RideMate का बटन टैप करते हैं, तब वह Uber, Ola और Rapido के किराए की तुलना करता है, इन्हीं तीन ऐप्स की सूचनाओं पर नज़र रखता है ताकि आपको अतिरिक्त बुकिंग रद्द करने की याद दिला सके, और रद्द करते समय आपका मार्गदर्शन करता है। वह इन ऐप्स के अंदर कभी कोई टैप या कार्य नहीं करता। किराए पढ़ने के लिए वह Modal के क्लाउड सर्वरों पर Meta का Muse Spark Open AI मॉडल इस्तेमाल करता है।</string>
+    <string name="onb_notice_data_title">RideMate क्या इस्तेमाल करता है, और कितने समय तक</string>
+    <string name="onb_notice_data_body">• पिकअप और ड्रॉप स्थान: आपके फ़ोन पर रखे जाते हैं और राइड के एक दिन बाद हटा दिए जाते हैं। आपके गंतव्य का टेक्स्ट Modal को भेजा जाता है ताकि AI सही जगह चुन सके।\n• किराया और राइड स्क्रीन के स्क्रीनशॉट: पहले मास्क किए जाते हैं, Modal पर AI पढ़ता है, कभी संग्रहीत नहीं होते।\n• स्क्रीन पर पहचाना गया टेक्स्ट: केवल आपके फ़ोन पर, राइड सत्र तक।\n• Uber, Ola और Rapido की सूचनाओं का टेक्स्ट (मास्क किया हुआ): आपके फ़ोन पर। केवल वे सूचनाएँ जिन्हें RideMate नहीं पहचानता, राइड के दौरान, Modal को भेजी जाती हैं।\n• आपकी आवाज़, केवल माइक टैप करने पर: केवल लिखित टेक्स्ट Modal को भेजा जाता है, ऑडियो कभी नहीं।\n• Google ईमेल, नाम और फ़ोटो, केवल साइन इन करने पर: Firebase में, जब तक आप मिटा न दें।\n• आपके खाते के एक-तरफ़ा कोड से जुड़ा उपयोग काउंटर: उचित उपयोग के लिए; मिटाने के बाद 48 घंटे तक।\n• IP पता: सीमाएँ लागू करने के लिए; 1 दिन।\n• राइड परिणाम और अनुरोध रिकॉर्ड (केवल मेटाडेटा, कोई टेक्स्ट, स्थान या किराया नहीं): 1 वर्ष।\n• क्रैश रिपोर्ट, कभी भी स्क्रीन या सूचना के टेक्स्ट के साथ नहीं।\nकोई विज्ञापन, विज्ञापन ID, मार्केटिंग एनालिटिक्स या संपर्क (contacts) नहीं।</string>
+    <string name="onb_notice_masking_title">अपलोड से पहले मास्किंग</string>
+    <string name="onb_notice_masking_body">आपके फ़ोन से कुछ भी बाहर जाने से पहले, RideMate फ़ोन नंबर, OTP और PIN, नंबर प्लेट, नाम और आपकी स्टेटस बार को धुंधला कर देता है। यदि स्क्रीन किराए या राइड की स्क्रीन जैसी नहीं दिखती, तो कुछ भी अपलोड नहीं होता। RideMate आपकी स्क्रीन केवल तब देखता है जब आप उसका बटन टैप करते हैं, और हर तुलना के लिए Android आपसे अनुमति माँगता है।</string>
+    <string name="onb_notice_where_title">आपका डेटा कहाँ प्रोसेस होता है</string>
+    <string name="onb_notice_where_body">AI प्रोसेसिंग अमेरिका (USA) में Modal के सर्वरों पर होती है। RideMate का छोटा सर्वर भी Modal पर चलता है। साइन-इन, क्रैश रिपोर्ट और रिमोट सेटिंग्स Google Firebase की सेवाएँ हैं; Firestore के रिकॉर्ड मुंबई (asia-south1) में संग्रहीत होते हैं। सूचना-पहुँच केवल Uber, Ola और Rapido तक सीमित है; बाकी सभी ऐप्स की सूचनाएँ अनदेखी की जाती हैं।</string>
+    <string name="onb_notice_consent_title">आपकी सहमति</string>
+    <string name="onb_notice_consent_body">हर अनुमति अलग से, उसके कारण के साथ माँगी जाती है। Google साइन-इन वैकल्पिक है: इसके बिना आप किराए स्वयं टाइप करते हैं। आप कभी भी सहमति वापस ले सकते हैं: कोई अनुमति बंद करें, साइन आउट करें, सेटिंग्स → मिटाएँ (Erase) इस्तेमाल करें, या %1$s पर ईमेल करें।</string>
+    <string name="onb_notice_rights_title">आपके अधिकार</string>
+    <string name="onb_notice_rights_body">सेटिंग्स → मेरा डेटा में देखें कि RideMate क्या रखता है। हमसे अपना डेटा सुधारने या मिटाने को कहें, अपनी ओर से कार्य करने के लिए किसी को नामित करें, या %1$s पर हमसे शिकायत करें (हम 30 दिनों के भीतर जवाब देते हैं)। यदि आप संतुष्ट नहीं हैं, तो भारतीय डेटा संरक्षण बोर्ड से शिकायत कर सकते हैं।</string>
+    <string name="onb_notice_erase_title">\"Erase\" क्या करता है</string>
+    <string name="onb_notice_erase_body">Erase आपका खाता, इस फ़ोन पर और हमारे सर्वर पर आपका RideMate डेटा मिटा देता है, सिवाय मेटाडेटा लॉग (1 वर्ष, कानून द्वारा आवश्यक) और एक गुमनाम उपयोग काउंटर (48 घंटे, दुरुपयोग की रोकथाम) के।</string>
+    <string name="onb_notice_contact_title">संपर्क</string>
+    <string name="onb_notice_contact_body">बहारुल इस्लाम (Baharul Islam), बारपेटा, असम, भारत · %1$s (30 दिनों के भीतर जवाब)</string>
+
+    <string name="onb_signin_title">Google से साइन इन करें</string>
+    <string name="onb_signin_why">AI से किराया पढ़ने के लिए Google साइन-इन ज़रूरी है, ताकि मुफ़्त AI बजट सभी लोगों में उचित रूप से बँटे।</string>
+    <string name="onb_signin_manual_note">साइन इन किए बिना आप किराए स्वयं टाइप करते हैं (मैनुअल मोड)। राइड गार्डियन और रद्द करने के रिमाइंडर दोनों तरह से काम करते हैं। आप बाद में भी साइन इन कर सकते हैं।</string>
+    <string name="onb_signin_google">Google से साइन इन करें</string>
+    <string name="onb_signin_skip">साइन इन किए बिना आगे बढ़ें</string>
+    <string name="onb_signin_busy">Google साइन-इन की प्रतीक्षा है…</string>
+    <string name="onb_signin_problem_title">साइन इन नहीं हुआ</string>
+    <string name="onb_signin_cancelled">साइन-इन रद्द कर दिया गया। फिर से कोशिश करें, या साइन इन किए बिना आगे बढ़ें।</string>
+    <string name="onb_signin_no_account">इस फ़ोन पर कोई Google खाता नहीं है। Android सेटिंग्स → खाते में एक जोड़ें, या साइन इन किए बिना आगे बढ़ें।</string>
+    <string name="onb_signin_offline">आप ऑफ़लाइन हैं। इंटरनेट से जुड़कर फिर से कोशिश करें, या साइन इन किए बिना आगे बढ़ें।</string>
+    <string name="onb_signin_failed">Google साइन-इन नहीं हो पाया। एक मिनट बाद फिर कोशिश करें, या साइन इन किए बिना आगे बढ़ें।</string>
+
+    <string name="onb_notif_title">सूचनाओं की अनुमति दें</string>
+    <string name="onb_notif_why">RideMate आपको अतिरिक्त बुकिंग रद्द करने की याद दिलाता है, इसलिए उसे सूचनाएँ दिखानी होती हैं।</string>
+    <string name="onb_notif_action">सूचनाओं की अनुमति दें</string>
+
+    <string name="onb_access_title">RideMate को राइड ऐप्स की सूचनाएँ देखने दें</string>
+    <string name="onb_access_why">RideMate केवल Uber, Ola और Rapido की सूचनाएँ पढ़ता है, ताकि पता चले कि ड्राइवर ने राइड स्वीकार या रद्द की; बाकी सभी ऐप्स अनदेखे रहते हैं।</string>
+    <string name="onb_access_hint">अगली स्क्रीन पर \"RideMate राइड गार्डियन\" ढूँढकर उसे चालू करें, फिर वापस आएँ।</string>
+    <string name="onb_access_action">सूचना-पहुँच खोलें</string>
+    <string name="onb_greyed_title">क्या स्विच धुंधला (बंद) दिख रहा है?</string>
+    <string name="onb_greyed_body">Play Store के बाहर से इंस्टॉल किए गए ऐप्स के लिए Android यह स्विच रोक देता है। RideMate थोड़ी देर में दिखाएगा कि इसे कैसे चालू करें।</string>
+    <string name="onb_greyed_action">मुझे तरीका दिखाएँ</string>
+
+    <string name="onb_overlay_title">तैरते बटन की अनुमति दें</string>
+    <string name="onb_overlay_why">RideMate का छोटा तैरता बटन राइड ऐप के ऊपर रहता है, ताकि आप उसे टैप करके किराए पढ़ सकें।</string>
+    <string name="onb_overlay_hint">अगली स्क्रीन पर RideMate के लिए \"दूसरे ऐप्स के ऊपर दिखाने की अनुमति\" चालू करें, फिर वापस आएँ।</string>
+    <string name="onb_overlay_action">दूसरे ऐप्स के ऊपर दिखाना खोलें</string>
+
+    <string name="onb_restricted_title">प्रतिबंधित सेटिंग्स की अनुमति दें</string>
+    <string name="onb_restricted_why">Play Store के बाहर से इंस्टॉल किए गए ऐप्स के लिए Android कुछ स्विच तब तक रोकता है जब तक आप एक बार अनुमति न दें।</string>
+    <string name="onb_restricted_steps_title">अनुमति कैसे दें</string>
+    <string name="onb_restricted_steps">1. \"ऐप जानकारी खोलें\" टैप करें।\n2. ⋮ (ऊपर दाईं ओर) टैप करें, फिर \"प्रतिबंधित सेटिंग्स की अनुमति दें\" (Allow restricted settings) चुनें, और अपने PIN या फ़िंगरप्रिंट से पुष्टि करें।\n3. यहाँ वापस आकर सूचना-पहुँच और तैरता बटन चालू करें।</string>
+    <string name="onb_restricted_open_app_info">ऐप जानकारी खोलें</string>
+
+    <string name="onb_location_title">पिकअप के लिए आपकी लोकेशन</string>
+    <string name="onb_location_why">RideMate आपकी मौजूदा जगह से पिकअप भर देता है, केवल तब जब आप ऐप इस्तेमाल कर रहे हों।</string>
+    <string name="onb_location_action">लोकेशन की अनुमति दें</string>
+    <string name="onb_location_not_now">अभी नहीं, मैं पिकअप टाइप करूँगा/करूँगी</string>
+
+    <string name="onb_battery_title">रिमाइंडर समय पर रखें</string>
+    <string name="onb_battery_why">बैटरी बचत RideMate को बैकग्राउंड में रोक सकती है, जिससे रद्द करने के रिमाइंडर देर से आ सकते हैं; बैकग्राउंड में चलने की अनुमति उन्हें समय पर रखती है।</string>
+    <string name="onb_battery_action">बैकग्राउंड में चलने की अनुमति दें</string>
+    <string name="onb_oem_title">आपके फ़ोन पर एक और सेटिंग</string>
+    <string name="onb_oem_open">यह सेटिंग खोलें</string>
+    <string name="onb_oem_xiaomi">Xiaomi, Redmi और POCO फ़ोन ऐप्स को अपने आप भी रोकते हैं। Security → Autostart (या ऐप जानकारी → Autostart) खोलें और RideMate चालू करें। फिर ऐप जानकारी → Battery saver में \"No restrictions\" चुनें।</string>
+    <string name="onb_oem_oppo_realme">Oppo, Realme और OnePlus फ़ोन ऐप्स को अपने आप भी रोकते हैं। ऐप जानकारी → Battery usage खोलें और \"Allow background activity\" तथा \"Allow auto launch\" चालू करें।</string>
+    <string name="onb_oem_vivo">Vivo और iQOO फ़ोन ऐप्स को अपने आप भी रोकते हैं। i Manager → App manager → Autostart खोलें और RideMate चालू करें। फिर Battery → Background power consumption में RideMate को अनुमति दें।</string>
+    <string name="onb_oem_samsung">Samsung फ़ोन कम इस्तेमाल होने वाले ऐप्स को सुला सकते हैं। Settings → Battery → Background usage limits → Never sleeping apps खोलें और RideMate जोड़ें।</string>
+    <string name="onb_oem_motorola">Motorola फ़ोन बैकग्राउंड ऐप्स को सीमित कर सकते हैं। ऐप जानकारी → Battery खोलें और \"Unrestricted\" चुनें (या \"Allow background usage\" चालू करें)।</string>
+
+    <string name="onb_health_title">छोटी सी स्व-जाँच</string>
+    <string name="onb_health_why">RideMate एक परीक्षण सूचना भेजकर जाँचता है कि वह उसे देख पा रहा है, ताकि ड्राइवर के राइड स्वीकार करने की सूचना छूटे नहीं।</string>
+    <string name="onb_health_run">स्व-जाँच चलाएँ</string>
+    <string name="onb_health_running">जाँच हो रही है… इसमें 5 सेकंड तक लगते हैं।</string>
+    <string name="onb_health_ok">RideMate सूचनाएँ देख पा रहा है।</string>
+    <string name="onb_health_retry">फिर से कोशिश करें</string>
+    <string name="onb_health_skip">फिर भी आगे बढ़ें</string>
+    <string name="onb_health_not_seen_title">RideMate अपनी परीक्षण सूचना नहीं देख पाया</string>
+    <string name="onb_health_not_seen_body">RideMate की सूचना-पहुँच बंद करके फिर चालू करें, फिर दोबारा कोशिश करें। फिर भी न हो, तो फ़ोन रीस्टार्ट करें।</string>
+    <string name="onb_health_notif_blocked_title">सूचनाएँ बंद हैं</string>
+    <string name="onb_health_notif_blocked_body">RideMate अपनी परीक्षण सूचना नहीं भेज सकता। सूचनाओं की अनुमति दें, फिर दोबारा कोशिश करें।</string>
+    <string name="onb_health_access_missing_title">सूचना-पहुँच बंद है</string>
+    <string name="onb_health_access_missing_body">RideMate राइड ऐप्स की सूचनाएँ नहीं देख सकता। सूचना-पहुँच चालू करें, फिर दोबारा कोशिश करें।</string>
+    <string name="onb_selftest_channel">RideMate स्व-जाँच</string>
+    <string name="onb_selftest_channel_description">RideMate सेट अप करते समय एक छोटी परीक्षण सूचना।</string>
+    <string name="onb_selftest_title">RideMate स्व-जाँच</string>
+    <string name="onb_selftest_text">जाँच रहे हैं कि RideMate सूचनाएँ देख पा रहा है। यह अपने आप हट जाएगी।</string>
+
+    <string name="onb_done_title">सब तैयार है</string>
+    <string name="onb_done_body">RideMate ये अनुमतियाँ इस्तेमाल कर सकता है। आप इन्हें कभी भी Android सेटिंग्स में बदल सकते हैं; हर तुलना से पहले RideMate इन्हें फिर से जाँचता है।</string>
+    <string name="onb_done_health_skipped_title">स्व-जाँच पास नहीं हुई</string>
+    <string name="onb_done_health_skipped_body">RideMate से राइड ऐप्स की सूचनाएँ छूट सकती हैं। हर तुलना से पहले वह फिर जाँचेगा और ठीक करने का तरीका दिखाएगा।</string>
+    <string name="onb_done_start">RideMate इस्तेमाल करना शुरू करें</string>
+</resources>

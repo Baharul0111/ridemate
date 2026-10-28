@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Onboarding (app.ridemate.onboarding): 18+, privacy notice, sign-in, permissions, self-test. -->
+<resources>
+    <string name="onb_step_of">Step %1$d of %2$d</string>
+    <string name="onb_continue">Continue</string>
+    <string name="onb_not_now">Not now</string>
+    <string name="onb_status_allowed">Allowed</string>
+    <string name="onb_status_not_allowed">Not allowed yet</string>
+
+    <string name="onb_perm_notifications">Notifications</string>
+    <string name="onb_perm_notification_access">Notification access</string>
+    <string name="onb_perm_overlay">Floating button</string>
+    <string name="onb_perm_location">Location</string>
+    <string name="onb_perm_battery">Background running</string>
+
+    <!-- 18+ -->
+    <string name="onb_age_title">Are you 18 or older?</string>
+    <string name="onb_age_why">RideMate is for adults only. India\'s data protection law and the licence of the AI model RideMate uses require this check.</string>
+    <string name="onb_age_yes">Yes, I\'m 18 or older</string>
+    <string name="onb_age_no">No, I\'m under 18</string>
+    <string name="onb_blocked_title">RideMate is for adults only</string>
+    <string name="onb_blocked_card_title">You can\'t use RideMate yet</string>
+    <string name="onb_blocked_body">You need to be 18 or older to use RideMate. Nothing was saved or sent from your phone.</string>
+    <string name="onb_blocked_close">Close RideMate</string>
+
+    <!-- Privacy notice -->
+    <string name="onb_notice_title">Your privacy</string>
+    <string name="onb_notice_why">Please read how RideMate uses your data. You can read this again any time in Settings → Privacy notice.</string>
+    <string name="onb_notice_accept">I agree, continue</string>
+    <string name="onb_notice_decline">I don\'t agree, close RideMate</string>
+    <string name="onb_notice_version">Version 1.0 · Effective 28 October 2026</string>
+    <string name="onb_notice_usa_callout">AI processing happens on Modal\'s servers in the USA.</string>
+    <string name="onb_notice_usa_callout_body">Masked screenshots, notification text RideMate doesn\'t recognise, your destination text and voice transcripts may be processed outside India.</string>
+    <string name="onb_notice_who_title">Who we are</string>
+    <string name="onb_notice_who_body">RideMate is made by Baharul Islam, an individual developer in Barpeta, Assam, India. Privacy contact and grievance officer: %1$s. We reply within 30 days.</string>
+    <string name="onb_notice_adults_title">Adults only (18+)</string>
+    <string name="onb_notice_adults_body">You must be 18 or older to use RideMate. If we learn that someone under 18 is using it, we delete their data.</string>
+    <string name="onb_notice_does_title">What RideMate does</string>
+    <string name="onb_notice_does_body">RideMate compares Uber, Ola and Rapido prices when you tap its button, watches those three apps\' notifications to remind you to cancel extra bookings, and guides you while you cancel them. It never taps or acts inside those apps. To read prices it uses Meta\'s Muse Spark Open AI model on Modal\'s cloud servers.</string>
+    <string name="onb_notice_data_title">What RideMate uses, and for how long</string>
+    <string name="onb_notice_data_body">• Pickup and drop places: kept on your phone and deleted a day after the ride. Your destination text is sent to Modal so the AI can pick the right place.\n• Screenshots of fare and ride screens: masked first, read by the AI on Modal, never stored.\n• Text recognised on screen: on your phone only, for the ride session.\n• Uber, Ola and Rapido notification text (masked): on your phone. Only notifications RideMate doesn\'t recognise, during a ride, are sent to Modal.\n• Your voice, only if you tap the mic: only the text transcript is sent to Modal, never the audio.\n• Google email, name and photo, only if you sign in: kept by Firebase until you erase.\n• A usage counter linked to a one-way code of your account: for fair use; kept 48 hours after you erase.\n• IP address: for rate limits; 1 day.\n• Ride outcome and request records (metadata only, no text, places or prices): 1 year.\n• Crash reports, never with screen or notification text.\nNo ads, no advertising IDs, no marketing analytics, no contacts.</string>
+    <string name="onb_notice_masking_title">Masking before upload</string>
+    <string name="onb_notice_masking_body">Before anything leaves your phone, RideMate blurs phone numbers, OTPs and PINs, number plates, names and your status bar. If a screen doesn\'t look like a fare or ride screen, nothing is uploaded. RideMate looks at your screen only when you tap its button, and Android asks your permission for each comparison.</string>
+    <string name="onb_notice_where_title">Where your data is processed</string>
+    <string name="onb_notice_where_body">AI processing happens on Modal\'s servers in the USA. RideMate\'s small server also runs on Modal. Sign-in, crash reports and remote settings are Google Firebase services; Firestore records are stored in Mumbai (asia-south1). Notification access is limited to Uber, Ola and Rapido; notifications from every other app are ignored.</string>
+    <string name="onb_notice_consent_title">Your consent</string>
+    <string name="onb_notice_consent_body">Each permission is asked separately, with its reason. Google sign-in is optional: without it, you type prices yourself. You can withdraw consent any time: turn off a permission, sign out, use Settings → Erase, or email %1$s.</string>
+    <string name="onb_notice_rights_title">Your rights</string>
+    <string name="onb_notice_rights_body">See what RideMate holds in Settings → My data. Ask us to correct or erase your data, nominate someone to act for you, or complain to us at %1$s (we reply within 30 days). If you\'re not satisfied, you can complain to the Data Protection Board of India.</string>
+    <string name="onb_notice_erase_title">What Erase does</string>
+    <string name="onb_notice_erase_body">Erase deletes your account, your RideMate data on this phone and on our server, except metadata logs (1 year, required by law) and an anonymous usage counter (48 h, abuse prevention).</string>
+    <string name="onb_notice_contact_title">Contact</string>
+    <string name="onb_notice_contact_body">Baharul Islam, Barpeta, Assam, India · %1$s (reply within 30 days)</string>
+
+    <!-- Sign-in -->
+    <string name="onb_signin_title">Sign in with Google</string>
+    <string name="onb_signin_why">AI price reading needs Google sign-in, so the free AI budget is shared fairly between people.</string>
+    <string name="onb_signin_manual_note">Without signing in, you type prices yourself (manual mode). The ride guardian and cancel reminders work either way. You can sign in later.</string>
+    <string name="onb_signin_google">Sign in with Google</string>
+    <string name="onb_signin_skip">Continue without signing in</string>
+    <string name="onb_signin_busy">Waiting for Google sign-in…</string>
+    <string name="onb_signin_problem_title">Not signed in</string>
+    <string name="onb_signin_cancelled">Sign-in was cancelled. Try again, or continue without signing in.</string>
+    <string name="onb_signin_no_account">There\'s no Google account on this phone. Add one in Android Settings → Accounts, or continue without signing in.</string>
+    <string name="onb_signin_offline">You\'re offline. Connect to the internet and try again, or continue without signing in.</string>
+    <string name="onb_signin_failed">Google sign-in didn\'t work. Try again in a minute, or continue without signing in.</string>
+
+    <!-- Notifications -->
+    <string name="onb_notif_title">Allow notifications</string>
+    <string name="onb_notif_why">RideMate reminds you to cancel extra bookings, so it needs to show notifications.</string>
+    <string name="onb_notif_action">Allow notifications</string>
+
+    <!-- Notification access -->
+    <string name="onb_access_title">Let RideMate see ride-app notifications</string>
+    <string name="onb_access_why">RideMate reads only Uber, Ola and Rapido notifications, to know when a driver accepts or cancels; every other app is ignored.</string>
+    <string name="onb_access_hint">In the next screen, find \"RideMate ride guardian\" and turn it on, then come back.</string>
+    <string name="onb_access_action">Open notification access</string>
+    <string name="onb_greyed_title">Is the switch greyed out?</string>
+    <string name="onb_greyed_body">Android blocks this switch for apps installed from outside the Play Store. RideMate will show you how to allow it in a moment.</string>
+    <string name="onb_greyed_action">Show me how</string>
+
+    <!-- Overlay -->
+    <string name="onb_overlay_title">Allow the floating button</string>
+    <string name="onb_overlay_why">RideMate\'s small floating button sits over the ride app, so you can tap it to read prices.</string>
+    <string name="onb_overlay_hint">In the next screen, turn on \"Allow display over other apps\" for RideMate, then come back.</string>
+    <string name="onb_overlay_action">Open display over other apps</string>
+
+    <!-- Restricted settings (sideloaded Android 13+) -->
+    <string name="onb_restricted_title">Allow restricted settings</string>
+    <string name="onb_restricted_why">Android blocks some switches for apps installed from outside the Play Store until you allow them once.</string>
+    <string name="onb_restricted_steps_title">How to allow it</string>
+    <string name="onb_restricted_steps">1. Tap \"Open App info\".\n2. Tap ⋮ (top right), then \"Allow restricted settings\", and confirm with your PIN or fingerprint.\n3. Come back here and turn on notification access and the floating button.</string>
+    <string name="onb_restricted_open_app_info">Open App info</string>
+
+    <!-- Location -->
+    <string name="onb_location_title">Use your location for pickup</string>
+    <string name="onb_location_why">RideMate fills in your pickup from where you are, only while you use the app.</string>
+    <string name="onb_location_action">Allow location</string>
+    <string name="onb_location_not_now">Not now, I\'ll type my pickup</string>
+
+    <!-- Battery + OEM -->
+    <string name="onb_battery_title">Keep reminders on time</string>
+    <string name="onb_battery_why">Battery saving can pause RideMate in the background, so cancel reminders might come late; allowing background running keeps them on time.</string>
+    <string name="onb_battery_action">Allow background running</string>
+    <string name="onb_oem_title">One more setting on your phone</string>
+    <string name="onb_oem_open">Open this setting</string>
+    <string name="onb_oem_xiaomi">Xiaomi, Redmi and POCO phones also stop apps on their own. Open Security → Autostart (or App info → Autostart) and turn on RideMate. Then in App info → Battery saver, choose \"No restrictions\".</string>
+    <string name="onb_oem_oppo_realme">Oppo, Realme and OnePlus phones also stop apps on their own. Open App info → Battery usage and turn on \"Allow background activity\" and \"Allow auto launch\".</string>
+    <string name="onb_oem_vivo">Vivo and iQOO phones also stop apps on their own. Open i Manager → App manager → Autostart and turn on RideMate. Then in Battery → Background power consumption, allow RideMate.</string>
+    <string name="onb_oem_samsung">Samsung phones may put unused apps to sleep. Open Settings → Battery → Background usage limits → Never sleeping apps, and add RideMate.</string>
+    <string name="onb_oem_motorola">Motorola phones may limit background apps. Open App info → Battery and choose \"Unrestricted\" (or turn on \"Allow background usage\").</string>
+
+    <!-- Self-test -->
+    <string name="onb_health_title">Quick self-test</string>
+    <string name="onb_health_why">RideMate posts a test notification and checks that it can see it, so it won\'t miss a driver accepting.</string>
+    <string name="onb_health_run">Run the self-test</string>
+    <string name="onb_health_running">Checking… this takes up to 5 seconds.</string>
+    <string name="onb_health_ok">RideMate can see notifications.</string>
+    <string name="onb_health_retry">Try again</string>
+    <string name="onb_health_skip">Continue anyway</string>
+    <string name="onb_health_not_seen_title">RideMate couldn\'t see its test notification</string>
+    <string name="onb_health_not_seen_body">Turn RideMate\'s notification access off and on again, then try again. If it still fails, restart your phone.</string>
+    <string name="onb_health_notif_blocked_title">Notifications are off</string>
+    <string name="onb_health_notif_blocked_body">RideMate can\'t post its test notification. Allow notifications, then try again.</string>
+    <string name="onb_health_access_missing_title">Notification access is off</string>
+    <string name="onb_health_access_missing_body">RideMate can\'t see ride-app notifications. Turn on notification access, then try again.</string>
+    <string name="onb_selftest_channel">RideMate self-test</string>
+    <string name="onb_selftest_channel_description">A short test notification while you set up RideMate.</string>
+    <string name="onb_selftest_title">RideMate self-test</string>
+    <string name="onb_selftest_text">Checking that RideMate can see notifications. This disappears by itself.</string>
+
+    <!-- Done -->
+    <string name="onb_done_title">You\'re all set</string>
+    <string name="onb_done_body">Here\'s what RideMate may use. You can change these any time in Android settings; RideMate checks them again before each comparison.</string>
+    <string name="onb_done_health_skipped_title">The self-test didn\'t pass</string>
+    <string name="onb_done_health_skipped_body">RideMate may miss ride-app notifications. Before each comparison it checks again and shows how to fix it.</string>
+    <string name="onb_done_start">Start using RideMate</string>
+</resources>

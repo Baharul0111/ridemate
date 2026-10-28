@@ -26,6 +26,8 @@ import app.ridemate.privacy.EraseUseCase
 import app.ridemate.privacy.LocalDataWiper
 import app.ridemate.privacy.MyDataProvider
 import app.ridemate.privacy.SignInKind
+import app.ridemate.ui.AppShell
+import app.ridemate.ui.FeatureBindings
 import app.ridemate.update.UpdateChecker
 import app.ridemate.util.BuildInfo
 import app.ridemate.util.Clock
@@ -144,6 +146,13 @@ class AppGraph(
             scope = appScope,
         )
     }
+
+    // ---- app shell (app.ridemate.ui / onboarding / home / settings / dev) ----
+    /** Other areas' screens and services as the shell sees them; the integration step binds the real ones here. */
+    val featureBindings: FeatureBindings by lazy { FeatureBindings() }
+
+    /** Onboarding state, settings, language, developer mode, the Recorder sink and the self-test registry. */
+    val appShell: AppShell by lazy { AppShell(this) }
 
     @Volatile
     private var started = false
