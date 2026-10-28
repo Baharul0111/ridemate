@@ -201,18 +201,4 @@ class OnboardingControllerTest {
         c.skipHealthCheck()
         assertEquals(HealthCheckOutcome.SKIPPED, store.answers.value.healthCheck)
     }
-
-    @Test
-    fun `self-test registry recognises only RideMate's own self-test channel`() {
-        val registry = SelfTestRegistry()
-        assertTrue(SelfTestRegistry.isSelfTestPost("in.ridemate.app", "rm_selftest", "in.ridemate.app"))
-        assertFalse(SelfTestRegistry.isSelfTestPost("com.ubercab", "rm_selftest", "in.ridemate.app"))
-        assertFalse(SelfTestRegistry.isSelfTestPost("in.ridemate.app", "reminders", "in.ridemate.app"))
-        assertFalse(registry.hasSeen("t1"))
-        registry.onPosted("t1")
-        registry.onPosted(null)
-        assertTrue(registry.hasSeen("t1"))
-        repeat(40) { registry.onPosted("x$it") }
-        assertFalse("bounded: old tags are forgotten", registry.hasSeen("t1"))
-    }
 }

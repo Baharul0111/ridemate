@@ -8,6 +8,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.navigation.NavHostController
@@ -120,19 +121,18 @@ class ShellNavigationTest {
         rule.onNodeWithContentDescription("Settings").performClick()
         rule.onNodeWithText("Privacy notice").assertIsDisplayed()
 
-        // A notification tap opens the guardian (a placeholder until the integration binds A3's screen).
+        // A notification tap opens the guardian's real screen.
         deepLinks.value = DeepLink.Guardian("s1", "first_driver")
         rule.waitForIdle()
         assertNull("the deep link is consumed once", deepLinks.value)
-        rule.onNodeWithText("Ride guardian").assertIsDisplayed()
-        rule.onNodeWithText("This part isn't in this build yet").assertIsDisplayed()
+        rule.onAllNodesWithText("Ride guardian").onFirst().assertIsDisplayed()
         rule.runOnIdle {
             assertEquals(Routes.GUARDIAN, nav.currentDestination?.route)
             assertEquals("s1", nav.currentBackStackEntry?.arguments?.getString(Routes.ARG_SESSION))
             assertEquals("first_driver", nav.currentBackStackEntry?.arguments?.getString(Routes.ARG_SHEET))
         }
 
-        rule.onNodeWithText("Go to the home screen").performScrollTo().performClick()
+        rule.runOnIdle { NavFeatureNavigator(nav) { true }.home() }
         rule.onNodeWithText("Compare ride prices").assertIsDisplayed()
         rule.runOnIdle {
             assertEquals(Routes.HOME, nav.currentDestination?.route)

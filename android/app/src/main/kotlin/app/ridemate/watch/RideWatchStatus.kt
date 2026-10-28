@@ -12,14 +12,18 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import app.ridemate.R
 import app.ridemate.notify.GuardianChannels
+import app.ridemate.onboarding.RideWatchSelfTest
+import app.ridemate.precheck.RideWatchPing
 import app.ridemate.util.Clock
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeoutOrNull
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.ConcurrentLinkedDeque
 
 /** What the pre-session check sees (§4.2 "Pre-session check"). */
 enum class WatchHealth {
@@ -42,8 +46,11 @@ enum class SelfTestResult { PASSED, ACCESS_OFF, NOTIFICATIONS_BLOCKED, TIMED_OUT
  * `rm_selftest` channel and waits for the listener to see it. The listener reads nothing of its own app's posts except
  * this channel's id and the self-test tag.
  */
-class RideWatchStatus(private val context: Context, private val clock: Clock) {
+class RideWatchStatus(private val context: Context, private val clock: Clock) : RideWatchSelfTest, RideWatchPing {
     private val _connected = MutableStateFlow(false)
+
+    /** Tags of RideMate's own self-test posts the listener has seen (onboarding health check), newest last. */
+    private val seenSelfTests = ConcurrentLinkedDeque<String>()
 
     /** True while the system has the listener bound. */
     val connected: StateFlow<Boolean> = _connected.asStateFlow()
@@ -61,8 +68,8 @@ class RideWatchStatus(private val context: Context, private val clock: Clock) {
 
     fun isAccessGranted(): Boolean = NotificationManagerCompat.getEnabledListenerPackages(context).contains(context.packageName)
 
-    /** The pre-session check. A granted but unbound listener gets a rebind request. */
-    fun ping(): WatchHealth = when {
+    /** The listener's health. A granted but unbound listener gets a rebind request. */
+    fun health(): WatchHealth = when {
         !isAccessGranted() -> WatchHealth.ACCESS_OFF
         connected.value -> WatchHealth.OK
         else -> {
@@ -118,7 +125,25 @@ class RideWatchStatus(private val context: Context, private val clock: Clock) {
 
     /** Called by the listener when it sees one of RideMate's own self-test posts. */
     fun onSelfTestSeen(tag: String?) {
-        if (tag != null) waiters[tag]?.complete(Unit)
+        if (tag.isNullOrBlank()) return
+        seenSelfTests.addLast(tag)
+        while (seenSelfTests.size > SEEN_CAPACITY) seenSelfTests.pollFirst()
+        waiters[tag]?.complete(Unit)
+    }
+
+    /** Onboarding's health check: has the listener seen the self-test post tagged [token]? */
+    override fun hasSeen(token: String): Boolean = seenSelfTests.contains(token)
+
+    /**
+     * The pre-session check's ping: true when the listener is bound. A granted-but-unbound listener is asked to rebind
+     * and given [rebindWaitMs] to come back before it counts as not responding.
+     */
+    override suspend fun ping(): Boolean = isConnected()
+
+    suspend fun isConnected(rebindWaitMs: Long = REBIND_WAIT_MS): Boolean = when (health()) {
+        WatchHealth.OK -> true
+        WatchHealth.ACCESS_OFF -> false
+        WatchHealth.NOT_CONNECTED -> withTimeoutOrNull(rebindWaitMs) { connected.first { it } } == true
     }
 
     /** The listener connected; [rereadActive] re-reads the shade on demand (I9, after a guardian restore). */
@@ -150,5 +175,9 @@ class RideWatchStatus(private val context: Context, private val clock: Clock) {
         const val DEFAULT_SELF_TEST_TIMEOUT_MS = 5_000L
         private const val SELF_TEST_GRACE_MS = 5_000L
         const val SELF_TEST_NOTIFICATION_ID = 7_301
+        private const val SEEN_CAPACITY = 16
+
+        /** How long the pre-session ping waits for a rebound listener (inside the check's own 2 s limit). */
+        const val REBIND_WAIT_MS = 1_500L
     }
 }

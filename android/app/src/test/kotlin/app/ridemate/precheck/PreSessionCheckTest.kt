@@ -43,7 +43,7 @@ class PreSessionCheckTest {
         override fun installedRideApps() = v(installed)
     }
 
-    class FakeRideWatch(var answer: suspend () -> Boolean = { true }) : RideWatchStatus {
+    class FakeRideWatch(var answer: suspend () -> Boolean = { true }) : RideWatchPing {
         var pings = 0
         override suspend fun ping(): Boolean {
             pings++
@@ -53,7 +53,7 @@ class PreSessionCheckTest {
 
     private val probes = FakeProbes()
     private val rideWatch = FakeRideWatch()
-    private var bound: RideWatchStatus? = rideWatch
+    private var bound: RideWatchPing? = rideWatch
     private val clock = FakeClock()
     private val allApps = Provider.LIVE_APPS.toSet()
 

@@ -13,7 +13,12 @@ import app.ridemate.config.RemoteConfigBackend
 import app.ridemate.crash.CrashBackend
 import app.ridemate.crash.FirebaseCrashBackend
 import app.ridemate.data.RideMateDb
+import app.ridemate.net.ApiClient
 import app.ridemate.net.OkHttpApiClient
+import app.ridemate.ocr.MlKitOcrEngine
+import app.ridemate.ocr.OcrEngine
+import app.ridemate.ondc.FirestoreOndcTxnSource
+import app.ridemate.ondc.OndcTxnSource
 import app.ridemate.util.AndroidBootIdProvider
 import app.ridemate.util.BootIdProvider
 import app.ridemate.util.Clock
@@ -38,6 +43,12 @@ class PlatformSeams(
     val httpClient: () -> OkHttpClient,
     val workManager: (Context) -> WorkManager,
     val bootIds: (Context) -> BootIdProvider,
+    /** The ONDC transaction listener (Firestore `ondc_txn/{txnId}` in production). */
+    val ondcTxns: () -> OndcTxnSource = { FirestoreOndcTxnSource() },
+    /** Channel B's on-device OCR (ML Kit Text Recognition v2 in production). */
+    val ocrEngine: () -> OcrEngine = { MlKitOcrEngine() },
+    /** Replaces the OkHttp API client when it returns one (tests: a scripted server, never the real network). */
+    val apiClient: () -> ApiClient? = { null },
 ) {
     companion object {
         fun production(): PlatformSeams = PlatformSeams(

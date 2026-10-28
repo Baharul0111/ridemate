@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import androidx.core.content.FileProvider
 import app.ridemate.R
+import app.ridemate.messaging.FirebaseFcmTokenSource
 import com.google.firebase.messaging.FirebaseMessaging
 import kotlinx.coroutines.tasks.await
 import java.io.File
@@ -60,7 +61,7 @@ interface OwnerPushTokens {
 }
 
 class FirebaseOwnerPushTokens : OwnerPushTokens {
-    override suspend fun token(): String? = runCatching { FirebaseMessaging.getInstance().token.await() }.getOrNull()
+    override suspend fun token(): String? = runCatching { FirebaseFcmTokenSource.currentToken() }.getOrNull()
 
     override suspend fun delete(): Boolean = runCatching { FirebaseMessaging.getInstance().deleteToken().await() }.isSuccess
 }

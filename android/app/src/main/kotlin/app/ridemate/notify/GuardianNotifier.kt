@@ -19,6 +19,8 @@ import androidx.core.content.ContextCompat
 import app.ridemate.R
 import app.ridemate.core.guardian.OpenPurpose
 import app.ridemate.core.model.Provider
+import app.ridemate.core.guardian.UiAction
+import app.ridemate.session.GuardianActionActivity
 import app.ridemate.session.NotificationActionReceiver
 
 /** Intents behind guardian notifications: action buttons (to [NotificationActionReceiver]) and content taps. */
@@ -30,8 +32,11 @@ object GuardianIntents {
     const val EXTRA_DESTINATION = "app.ridemate.extra.DESTINATION"
     const val DESTINATION_GUARDIAN = "guardian"
 
-    /** "Read fares" from the ongoing notification: the capture area starts a fare read (it needs an activity). */
-    const val DESTINATION_READ_FARES = "read_fares"
+    /** "Compare again (same trip)": the new comparison's list. */
+    const val DESTINATION_COMPARE = "compare"
+
+    /** Extra with [DESTINATION_COMPARE]: the session to show. */
+    const val EXTRA_SESSION_ID = "app.ridemate.extra.GUARDIAN_SESSION_ID"
 
     private const val FLAGS = PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
 
@@ -45,10 +50,11 @@ object GuardianIntents {
     fun tapPendingIntent(context: Context, cardId: String, index: Int, target: ActionTarget): PendingIntent =
         PendingIntent.getBroadcast(context, requestCode(cardId, index), tapIntent(context, cardId, index, target), FLAGS)
 
-    /** Opens RideMate on [destination] (the UI shell routes it). */
-    fun rideMateIntent(context: Context, destination: String = DESTINATION_GUARDIAN): Intent? =
+    /** Opens RideMate on [destination] (the UI shell routes it), optionally for [sessionId]. */
+    fun rideMateIntent(context: Context, destination: String = DESTINATION_GUARDIAN, sessionId: String? = null): Intent? =
         context.packageManager.getLaunchIntentForPackage(context.packageName)?.apply {
             putExtra(EXTRA_DESTINATION, destination)
+            sessionId?.let { putExtra(EXTRA_SESSION_ID, it) }
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
         }
 
@@ -56,22 +62,33 @@ object GuardianIntents {
         rideMateIntent(context)?.let { PendingIntent.getActivity(context, requestCode(cardId, -1), it, FLAGS) }
 
     /**
-     * A button's PendingIntent. Buttons that must show an activity (Read fares, Open RideMate) open it directly: Android
-     * blocks activity starts from a receiver behind a notification tap.
+     * A button's PendingIntent. Open RideMate opens it directly (Android blocks activity starts from a receiver behind a
+     * notification tap). Buttons that capture the screen or open the comparison go through the transparent
+     * [GuardianActionActivity], whose start collapses the shade first; every other button is a broadcast.
      */
     fun buttonPendingIntent(context: Context, cardId: String, index: Int, target: ActionTarget): PendingIntent {
-        val destination = when ((target as? SessionOp)?.op) {
-            SessionOpKind.READ_FARES -> DESTINATION_READ_FARES
-            SessionOpKind.OPEN_GUARDIAN -> DESTINATION_GUARDIAN
-            else -> null
+        if ((target as? SessionOp)?.op == SessionOpKind.OPEN_GUARDIAN) {
+            rideMateIntent(context, DESTINATION_GUARDIAN)?.let { return PendingIntent.getActivity(context, requestCode(cardId, index), it, FLAGS) }
         }
-        val activity = destination?.let { rideMateIntent(context, it) }
-        return if (activity != null) {
-            PendingIntent.getActivity(context, requestCode(cardId, index), activity, FLAGS)
-        } else {
-            tapPendingIntent(context, cardId, index, target)
+        if (needsActivity(target)) {
+            val activity = Intent(tapIntent(context, cardId, index, target))
+                .setClass(context, GuardianActionActivity::class.java)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_ANIMATION or Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS)
+            return PendingIntent.getActivity(context, requestCode(cardId, index), activity, FLAGS)
         }
+        return tapPendingIntent(context, cardId, index, target)
     }
+
+    /**
+     * Buttons that need an activity start behind them: Read fares, Show me and Check screen capture the screen behind
+     * the shade, and Compare again opens the comparison (Android blocks activity starts from a receiver).
+     */
+    fun needsActivity(target: ActionTarget): Boolean = when (target) {
+        is SessionOp -> target.op == SessionOpKind.READ_FARES
+        is GuardianTap -> target.action in ACTIVITY_ACTIONS
+    }
+
+    private val ACTIVITY_ACTIONS = setOf(UiAction.SHOW_ME, UiAction.CHECK_SCREEN, UiAction.COMPARE_AGAIN)
 
     /** A user tap on the notification opens the ride app directly (allowed from the background). */
     fun rideApp(context: Context, cardId: String, intent: Intent): PendingIntent =
@@ -190,8 +207,8 @@ class GuardianNotifier(
     }
 
     /** Brings RideMate to the front on [destination] (used for in-app taps, where RideMate is already in front). */
-    fun openRideMate(destination: String): Boolean {
-        val intent = GuardianIntents.rideMateIntent(context, destination) ?: return false
+    fun openRideMate(destination: String, sessionId: String? = null): Boolean {
+        val intent = GuardianIntents.rideMateIntent(context, destination, sessionId) ?: return false
         return try {
             context.startActivity(intent)
             true

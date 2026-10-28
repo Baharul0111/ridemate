@@ -4,11 +4,15 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import app.ridemate.MainActivity
+import app.ridemate.notify.GuardianIntents
 
 /** Where an intent from a notification (or the launcher) asks the app to go. */
 sealed interface DeepLink {
     /** The guardian of [sessionId]; [sheet] is an opaque sheet id the guardian understands (e.g. "first_driver"). */
     data class Guardian(val sessionId: String?, val sheet: String?) : DeepLink
+
+    /** The comparison list of [sessionId] (null: the current one), e.g. after "Compare again (same trip)". */
+    data class Comparison(val sessionId: String?) : DeepLink
 }
 
 /**
@@ -36,10 +40,22 @@ object DeepLinks {
             }
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
 
+    /**
+     * The screen [intent] asks for: an [ACTION_OPEN_GUARDIAN] link, or the guardian's notification taps (RideMate's
+     * launch intent with [GuardianIntents.EXTRA_DESTINATION]). Anything else opens the app normally.
+     */
     fun parse(intent: Intent?): DeepLink? {
-        if (intent?.action != ACTION_OPEN_GUARDIAN) return null
-        val session = intent.getStringExtra(EXTRA_SESSION_ID)?.takeIf { SAFE_ID.matches(it) }
-        val sheet = intent.getStringExtra(EXTRA_SHEET)?.takeIf { SAFE_ID.matches(it) }
-        return DeepLink.Guardian(session, sheet)
+        intent ?: return null
+        if (intent.action == ACTION_OPEN_GUARDIAN) {
+            val session = intent.getStringExtra(EXTRA_SESSION_ID)?.takeIf { SAFE_ID.matches(it) }
+            val sheet = intent.getStringExtra(EXTRA_SHEET)?.takeIf { SAFE_ID.matches(it) }
+            return DeepLink.Guardian(session, sheet)
+        }
+        val session = intent.getStringExtra(GuardianIntents.EXTRA_SESSION_ID)?.takeIf { SAFE_ID.matches(it) }
+        return when (intent.getStringExtra(GuardianIntents.EXTRA_DESTINATION)) {
+            GuardianIntents.DESTINATION_GUARDIAN -> DeepLink.Guardian(session, null)
+            GuardianIntents.DESTINATION_COMPARE -> DeepLink.Comparison(session)
+            else -> null
+        }
     }
 }

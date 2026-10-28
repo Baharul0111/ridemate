@@ -10,13 +10,12 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.ridemate.data.RecorderPostEntity
 import app.ridemate.dev.CaptureTestResult.Done
-import app.ridemate.home.DefaultPreSessionGate
+import app.ridemate.integration.PrecheckGate
+import app.ridemate.integration.RideMateScreens
 import app.ridemate.net.ConfigCheckBudget
 import app.ridemate.net.ConfigCheckResponse
-import app.ridemate.onboarding.SelfTestRegistry
 import app.ridemate.testing.A11y
 import app.ridemate.testing.TestRideMateApp
-import app.ridemate.ui.PlaceholderFeatureScreens
 import app.ridemate.ui.RideMateTheme
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -88,11 +87,11 @@ class DevScreenTest {
         val graph = app.graph
         val shell = graph.appShell
         assertSame(shell, graph.appShell)
-        assertSame(PlaceholderFeatureScreens, graph.featureBindings.screens)
-        assertTrue(shell.preSessionGate is DefaultPreSessionGate)
-        assertSame(shell.selfTestRegistry, shell.rideWatchSelfTest)
+        assertTrue(graph.featureBindings.screens is RideMateScreens)
+        assertTrue(shell.preSessionGate is PrecheckGate)
+        assertSame(graph.rideWatchStatus, shell.rideWatchSelfTest)
+        assertSame(graph.captureDevTools, graph.featureBindings.captureTester)
         assertFalse("the Recorder is off until the owner turns developer mode on", shell.recorderSink.isRecording)
-        assertTrue(SelfTestRegistry.CHANNEL_ID == "rm_selftest")
 
         shell.onboardingStore.markCompleted()
         shell.settingsStore.setKeepSearchingDefault(true)

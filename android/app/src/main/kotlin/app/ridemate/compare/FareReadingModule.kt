@@ -11,7 +11,6 @@ import app.ridemate.capture.StopReason
 import app.ridemate.crash.CrashSite
 import app.ridemate.ocr.FrameMasker
 import app.ridemate.ocr.MaskingRenderer
-import app.ridemate.ocr.MlKitOcrEngine
 import app.ridemate.ocr.OcrEngine
 import app.ridemate.util.Clock
 import kotlinx.coroutines.withContext
@@ -54,7 +53,7 @@ class FareReadingModule(private val graph: AppGraph) {
         )
     }
 
-    val ocrEngine: OcrEngine by lazy { MlKitOcrEngine() }
+    val ocrEngine: OcrEngine by lazy { graph.seams.ocrEngine() }
 
     val masker: FrameMasker by lazy { MaskingRenderer(config = { config.maskConfig() }) }
 

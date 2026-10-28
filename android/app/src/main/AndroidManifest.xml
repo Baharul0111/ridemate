@@ -81,6 +81,16 @@
             android:taskAffinity=""
             android:theme="@style/Theme.RideMate.Transparent" />
 
+        <!-- Notification buttons that capture the screen or open the comparison (Read fares, Show me, Check screen,
+             Compare again): starting it collapses the shade first. Transparent, never exported. -->
+        <activity
+            android:name=".session.GuardianActionActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:taskAffinity=""
+            android:theme="@style/Theme.RideMate.Transparent" />
+
         <!-- Fallback when capture is blocked: share a screenshot of a fare screen to RideMate. -->
         <activity
             android:name=".capture.ShareReceiverActivity"
@@ -156,6 +166,16 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/dev_export_paths" />
         </provider>
+
+        <!-- Firebase Auth's web-redirect activities (generic OAuth providers, phone-number reCAPTCHA) are exported for
+             flows RideMate never uses (it signs in with Google through Credential Manager, or anonymously):
+             removed, so nothing outside RideMate can start them. -->
+        <activity
+            android:name="com.google.firebase.auth.internal.GenericIdpActivity"
+            tools:node="remove" />
+        <activity
+            android:name="com.google.firebase.auth.internal.RecaptchaActivity"
+            tools:node="remove" />
 
         <meta-data
             android:name="firebase_analytics_collection_deactivated"

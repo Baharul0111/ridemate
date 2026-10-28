@@ -17,6 +17,7 @@ import app.ridemate.BuildConfig
 import app.ridemate.R
 import app.ridemate.dev.VersionTapOutcome
 import app.ridemate.onboarding.AppPermission
+import app.ridemate.privacy.EraseStatus
 import app.ridemate.privacy.PrivacyMessages
 import app.ridemate.ui.SystemIntents
 import app.ridemate.ui.findActivity
@@ -85,8 +86,10 @@ fun SettingsRoute(graph: AppGraph, nav: SettingsNavigation) {
             dismissErase = model::dismissEraseDialog,
             reauthErase = { context.findActivity()?.let { model.reauthAndErase(it) } },
             eraseFinished = {
+                val wiped = !state.eraseDialog.localWipeFailed
                 model.dismissEraseDialog()
-                nav.afterErase()
+                // A failed local wipe left everything in place: stay here so the user can free up storage and retry.
+                if (wiped) nav.afterErase()
             },
             contactPrivacy = { contactPrivacy(context) },
             setLanguage = { lang -> if (model.setLanguage(lang)) context.findActivity()?.recreate() },
@@ -117,8 +120,9 @@ fun MyDataRoute(graph: AppGraph, onBack: () -> Unit, afterErase: () -> Unit) {
             dismissErase = model::dismissEraseDialog,
             reauthErase = { context.findActivity()?.let { model.reauthAndErase(it) } },
             eraseFinished = {
+                val wiped = !state.eraseDialog.localWipeFailed
                 model.dismissEraseDialog()
-                afterErase()
+                if (wiped) afterErase()
             },
         ),
     )
@@ -182,3 +186,7 @@ private val TapOutcomeSaver = androidx.compose.runtime.saveable.Saver<VersionTap
         }
     },
 )
+
+/** The erase dialog shows the outcome "the data on this phone could not be wiped". */
+private val EraseDialog.localWipeFailed: Boolean
+    get() = (this as? EraseDialog.Result)?.status == EraseStatus.LocalWipeFailed

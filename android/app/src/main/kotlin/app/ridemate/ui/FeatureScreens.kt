@@ -1,10 +1,6 @@
 package app.ridemate.ui
 
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.res.stringResource
-import app.ridemate.R
 import app.ridemate.dev.CaptureTester
 import app.ridemate.dev.GoldenCaptureSource
 import app.ridemate.home.PreSessionGate
@@ -35,9 +31,8 @@ interface FeatureNavigator {
 }
 
 /**
- * Composable slots for screens owned by other areas (A2: trip input + comparison; A3: guardian + demo). The shell's
- * navigation renders whatever is bound here; [PlaceholderFeatureScreens] stands in until the integration binds the
- * real screens, so the shell never depends on them being present.
+ * Composable slots for screens owned by other areas (A1: trip input; A2: comparison; A3: guardian + demo), bound in
+ * [app.ridemate.AppGraph.featureBindings] to `app.ridemate.integration.RideMateScreens`.
  */
 interface FeatureScreens {
     @Composable
@@ -51,49 +46,23 @@ interface FeatureScreens {
 
     @Composable
     fun Demo(navigator: FeatureNavigator)
-}
 
-/** Stand-ins: a titled screen that says the part is not in this build, with a way back. */
-object PlaceholderFeatureScreens : FeatureScreens {
+    /** Drawn over every screen: the guardian's open sheet while a ride session runs. */
     @Composable
-    override fun TripInput(navigator: FeatureNavigator) = Placeholder(stringResource(R.string.ui_feature_trip), navigator)
-
-    @Composable
-    override fun Comparison(sessionId: String?, navigator: FeatureNavigator) =
-        Placeholder(stringResource(R.string.ui_feature_compare), navigator)
-
-    @Composable
-    override fun Guardian(sessionId: String?, sheet: String?, navigator: FeatureNavigator) =
-        Placeholder(stringResource(R.string.ui_feature_guardian), navigator)
-
-    @Composable
-    override fun Demo(navigator: FeatureNavigator) = Placeholder(stringResource(R.string.ui_feature_demo), navigator)
-
-    @Composable
-    private fun Placeholder(title: String, navigator: FeatureNavigator) {
-        ScreenScaffold(title = title, onBack = navigator::back) {
-            InfoCard(
-                title = stringResource(R.string.ui_feature_missing_title),
-                body = stringResource(R.string.ui_feature_missing_body),
-                tone = ChipTone.WARNING,
-            )
-            Text(stringResource(R.string.ui_feature_missing_next), style = MaterialTheme.typography.bodyMedium)
-            PrimaryButton(stringResource(R.string.ui_go_home), navigator::home)
-        }
-    }
+    fun SessionSheets(navigator: FeatureNavigator)
 }
 
 /**
- * Everything the shell needs from other areas, in one place for the integration step to bind (AppGraph
- * `featureBindings`). Null services fall back to the shell's own defaults:
- * - [preSessionGate]: A2's PreSessionCheck (default: permission-based `DefaultPreSessionGate`);
- * - [rideWatchSelfTest]: A3's RideWatchStatus (default: `SelfTestRegistry`, which RideWatch feeds);
+ * Everything the shell needs from other areas, in one place, bound by AppGraph `featureBindings`:
+ * - [screens]: the real feature screens;
+ * - [preSessionGate]: A2's PreSessionCheck (pings RideWatch);
+ * - [rideWatchSelfTest]: A3's RideWatchStatus (sees RideMate's own `rm_selftest` post);
  * - [captureTester] / [goldenCaptures]: A2's CaptureManager (+ OcrAndMask) for the developer Recorder.
  */
 data class FeatureBindings(
-    val screens: FeatureScreens = PlaceholderFeatureScreens,
-    val preSessionGate: PreSessionGate? = null,
-    val rideWatchSelfTest: RideWatchSelfTest? = null,
-    val captureTester: CaptureTester = CaptureTester.Unavailable,
-    val goldenCaptures: GoldenCaptureSource = GoldenCaptureSource.Unavailable,
+    val screens: FeatureScreens,
+    val preSessionGate: PreSessionGate,
+    val rideWatchSelfTest: RideWatchSelfTest,
+    val captureTester: CaptureTester,
+    val goldenCaptures: GoldenCaptureSource,
 )

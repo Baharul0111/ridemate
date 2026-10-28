@@ -10,11 +10,11 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 
 /**
- * RideWatch (the notification listener) answering "are you connected right now?". The watch area binds the real
- * implementation at integration (AppGraph.rideWatchStatus); without one, [PreSessionCheck] can only read whether
- * notification access is switched on.
+ * RideWatch (the notification listener) answering "are you connected right now?". Bound in AppGraph to the watch
+ * area's `app.ridemate.watch.RideWatchStatus`; without one, [PreSessionCheck] can only read whether notification
+ * access is switched on.
  */
-interface RideWatchStatus {
+fun interface RideWatchPing {
     /** True when RideWatch is connected to Android's notification stream. May suspend briefly; it is time-limited. */
     suspend fun ping(): Boolean
 }
@@ -137,7 +137,7 @@ interface PrecheckProbes {
  */
 class PreSessionCheck(
     private val probes: PrecheckProbes,
-    private val rideWatch: () -> RideWatchStatus?,
+    private val rideWatch: () -> RideWatchPing?,
     private val clock: Clock,
     private val pingTimeoutMs: Long = PING_TIMEOUT_MS,
     private val io: CoroutineDispatcher = Dispatchers.IO,
@@ -188,7 +188,7 @@ class PreSessionCheck(
      * blocks its thread can't hold Compare past the limit; a ping that fails, or gives up with its own internal time
      * limit (a CancellationException of its own), counts as no answer instead of ending the check.
      */
-    private suspend fun answersPing(status: RideWatchStatus): Boolean =
+    private suspend fun answersPing(status: RideWatchPing): Boolean =
         withTimeoutOrNull(pingTimeoutMs) {
             try {
                 awaitDetached(io) { status.ping() }

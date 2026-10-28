@@ -22,17 +22,40 @@ import app.ridemate.data.PurgeWorker
 import app.ridemate.data.RetentionPurger
 import app.ridemate.data.RideMateDb
 import app.ridemate.data.StorageHealth
+import app.ridemate.core.guardian.GuardianEffect
+import app.ridemate.core.guardian.UserAction
+import app.ridemate.core.model.Provider
+import app.ridemate.bubble.TapIds
+import app.ridemate.integration.CaptureDevTools
+import app.ridemate.integration.ComparisonStarter
+import app.ridemate.integration.GuardianCaptureHost
+import app.ridemate.integration.GuardianCompareCommands
+import app.ridemate.integration.GuardianDemoHost
+import app.ridemate.integration.GuardianLegOpenedSink
+import app.ridemate.integration.NetworkSearch
+import app.ridemate.integration.OcrEngineDemoOcr
+import app.ridemate.integration.PrecheckGate
+import app.ridemate.integration.RideMateScreens
+import app.ridemate.integration.RouteFareLauncher
+import app.ridemate.integration.RouteLauncher
+import app.ridemate.integration.ScreenCheck
+import app.ridemate.integration.SessionBubble
+import app.ridemate.integration.SessionBubbleDeps
+import app.ridemate.notify.GuardianIntents
+import app.ridemate.notify.SessionOp
+import app.ridemate.session.CompareAgainHandler
+import app.ridemate.session.FareReadRequester
+import app.ridemate.session.OndcCommandSink
+import app.ridemate.session.RideSessionService
 import app.ridemate.launch.AndroidDropClipboard
 import app.ridemate.launch.AndroidLaunchNotifier
 import app.ridemate.launch.AppLauncher
 import app.ridemate.launch.BubbleVisibility
 import app.ridemate.launch.ContextActivityStarter
 import app.ridemate.launch.InstalledApps
-import app.ridemate.launch.LegOpenedSink
 import app.ridemate.launch.PackageManagerApps
 import app.ridemate.launch.ProcessForeground
 import app.ridemate.launch.RemoteLaunchTemplates
-import app.ridemate.launch.RoomLegOpenedSink
 import app.ridemate.demo.AndroidDemoAssets
 import app.ridemate.demo.DemoController
 import app.ridemate.demo.DemoFareReader
@@ -43,7 +66,6 @@ import app.ridemate.messaging.OwnerMessaging
 import app.ridemate.messaging.OwnerTokenRegistrar
 import app.ridemate.net.ApiClient
 import app.ridemate.net.OkHttpApiClient
-import app.ridemate.ondc.FirestoreOndcTxnSource
 import app.ridemate.ondc.OndcClient
 import app.ridemate.outbox.OutboxDriver
 import app.ridemate.outbox.OutboxRepository
@@ -55,7 +77,6 @@ import app.ridemate.privacy.MyDataProvider
 import app.ridemate.privacy.SignInKind
 import app.ridemate.precheck.AndroidPrecheckProbes
 import app.ridemate.precheck.PreSessionCheck
-import app.ridemate.precheck.RideWatchStatus
 import app.ridemate.trip.RecentPlacesStore
 import app.ridemate.ui.AppShell
 import app.ridemate.ui.FeatureBindings
@@ -92,8 +113,12 @@ import java.util.concurrent.CopyOnWriteArrayList
  * - [crashReporter] sanitized crash reporting
  * - [updateChecker] update banner state
  * - [sessionActivity] whether a ride session's foreground service runs (the session service sets it)
- * - [appLauncher], [preSessionCheck], [installedApps], [recentPlaces] trip input / launch / pre-session check; the
- *   bubble, RideWatch and guardian bind [bubbleVisibility], [rideWatchStatus] and [legOpenedSink]
+ * - [appLauncher], [preSessionCheck], [installedApps], [recentPlaces] trip input / launch / pre-session check
+ * - [fareReading] bubble host, capture, OCR + masking, Read fares, Show me, the comparison list
+ * - [guardian] / [guardianRuntime] RideWatch, the session service, notifications; [sessionBubble] the overlay bubble
+ * - [demoController], [ondcClient], [ownerMessaging]; [appShell] onboarding, home, settings, developer mode
+ *
+ * Every cross-area port is bound here to its one real implementation (package `app.ridemate.integration`).
  */
 class AppGraph(
     val app: Application,
@@ -109,6 +134,11 @@ class AppGraph(
     /** Process-wide scope for platform work; failures are reported (sanitized), never crash the app. */
     val appScope: CoroutineScope = CoroutineScope(
         SupervisorJob() + dispatchers.default + CoroutineExceptionHandler { _, e -> crashReporter.recordNonFatal(e, CrashSite.OTHER) },
+    )
+
+    /** Main-thread scope for the parts confined to it (demo, ONDC, launcher calls from taps). */
+    val mainScope: CoroutineScope = CoroutineScope(
+        SupervisorJob() + dispatchers.main + CoroutineExceptionHandler { _, e -> crashReporter.recordNonFatal(e, CrashSite.OTHER) },
     )
 
     val sessionActivity: SessionActivity = SessionActivity()
@@ -136,7 +166,7 @@ class AppGraph(
     val httpClient: OkHttpClient by lazy { seams.httpClient() }
 
     val apiClient: ApiClient by lazy {
-        OkHttpApiClient(
+        seams.apiClient() ?: OkHttpApiClient(
             http = httpClient,
             baseUrl = { configRepository.apiBaseUrl() },
             tokens = authGateway,
@@ -188,22 +218,19 @@ class AppGraph(
     }
 
     // ---- trip / launch / pre-session check (app.ridemate.trip, .launch, .precheck) ----
-    /** Bound by the bubble area: whether the overlay bubble is visible (Android 15 background-start rule). */
     @Volatile
-    var bubbleVisibility: BubbleVisibility = BubbleVisibility.Hidden
+    private var boundBubbleVisibility: BubbleVisibility? = null
 
-    /** Bound by RideWatch: answers the pre-session ping; null = read the enabled-listener list instead. */
-    @Volatile
-    var rideWatchStatus: RideWatchStatus? = null
-
-    /** Bound by the guardian: records SELECTED → OPENED; null = AppLauncher moves the Room leg row itself. */
-    @Volatile
-    var legOpenedSink: LegOpenedSink? = null
+    /** Whether the overlay bubble is visible (Android 15 background-start rule): the session service's bubble. */
+    var bubbleVisibility: BubbleVisibility
+        get() = boundBubbleVisibility ?: sessionBubble
+        set(value) {
+            boundBubbleVisibility = value
+        }
 
     val installedApps: InstalledApps by lazy { PackageManagerApps(app) }
 
     val appLauncher: AppLauncher by lazy {
-        val roomSink = RoomLegOpenedSink(db.legDao())
         AppLauncher(
             templates = RemoteLaunchTemplates(configRepository),
             apps = installedApps,
@@ -214,7 +241,7 @@ class AppGraph(
                 override val isShowing: Boolean get() = bubbleVisibility.isShowing
             },
             foreground = ProcessForeground(),
-            legOpened = LegOpenedSink { legId, provider, at -> (legOpenedSink ?: roomSink).legOpened(legId, provider, at) },
+            legOpened = GuardianLegOpenedSink { guardianRuntime },
             clock = clock,
             onRecordFailure = { e -> crashReporter.recordNonFatal(e, CrashSite.OTHER) },
         )
@@ -234,18 +261,125 @@ class AppGraph(
     }
 
     // ---- fare reading (bubble, capture, OCR + masking, Read fares, comparison list) ----
-    val fareReading: FareReadingModule by lazy { FareReadingModule(this) }
+    val fareReading: FareReadingModule by lazy {
+        FareReadingModule(this).also { module ->
+            module.sessionCommands = GuardianCompareCommands { guardianRuntime }
+            module.appLauncher = RouteFareLauncher(
+                launcher = { appLauncher },
+                db = { db },
+                installed = { installedApps },
+                legIdFor = { guardianRuntime.legIdFor(it) },
+                scope = appScope,
+                onError = { crashReporter.recordNonFatal(it, CrashSite.OTHER) },
+            )
+            module.capture.foregroundHost = GuardianCaptureHost { guardianRuntime }
+        }
+    }
 
     // ---- app shell (app.ridemate.ui / onboarding / home / settings / dev) ----
-    /** Other areas' screens and services as the shell sees them; the integration step binds the real ones here. */
-    val featureBindings: FeatureBindings by lazy { FeatureBindings() }
+    /** Other areas' screens and services as the shell sees them. */
+    val featureBindings: FeatureBindings by lazy {
+        FeatureBindings(
+            screens = RideMateScreens(this),
+            preSessionGate = PrecheckGate(preSessionCheck, installedApps) { configRepository.ondcEnabled.value },
+            rideWatchSelfTest = rideWatchStatus,
+            captureTester = captureDevTools,
+            goldenCaptures = captureDevTools,
+        )
+    }
+
+    /** Developer mode's capture test and golden captures over the real capture pipeline. */
+    val captureDevTools: CaptureDevTools by lazy {
+        CaptureDevTools(
+            capture = { fareReading.capture },
+            ocr = { fareReading.ocrEngine },
+            masker = { fareReading.masker },
+            bubbleVisible = { sessionBubble.isVisible },
+            holdService = { RideSessionService.holdForCapture(app) },
+            clock = clock,
+            cpu = dispatchers.default,
+        )
+    }
 
     /** Onboarding state, settings, language, developer mode, the Recorder sink and the self-test registry. */
     val appShell: AppShell by lazy { AppShell(this) }
 
     // ---- ride guardian: RideWatch, session service, notifications (packages watch / session / notify) ----
     /** Where the bubble, launcher, capture, ONDC and compare areas plug into the guardian. */
-    val guardianBindings: SessionBindings by lazy { SessionBindings(app) }
+    val guardianBindings: SessionBindings by lazy {
+        SessionBindings(app).also { b ->
+            b.bubble = sessionBubble
+            b.capture = screenCheck
+            b.ondc = object : OndcCommandSink {
+                override fun execute(command: GuardianEffect.OndcCommand) {
+                    mainScope.launch { ondcClient.execute(command) }
+                }
+
+                override fun keepRide(legId: String) = ondcClient.keepRide(legId)
+            }
+            b.compareAgain = CompareAgainHandler { sessionId ->
+                guardian.notifier.openRideMate(GuardianIntents.DESTINATION_COMPARE, sessionId)
+            }
+            b.fareReader = FareReadRequester { fareReading.coordinator.onReadFaresTap(TapIds.newTapId()) }
+        }
+    }
+
+    /** The floating bubble the session service hosts (guardian card, fare reader status, Show me arrow). */
+    val sessionBubble: SessionBubble by lazy {
+        SessionBubble(
+            deps = object : SessionBubbleDeps {
+                override val status get() = guardianRuntime.status
+                override val uiState get() = guardianRuntime.uiState
+                override val pasteDrop get() = appLauncher.pasteDrop
+                override fun presenter() = guardian.presenter()
+                override fun showMeAvailable(provider: Provider): Boolean =
+                    configRepository.boolean(ConfigKeys.POINT_SUPPORTED, true) && fareReading.showMe.isAvailable(provider)
+                override fun readFares(tapId: String) {
+                    fareReading.coordinator.onReadFaresTap(tapId)
+                }
+                override fun userAction(action: UserAction) = guardianRuntime.onUserAction(action)
+                override fun sessionOp(op: SessionOp) = guardianRuntime.perform(op)
+                override fun endCapture() = fareReading.endCapture()
+                override fun copyDropAgain() {
+                    appLauncher.copyDropAgain()
+                }
+            },
+            main = dispatchers.main,
+        ).also { bubble -> fareReading.bubbleHosts.host = bubble }
+    }
+
+    /** The guardian's user-tapped captures of a live ride app (Show me, cancel proof, Check screen). */
+    val screenCheck: ScreenCheck by lazy {
+        ScreenCheck(
+            capture = { fareReading.capture },
+            ocr = { fareReading.ocrEngine },
+            readFares = { fareReading.readFares },
+            showMe = { fareReading.showMe },
+            commands = { guardianRuntime },
+            sessionId = { guardianRuntime.status.value.sessionId },
+            tripKm = { fareReading.activeComparison.current()?.tripKm },
+            pointTarget = { provider -> cancelCards()?.cardFor(provider.packageName)?.pointTarget ?: DemoController.DEFAULT_POINT_TARGET },
+            cancelledKeywords = { provider -> cancelCards()?.cardFor(provider.packageName)?.cancelledKeywords.orEmpty() },
+            clock = clock,
+            scope = appScope,
+            main = dispatchers.main,
+            onError = { crashReporter.recordNonFatal(it, CrashSite.CAPTURE) },
+        )
+    }
+
+    private fun cancelCards() = configRepository.resolve(ConfigKeys.CANCEL_CARDS, ::parseCancelCards)?.value
+
+    /** The Compare tap after the trip screen's check: guardian session, ONDC search, first app opened. */
+    val comparisonStarter: ComparisonStarter by lazy {
+        ComparisonStarter(
+            guardian = guardianRuntime,
+            launcher = RouteLauncher { request -> appLauncher.openFromUserTap(request) },
+            network = NetworkSearch { sessionId, legId, pickup, drop -> ondcClient.search(sessionId, legId, pickup, drop) },
+            keepSearchingDefault = { appShell.settingsStore.keepSearchingDefault.value },
+            scope = mainScope,
+            onError = { crashReporter.recordNonFatal(it, CrashSite.OTHER) },
+        )
+    }
     val rideWatchStatus: RideWatchStatus by lazy { RideWatchStatus(app, clock) }
     val guardian: GuardianModule by lazy { GuardianModule(this) }
 
@@ -276,21 +410,26 @@ class AppGraph(
             ),
             api = apiClient,
             clock = clock,
-            scope = CoroutineScope(SupervisorJob() + dispatchers.main + CoroutineExceptionHandler { _, e -> crashReporter.recordNonFatal(e, CrashSite.OTHER) }),
+            scope = mainScope,
             demoEnabled = configRepository.demoEnabled,
-            cancelCards = { configRepository.resolve(ConfigKeys.CANCEL_CARDS, ::parseCancelCards)?.value },
-        )
+            cancelCards = { cancelCards() },
+        ).also { controller ->
+            controller.bind(
+                ocr = OcrEngineDemoOcr({ fareReading.ocrEngine }, clock, dispatchers.default),
+                host = GuardianDemoHost({ guardianRuntime }, { controller.script()?.trip }, clock),
+            )
+        }
     }
 
     /** The ONDC buyer flow. Integration calls `ondcClient.bind { legId, event -> guardian.onProtocolEvent(legId, event) }`. */
     val ondcClient: OndcClient by lazy {
         OndcClient(
             api = apiClient,
-            txns = FirestoreOndcTxnSource(),
+            txns = seams.ondcTxns(),
             ondcEnabled = configRepository.ondcEnabled,
             clock = clock,
-            scope = CoroutineScope(SupervisorJob() + dispatchers.main + CoroutineExceptionHandler { _, e -> crashReporter.recordNonFatal(e, CrashSite.OTHER) }),
-        )
+            scope = mainScope,
+        ).also { client -> client.bind { legId, event -> guardianRuntime.onProtocolEvent(legId, event) } }
     }
 
     /** Owner alert pushes and the owner's FCM token registration ([app.ridemate.messaging.OwnerMessagingService]). */
@@ -341,6 +480,10 @@ class AppGraph(
                     is AuthState.Google -> SignInKind.GOOGLE
                 }
                 crashReporter.setKey(CrashKey.AUTH_KIND, kind)
+                // The owner's phone receives owner alerts: register its FCM token once the owner is signed in.
+                if (state is AuthState.Google && ownerMessaging.isOwner()) {
+                    appScope.launch { ownerMessaging.registerCurrentToken() }
+                }
             }
         }
 

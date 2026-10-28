@@ -1,0 +1,61 @@
+{
+  "image_sha256": "23ef930b5cc30c8100fe637c3e8136959da8b3b3a75488539d773b8ba2d1efcd",
+  "model": "meta-models/Muse-Spark-Open-816B-A42B",
+  "recorded_at": "2026-10-28T16:46:18Z",
+  "read": {
+    "app": "demo_kestrel",
+    "screen_type": "fare_options",
+    "options": [
+      {
+        "vehicle_class": "bike",
+        "label_text": "Bike",
+        "price_min": 112,
+        "price_max": 112,
+        "price_struck_text": "₹135",
+        "eta_min": 2,
+        "bbox_0_1000": [
+          29,
+          525,
+          958,
+          590
+        ]
+      },
+      {
+        "vehicle_class": "auto",
+        "label_text": "Auto",
+        "price_min": 180,
+        "price_max": 210,
+        "price_struck_text": null,
+        "eta_min": 4,
+        "bbox_0_1000": [
+          29,
+          605,
+          970,
+          695
+        ]
+      },
+      {
+        "vehicle_class": "cab_economy",
+        "label_text": "Kestrel Mini",
+        "price_min": 289,
+        "price_max": 289,
+        "price_struck_text": null,
+        "eta_min": 6,
+        "bbox_0_1000": [
+          30,
+          710,
+          958,
+          775
+        ]
+      }
+    ],
+    "fee_text": null,
+    "driver_eta_min": null,
+    "driver_distance_text": null
+  },
+  "usage": null,
+  "cost_usd": 0.006796,
+  "source": "live",
+  "request_id": "eval-run:793f4c6948e04a55:24bf24c2befd4767960c7b22bc3bf8d3",
+  "latency_ms": 45225
+}

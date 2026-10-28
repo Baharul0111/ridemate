@@ -84,19 +84,23 @@ class GuardianAppOpener(
     private fun openCardId(legId: String) = "open:$legId"
 }
 
-/** The opt-in "Keep searching" setting (off by default, with a fee and driver-harm warning). */
-class KeepSearchingPreference(context: Context) {
-    private val prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-
+/**
+ * The opt-in "Keep searching" setting (off by default, with a fee and driver-harm warning). One value for the whole
+ * app: Settings' `SettingsStore.keepSearchingDefault` is the store, the guardian's toggle writes through to it.
+ */
+class KeepSearchingPreference(private val read: () -> Boolean, private val write: (Boolean) -> Unit) {
     var enabled: Boolean
-        get() = prefs.getBoolean(KEY, false)
-        set(value) = prefs.edit { putBoolean(KEY, value) }
+        get() = read()
+        set(value) = write(value)
 
-    fun clear() = prefs.edit { clear() }
+    fun clear() = write(false)
 
     companion object {
-        const val PREFS = "ridemate_guardian_prefs"
-        private const val KEY = "keep_searching"
+        /** A preference held in memory only (tests). */
+        fun inMemory(initial: Boolean = false): KeepSearchingPreference {
+            var value = initial
+            return KeepSearchingPreference({ value }, { value = it })
+        }
     }
 }
 

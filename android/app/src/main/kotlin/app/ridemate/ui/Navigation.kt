@@ -58,6 +58,9 @@ object Routes {
     const val ARG_SESSION = "sessionId"
     const val ARG_SHEET = "sheet"
 
+    /** Screens without the guardian's sheet overlay. */
+    val NO_SESSION_SHEETS: Set<String> = setOf(ONBOARDING, GUARDIAN)
+
     /** Screens still reachable while a forced update blocks the rest (privacy rights never wait for an update). */
     val ALLOWED_DURING_FORCED_UPDATE: Set<String> = setOf(SETTINGS, PRIVACY, MY_DATA, ABOUT, LICENCES)
 
@@ -108,6 +111,7 @@ class NavFeatureNavigator(
 
     fun open(link: DeepLink) = when (link) {
         is DeepLink.Guardian -> guardian(link.sessionId, link.sheet)
+        is DeepLink.Comparison -> comparison(link.sessionId)
     }
 
     /** Onboarding again from the start (after Erase wiped its answers). */
@@ -191,6 +195,9 @@ fun RideMateRoot(
                 composable(Routes.LICENCES) { LicencesScreen(onBack = navigator::back) }
                 composable(Routes.DEV) { DevRoute(graph, onBack = navigator::back) }
             }
+            // The guardian's open sheet (driver found, "Cancel the others?", questions) over any screen: not over
+            // onboarding (no ride can exist before it is completed) nor the guardian screen (it lists them all).
+            if (entry?.destination?.route !in Routes.NO_SESSION_SHEETS && !blocked) screens.SessionSheets(navigator)
         }
         if (blocked) ForceUpdateScreen(update, onSettings = { navController.navigate(Routes.SETTINGS) { launchSingleTop = true } })
     }

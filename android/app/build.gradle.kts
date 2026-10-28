@@ -51,6 +51,11 @@ android {
             isDebuggable = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             signingConfig = signingConfigs.findByName("release")
+            // The R8 mapping file is uploaded to Crashlytics only on the owner's explicit request
+            // (-PuploadCrashlyticsMapping=true): a local or CI build never talks to Firebase by itself.
+            configure<com.google.firebase.crashlytics.buildtools.gradle.CrashlyticsExtension> {
+                mappingFileUploadEnabled = (findProperty("uploadCrashlyticsMapping") as String?) == "true"
+            }
         }
     }
 

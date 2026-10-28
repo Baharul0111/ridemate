@@ -8,6 +8,10 @@ import app.ridemate.PlatformSeams
 import app.ridemate.RideMateApp
 import app.ridemate.config.BundledConfigSource
 import app.ridemate.data.RideMateDb
+import app.ridemate.net.ApiClient
+import app.ridemate.ocr.OcrEngine
+import app.ridemate.ocr.OcrFailedException
+import app.ridemate.ondc.OndcTxnSource
 import app.ridemate.util.BuildInfo
 import okhttp3.OkHttpClient
 
@@ -38,6 +42,17 @@ class TestSeams(
     val bootIds: FakeBootIds = FakeBootIds(),
     var bundled: Map<String, String> = emptyMap(),
 ) {
+    /** Replaces the OkHttp API client when set before the graph's first use (no real network either way). */
+    var api: ApiClient? = null
+
+    /** Channel B's OCR (ML Kit does not run on the JVM): fails unless a test sets one. */
+    var ocr: OcrEngine = object : OcrEngine {
+        override suspend fun recognize(frame: app.ridemate.capture.FrameImage) = throw OcrFailedException()
+    }
+
+    /** The ONDC transaction listener (never Firestore in tests). */
+    var ondcTxns: OndcTxnSource = OndcTxnSource { _, _ -> AutoCloseable { } }
+
     fun seams(): PlatformSeams = PlatformSeams(
         clock = clock,
         authBackend = { auth },
@@ -49,6 +64,9 @@ class TestSeams(
         httpClient = { OkHttpClient() },
         workManager = { context -> WorkManager.getInstance(context) },
         bootIds = { bootIds },
+        ondcTxns = { ondcTxns },
+        ocrEngine = { ocr },
+        apiClient = { api },
     )
 
     companion object {

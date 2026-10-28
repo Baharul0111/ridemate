@@ -145,7 +145,7 @@ class GuardianTestRig(
     var appInForeground = false
     val captureGate = FakeCaptureGate()
     val journal = UiJournalStore(context)
-    val keepSearching = KeepSearchingPreference(context)
+    val keepSearching = KeepSearchingPreference.inMemory()
 
     private val executor: ExecutorService = Executors.newSingleThreadExecutor { Thread(it, "test-guardian").apply { isDaemon = true } }
     val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)

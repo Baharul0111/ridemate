@@ -16,6 +16,9 @@ import app.ridemate.capture.CaptureState
 import app.ridemate.capture.ShareReceiverActivity
 import app.ridemate.config.ConfigKeys
 import app.ridemate.core.model.Provider
+import app.ridemate.integration.GuardianCaptureHost
+import app.ridemate.integration.GuardianCompareCommands
+import app.ridemate.integration.RouteFareLauncher
 import app.ridemate.core.model.QuoteStatus
 import app.ridemate.core.model.RideState
 import app.ridemate.core.model.VehicleClass
@@ -56,10 +59,12 @@ class FareReadingModuleTest {
         assertSame(module.showMe, module.showMe)
         assertFalse("Show me needs Google sign-in", module.showMe.isAvailable(Provider.UBER))
         assertEquals(CaptureState.Idle, module.capture.state.value)
-        assertNull(module.capture.foregroundHost)
+        // Bound by the integration: the session service hosts capture, the guardian takes "Booked here", the launcher
+        // opens apps with the route; no bubble until the session service shows one.
+        assertTrue(module.capture.foregroundHost is GuardianCaptureHost)
         assertNull(module.bubbleHosts.surface)
-        assertNull(module.sessionCommands)
-        assertTrue(module.appLauncher is PackageLaunchLauncher)
+        assertTrue(module.sessionCommands is GuardianCompareCommands)
+        assertTrue(module.appLauncher is RouteFareLauncher)
         assertFalse("ride apps aren't installed here", module.appLauncher.open(Provider.UBER))
         assertFalse(module.appLauncher.open(Provider.DEMO_PEPPER))
         assertNull(module.installedVersions.versionCode(Provider.UBER))

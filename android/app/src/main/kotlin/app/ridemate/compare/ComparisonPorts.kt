@@ -72,12 +72,23 @@ class RoomActiveComparison(private val db: RideMateDb) : ActiveComparison {
         /** States in which a ride app's price screen can be read. */
         val READABLE: Set<RideState> = setOf(RideState.SELECTED, RideState.OPENED, RideState.QUOTED)
 
+        /** Stored for a typed place whose coordinates are unknown: such a trip has no straight-line distance. */
+        val UNKNOWN_POINT = app.ridemate.core.model.LatLng(0.0, 0.0)
+
         fun activeLegOf(session: SessionEntity, leg: LegEntity): ActiveLeg = ActiveLeg(
             sessionId = session.id,
             legId = leg.id,
             provider = leg.provider,
-            tripKm = SanityBands.tripKm(session.pickup.toPlace().point, session.drop.toPlace().point).takeIf { it > 0 },
+            tripKm = tripKmOf(session),
         )
+
+        /** The straight-line trip distance the gate's ₹/km band needs; null only when a point is unknown. */
+        fun tripKmOf(session: SessionEntity): Double? {
+            val pickup = session.pickup.toPlace().point
+            val drop = session.drop.toPlace().point
+            if (pickup == UNKNOWN_POINT || drop == UNKNOWN_POINT) return null
+            return SanityBands.tripKm(pickup, drop).takeIf { it > 0 }
+        }
     }
 }
 

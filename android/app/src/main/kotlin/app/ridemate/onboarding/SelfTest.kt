@@ -1,51 +1,22 @@
 package app.ridemate.onboarding
 
 import android.annotation.SuppressLint
-import android.app.NotificationChannel
-import android.app.NotificationManager
 import android.content.Context
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import app.ridemate.R
+import app.ridemate.notify.GuardianChannels
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withTimeoutOrNull
 import java.util.UUID
-import java.util.concurrent.ConcurrentLinkedDeque
 
 /**
  * What the onboarding health check needs from RideWatch: has it seen the self-test notification tagged `token`?
- * Bound to A3's RideWatchStatus by the integration; by default it is [SelfTestRegistry], which RideWatch feeds.
+ * Bound to the watch area's `app.ridemate.watch.RideWatchStatus`, which the listener feeds with RideMate's own
+ * `rm_selftest` posts (it reads only their channel id and tag).
  */
 fun interface RideWatchSelfTest {
     fun hasSeen(token: String): Boolean
-}
-
-/**
- * Where RideWatch reports RideMate's own self-test posts. RideWatch's listener calls [onPosted] for a post whose
- * package is RideMate's own and whose channel is [CHANNEL_ID] ([isSelfTestPost]); it reads nothing else from it.
- * Keeps the last [CAPACITY] tags.
- */
-class SelfTestRegistry : RideWatchSelfTest {
-    private val seen = ConcurrentLinkedDeque<String>()
-
-    fun onPosted(tag: String?) {
-        if (tag.isNullOrBlank()) return
-        seen.addLast(tag)
-        while (seen.size > CAPACITY) seen.pollFirst()
-    }
-
-    override fun hasSeen(token: String): Boolean = seen.contains(token)
-
-    companion object {
-        /** The notification channel of the onboarding self-test. */
-        const val CHANNEL_ID = "rm_selftest"
-        const val NOTIFICATION_ID = 7_001
-        private const val CAPACITY = 16
-
-        /** True for RideMate's own self-test post (RideWatch checks this before [onPosted]). */
-        fun isSelfTestPost(postPackage: String, channelId: String?, ownPackage: String): Boolean =
-            postPackage == ownPackage && channelId == CHANNEL_ID
-    }
 }
 
 /** Posts and removes the self-test notification. */
@@ -64,13 +35,8 @@ class AndroidSelfTestNotifier(context: Context) : SelfTestNotifier {
     override fun post(token: String): Boolean {
         val manager = NotificationManagerCompat.from(app)
         if (!manager.areNotificationsEnabled()) return false
-        val channel = NotificationChannel(
-            SelfTestRegistry.CHANNEL_ID,
-            app.getString(R.string.onb_selftest_channel),
-            NotificationManager.IMPORTANCE_LOW,
-        ).apply { description = app.getString(R.string.onb_selftest_channel_description) }
-        app.getSystemService(NotificationManager::class.java)?.createNotificationChannel(channel)
-        val notification = NotificationCompat.Builder(app, SelfTestRegistry.CHANNEL_ID)
+        GuardianChannels.ensure(app) // one definition of every RideMate channel, rm_selftest included
+        val notification = NotificationCompat.Builder(app, GuardianChannels.SELFTEST)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(app.getString(R.string.onb_selftest_title))
             .setContentText(app.getString(R.string.onb_selftest_text))
@@ -79,7 +45,7 @@ class AndroidSelfTestNotifier(context: Context) : SelfTestNotifier {
             .setSilent(true)
             .build()
         return try {
-            manager.notify(token, SelfTestRegistry.NOTIFICATION_ID, notification)
+            manager.notify(token, NOTIFICATION_ID, notification)
             true
         } catch (_: SecurityException) {
             false
@@ -87,11 +53,12 @@ class AndroidSelfTestNotifier(context: Context) : SelfTestNotifier {
     }
 
     override fun cancel(token: String) {
-        runCatching { NotificationManagerCompat.from(app).cancel(token, SelfTestRegistry.NOTIFICATION_ID) }
+        runCatching { NotificationManagerCompat.from(app).cancel(token, NOTIFICATION_ID) }
     }
 
-    private companion object {
-        const val TIMEOUT_MS = 15_000L
+    companion object {
+        const val NOTIFICATION_ID = 7_001
+        private const val TIMEOUT_MS = 15_000L
     }
 }
 

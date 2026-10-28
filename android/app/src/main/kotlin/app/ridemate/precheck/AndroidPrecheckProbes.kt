@@ -24,7 +24,7 @@ class AndroidPrecheckProbes(
     private val apps: InstalledApps,
 ) : PrecheckProbes {
 
-    /** Fallback when no [RideWatchStatus] is bound: whether notification access is granted to RideMate. */
+    /** Fallback when no [RideWatchPing] is bound: whether notification access is granted to RideMate. */
     override fun listenerEnabled(): Boolean =
         NotificationManagerCompat.getEnabledListenerPackages(context).contains(context.packageName)
 

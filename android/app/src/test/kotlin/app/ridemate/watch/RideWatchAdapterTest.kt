@@ -117,10 +117,15 @@ class RideWatchAdapterTest {
         assertEquals(0, ongoing.contentReads)
         assertEquals(1, adapter.droppedUnread)
 
+        assertFalse(status.hasSeen("token"))
         val selfTest = CountingPost(context.packageName, channel = GuardianChannels.SELFTEST, tag = "token")
         adapter.onPosted(selfTest)
         assertEquals(0, selfTest.contentReads)
         assertEquals(1, adapter.droppedUnread)
+        // Onboarding's health check (bound to RideWatchStatus) now sees it; old tags are forgotten (bounded).
+        assertTrue(status.hasSeen("token"))
+        repeat(40) { adapter.onPosted(CountingPost(context.packageName, channel = GuardianChannels.SELFTEST, tag = "x$it")) }
+        assertFalse(status.hasSeen("token"))
     }
 
     @Test
@@ -190,9 +195,12 @@ class RideWatchAdapterTest {
 
     @Test
     fun `the self-test and ping report notification access that is off`() = runBlocking {
+        // NotificationManagerCompat caches the enabled list across tests; an empty value refreshes it.
+        Settings.Secure.putString(context.contentResolver, "enabled_notification_listeners", "")
         assertFalse(status.isAccessGranted())
+        assertFalse("the pre-session ping fails", status.ping())
         assertEquals(SelfTestResult.ACCESS_OFF, status.selfTest(timeoutMs = 100))
-        assertEquals(WatchHealth.ACCESS_OFF, status.ping())
+        assertEquals(WatchHealth.ACCESS_OFF, status.health())
     }
 
     @Test
@@ -203,8 +211,8 @@ class RideWatchAdapterTest {
             ComponentName(context, RideWatchService::class.java).flattenToString(),
         )
         assertEquals(SelfTestResult.TIMED_OUT, status.selfTest(timeoutMs = 50))
-        assertEquals(WatchHealth.NOT_CONNECTED, status.ping())
+        assertEquals(WatchHealth.NOT_CONNECTED, status.health())
         status.onConnected {}
-        assertEquals(WatchHealth.OK, status.ping())
+        assertEquals(WatchHealth.OK, status.health())
     }
 }

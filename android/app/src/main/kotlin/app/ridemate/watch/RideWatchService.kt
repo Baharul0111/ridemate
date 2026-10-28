@@ -3,7 +3,9 @@ package app.ridemate.watch
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import app.ridemate.RideMateApp
+import app.ridemate.core.model.Provider
 import app.ridemate.crash.CrashSite
+import app.ridemate.dev.RecordedPost
 
 /**
  * RideWatch's NotificationListenerService (§4.5). It only reads notifications; it never acts on them or on the apps
@@ -13,6 +15,8 @@ import app.ridemate.crash.CrashSite
  * - Allowlisted posts reach core's RideWatchPipeline immediately (no debounce) via the guardian runtime.
  * - On disconnect the service asks the system to rebind; on (re)connect the whole shade is re-read and every
  *   allowlisted post is processed as new (I9).
+ * - In developer mode with the Recorder on, every allowlisted post and removal is also handed to the owner Recorder
+ *   (§4.19 a), which masks it before storing it on the phone.
  */
 class RideWatchService : NotificationListenerService() {
 
@@ -35,6 +39,7 @@ class RideWatchService : NotificationListenerService() {
     override fun onNotificationPosted(sbn: StatusBarNotification?) {
         sbn ?: return
         adapter.onPosted(SbnListenerPost(sbn, reader))
+        record(sbn, removalReason = null)
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification?, rankingMap: RankingMap?) = onNotificationPosted(sbn)
@@ -49,6 +54,19 @@ class RideWatchService : NotificationListenerService() {
     override fun onNotificationRemoved(sbn: StatusBarNotification?, rankingMap: RankingMap?, reason: Int) {
         sbn ?: return
         adapter.onRemoved(SbnRemoval(sbn, reason))
+        record(sbn, removalReason = reason)
+    }
+
+    /** The owner Recorder: allowlisted packages only (I7), and only while developer mode records. */
+    private fun record(sbn: StatusBarNotification, removalReason: Int?) {
+        if (sbn.packageName !in Provider.RIDE_APP_PACKAGES) return
+        val recorder = graph.appShell.recorderSink
+        if (!recorder.isRecording) return
+        try {
+            recorder.record(recordedPost(reader, sbn, removalReason, graph.clock.wallMs()))
+        } catch (e: RuntimeException) {
+            graph.crashReporter.recordNonFatal(e, CrashSite.WATCH)
+        }
     }
 
     /** The current shade. Only the package name of each entry is read before the allowlist check. */
@@ -61,4 +79,23 @@ class RideWatchService : NotificationListenerService() {
         graph.crashReporter.recordNonFatal(e, CrashSite.WATCH)
         emptyList()
     }
+}
+
+/** One allowlisted post (or removal) as the Recorder stores it; the Recorder masks title, text and tag. */
+internal fun recordedPost(reader: SbnPostReader, sbn: StatusBarNotification, removalReason: Int?, atUtcMs: Long): RecordedPost {
+    val snapshot = reader.read(sbn)
+    return RecordedPost(
+        packageName = snapshot.packageName,
+        channelId = snapshot.channelId,
+        category = snapshot.category,
+        isOngoing = snapshot.isOngoing,
+        notificationId = snapshot.id,
+        tag = snapshot.tag,
+        title = snapshot.title,
+        text = snapshot.text,
+        redacted = snapshot.platformRedacted,
+        removalReason = removalReason,
+        atUtcMs = atUtcMs,
+        versionCode = snapshot.versionCode,
+    )
 }

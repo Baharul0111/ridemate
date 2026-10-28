@@ -2,9 +2,8 @@ package app.ridemate.dev
 
 import app.ridemate.auth.AuthState
 import app.ridemate.config.ConfigKeys
+import app.ridemate.messaging.OwnerAccess
 import app.ridemate.config.ConfigRepository
-import app.ridemate.core.config.ScalarConfig
-import app.ridemate.core.config.ScalarKeys
 import app.ridemate.ui.KeyValueStore
 import app.ridemate.ui.getBoolean
 import app.ridemate.ui.putBoolean
@@ -15,8 +14,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
-import java.security.MessageDigest
-import java.util.Locale
 
 /** What a tap on the version line did. */
 sealed interface VersionTapOutcome {
@@ -38,13 +35,10 @@ sealed interface VersionTapOutcome {
 
 /** The owner's identity: SHA-256 (lower-case hex) of the lower-cased email, as Remote Config lists it. */
 object OwnerEmails {
-    fun hash(email: String): String =
-        MessageDigest.getInstance("SHA-256").digest(email.trim().lowercase(Locale.ROOT).toByteArray(Charsets.UTF_8))
-            .joinToString("") { "%02x".format(it) }
+    fun hash(email: String): String = OwnerAccess.emailHash(email)
 
-    /** `owner_emails_sha256` parsed by core's [ScalarConfig] (malformed lists count as empty). */
-    fun hashesFrom(config: ConfigRepository): Set<String> =
-        ScalarConfig.from(mapOf(ScalarKeys.OWNER_EMAILS_SHA256 to config.string(ConfigKeys.OWNER_EMAILS_SHA256))).ownerEmailsSha256
+    /** `owner_emails_sha256`, a bare JSON list (malformed lists count as empty); the same parse owner alerts use. */
+    fun hashesFrom(config: ConfigRepository): Set<String> = OwnerAccess.parseHashes(config.string(ConfigKeys.OWNER_EMAILS_SHA256))
 }
 
 /**

@@ -182,24 +182,4 @@ class HomeModelTest {
         assertEquals(CompareCheck.Idle, home.state.value.compare)
         assertEquals("the user starts the comparison, never the re-check", 0, opened)
     }
-
-    @Test
-    fun `default pre-session gate blocks when RideWatch is blind and warns about the rest`() = runTest {
-        val permissions = FakePermissions()
-        var apps = setOf(Provider.RAPIDO)
-        var online = false
-        val gate = DefaultPreSessionGate(permissions, { apps }, { online })
-        val blind = gate.check()
-        assertEquals(
-            listOf(PreSessionIssue.LISTENER_OFF, PreSessionIssue.OVERLAY_OFF, PreSessionIssue.NOTIFICATIONS_OFF),
-            blind.blocking,
-        )
-        assertEquals(listOf(PreSessionIssue.BATTERY_OPTIMISED, PreSessionIssue.LOCATION_OFF, PreSessionIssue.OFFLINE), blind.warnings)
-
-        permissions.grant(*AppPermission.entries.toTypedArray())
-        online = true
-        assertEquals(PreSessionReport.READY, gate.check())
-        apps = emptySet()
-        assertEquals(listOf(PreSessionIssue.NO_SUPPORTED_APP), gate.check().blocking)
-    }
 }

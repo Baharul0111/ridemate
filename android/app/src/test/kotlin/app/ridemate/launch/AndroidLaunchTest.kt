@@ -16,9 +16,10 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.ridemate.core.model.LatLng
 import app.ridemate.core.model.Provider
 import app.ridemate.core.model.RideState
+import app.ridemate.core.model.VehicleClass
+import app.ridemate.session.SessionSpec
 import app.ridemate.testing.TestData
 import app.ridemate.testing.TestRideMateApp
-import app.ridemate.testing.TestSeams
 import app.ridemate.trip.TripPlace
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -221,57 +222,28 @@ class AndroidLaunchTest {
     }
 
     @Test
-    fun `the graph launcher honours the bound bubble and records OPENED in Room`() = runBlocking {
+    fun `the graph launcher honours the bound bubble and the guardian records OPENED`() = runBlocking {
         installRideApp(Provider.RAPIDO)
         val graph = app.graph
-        graph.db.sessionDao().insert(TestData.session())
-        graph.db.legDao().upsert(TestData.leg(id = "l1", provider = Provider.RAPIDO, state = RideState.SELECTED))
+        val runtime = graph.guardianRuntime
+        runtime.startSession(
+            SessionSpec(
+                pickup.toPlaceOrNull()!!, drop.toPlaceOrNull()!!, listOf(Provider.RAPIDO), listOf(VehicleClass.AUTO),
+                sessionId = "s1",
+            ),
+        )
+        runtime.awaitIdle()
+        val legId = runtime.legIdFor(Provider.RAPIDO)!!
         graph.bubbleVisibility = object : BubbleVisibility {
             override val isShowing: Boolean = true
         }
 
-        val result = graph.appLauncher.open(LaunchRequest(Provider.RAPIDO, pickup, drop, "l1"))
+        val result = graph.appLauncher.open(LaunchRequest(Provider.RAPIDO, pickup, drop, legId))
+        runtime.awaitIdle()
 
         assertEquals(LaunchOutcome.OPENED, result.outcome)
-        assertEquals(RideState.OPENED, graph.db.legDao().get("l1")!!.state)
+        assertEquals(RideState.OPENED, runtime.uiState.value.leg(legId)!!.state)
+        assertEquals(RideState.OPENED, graph.db.legDao().get(legId)!!.state)
         assertEquals(Provider.RAPIDO.packageName, shadowOf(context as Application).nextStartedActivity.`package`)
-    }
-
-    @Test
-    fun `a bound leg sink replaces the Room default`() = runBlocking {
-        installRideApp(Provider.OLA)
-        val graph = app.graph
-        val sink = RecordingLegSink()
-        graph.legOpenedSink = sink
-        graph.bubbleVisibility = object : BubbleVisibility {
-            override val isShowing: Boolean = true
-        }
-        graph.appLauncher.open(LaunchRequest(Provider.OLA, pickup, drop, "guardian-leg"))
-        assertEquals("guardian-leg", sink.opened.single().first)
-    }
-
-    @Test
-    fun `the room sink moves SELECTED to OPENED only, forward and idempotent`() = runBlocking {
-        val db = TestSeams.inMemoryDb(context)
-        db.sessionDao().insert(TestData.session())
-        db.legDao().upsert(TestData.leg(id = "sel", provider = Provider.OLA, state = RideState.SELECTED))
-        db.legDao().upsert(TestData.leg(id = "asg", provider = Provider.OLA, state = RideState.ASSIGNED))
-        val sink = RoomLegOpenedSink(db.legDao())
-
-        sink.legOpened("sel", Provider.OLA, 1_000L)
-        assertEquals(RideState.OPENED, db.legDao().get("sel")!!.state)
-        assertEquals(1_000L, db.legDao().get("sel")!!.lastEventAt)
-        sink.legOpened("sel", Provider.OLA, 2_000L)
-        assertEquals(1_000L, db.legDao().get("sel")!!.lastEventAt)
-
-        sink.legOpened("asg", Provider.OLA, 3_000L)
-        assertEquals(RideState.ASSIGNED, db.legDao().get("asg")!!.state)
-
-        db.legDao().upsert(TestData.leg(id = "other", provider = Provider.UBER, state = RideState.SELECTED))
-        sink.legOpened("other", Provider.OLA, 4_000L)
-        assertEquals(RideState.SELECTED, db.legDao().get("other")!!.state)
-
-        sink.legOpened("missing", Provider.OLA, 5_000L) // no crash
-        db.close()
     }
 }

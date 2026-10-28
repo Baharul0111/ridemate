@@ -58,8 +58,11 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
@@ -159,6 +162,15 @@ class GuardianRuntime(
     override val uiState: StateFlow<GuardianUiState> = _ui.asStateFlow()
     override val status: StateFlow<GuardianStatus> = _status.asStateFlow()
 
+    private val _effects = MutableSharedFlow<GuardianEffect>(extraBufferCapacity = EVENT_BUFFER)
+    private val _userActions = MutableSharedFlow<UserAction>(extraBufferCapacity = EVENT_BUFFER)
+
+    /** Every effect the guardian emits, in order (Try the demo follows its session through this). */
+    val effects: SharedFlow<GuardianEffect> = _effects.asSharedFlow()
+
+    /** Every user tap the guardian receives, from any surface (sheets, bubble, notifications, the demo). */
+    val userActions: SharedFlow<UserAction> = _userActions.asSharedFlow()
+
     /** Registers the outbox handlers, starts the persistence writer and restores an active session. Idempotent. */
     fun start() {
         if (!started.compareAndSet(false, true)) return
@@ -209,7 +221,7 @@ class GuardianRuntime(
         when (target) {
             is GuardianTap -> target.toUserAction(newTap())?.let(::onUserAction)
             is SessionOp -> when (target.op) {
-                SessionOpKind.READ_FARES -> onMain { bindings.fareReader?.readFares() ?: notifier.openRideMate(GuardianIntents.DESTINATION_READ_FARES) }
+                SessionOpKind.READ_FARES -> onMain { bindings.fareReader?.readFares() ?: notifier.openRideMate(GuardianIntents.DESTINATION_GUARDIAN) }
                 SessionOpKind.BOOKED_HERE -> enqueue {
                     val legId = target.ref ?: lastOpenedLegId ?: firstUnbookedLeg()
                     if (legId != null) applyUserAction(UserAction.BookedHere(legId, newTap()))
@@ -228,6 +240,16 @@ class GuardianRuntime(
         awaitIdle()
     }
 
+    /** Ends a Try-the-demo session at once: its bookings are fictional, nothing is left to remind about. */
+    fun endDemoSession() = enqueue {
+        val session = guardian.state.session ?: return@enqueue
+        if (!session.demo || session.closed) return@enqueue
+        guardian.endDemoSession()
+        closedAtUtc = clock.wallMs()
+        pipeline.demoSessionActive = false
+        onMain { bindings.bubble.clearCancelCard() }
+    }
+
     override fun requestStop() = enqueue {
         val session = guardian.state.session
         if (session != null && !session.closed) stopRequested = true
@@ -243,6 +265,28 @@ class GuardianRuntime(
     }
 
     override fun faresRead(provider: Provider) = enqueue { legOf(provider)?.let(guardian::markQuoted) }
+
+    // Leg-id forms of the commands, for callers that already know the leg (the launcher, Try the demo).
+
+    /** RideMate opened leg [legId]'s app (SELECTED → OPENED); "Booked here" then means this app. */
+    fun markOpenedLeg(legId: String) = enqueue {
+        if (guardian.state.legs.containsKey(legId)) {
+            lastOpenedLegId = legId
+            guardian.markOpened(legId)
+        }
+    }
+
+    fun markQuotedLeg(legId: String) = enqueue { guardian.markQuoted(legId) }
+
+    fun recordBookedFareLeg(legId: String, fareInr: Int) = enqueue { guardian.recordBookedFare(legId, fareInr) }
+
+    fun captureVerdictLeg(legId: String, cancelledKeywordsFound: Boolean, tapId: TapId, frameAtElapsedMs: Long) = enqueue {
+        guardian.onCaptureVerdict(legId, cancelledKeywordsFound, tapId, frameAtElapsedMs)
+    }
+
+    fun verifiedDriverReadingLeg(legId: String, etaMin: Int?, distanceMeters: Int?, tapId: TapId, frameAtElapsedMs: Long) = enqueue {
+        guardian.onVerifiedDriverReading(legId, etaMin, distanceMeters, tapId, frameAtElapsedMs)
+    }
 
     override fun bookedHere(provider: Provider) = enqueue { legOf(provider)?.let { applyUserAction(UserAction.BookedHere(it, newTap())) } }
 
@@ -391,8 +435,11 @@ class GuardianRuntime(
         when (action) {
             is UserAction.CheckScreen -> captureTaps[action.legId] = action.tapId
             is UserAction.ShowMe -> captureTaps[action.legId] = action.tapId
+            // The user kept the ONDC ride after seeing the fee: the soft cancel lapses on the network side too.
+            is UserAction.OndcKeepRide -> bindings.ondc?.let { sink -> onMain { sink.keepRide(action.legId) } }
             else -> Unit
         }
+        _userActions.tryEmit(action)
         guardian.onUserAction(action)
     }
 
@@ -539,9 +586,13 @@ class GuardianRuntime(
 
     private fun handle(effect: GuardianEffect) {
         ui = GuardianUiReducer.apply(ui, effect, clock.wallMs())
+        _effects.tryEmit(effect)
         when (effect) {
-            is GuardianEffect.OpenApp -> pendingOpens += OpenRequest.of(effect.legId, effect.provider, effect.purpose, effect.tapId)
-            is GuardianEffect.RequestCapture -> {
+            // Demo providers have no app and no screen to capture: Try the demo shows its bundled screens instead.
+            is GuardianEffect.OpenApp -> if (!effect.provider.isDemo) {
+                pendingOpens += OpenRequest.of(effect.legId, effect.provider, effect.purpose, effect.tapId)
+            }
+            is GuardianEffect.RequestCapture -> if (!effect.provider.isDemo) {
                 val tap = captureTaps[effect.legId]
                 bindings.capture?.let { capture -> onMain { capture.request(effect.legId, effect.provider, effect.reason, tap) } }
             }
@@ -764,6 +815,10 @@ class GuardianRuntime(
         )
         private const val SERVICE_RETRY_MS = 15_000L
         private const val IDLE_ROUNDS = 3
+        private const val EVENT_BUFFER = 1_024
+
+        /** The leg id core's guardian gives [provider] in session [sessionId] (first round). */
+        fun legIdOf(sessionId: String, provider: Provider): String = Guardian.legIdOf(sessionId, provider)
     }
 }
 

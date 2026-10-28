@@ -26,6 +26,9 @@ import app.ridemate.notify.SessionOp
 import app.ridemate.notify.SessionOpKind
 import app.ridemate.notify.TapScope
 import app.ridemate.testing.TestRideMateApp
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
@@ -70,8 +73,17 @@ class RideSessionServiceTest {
         destroyed += controller
     }
 
+    /**
+     * Waits for the guardian off the main thread while the main looper keeps running: the service's 1 s tick (outbox
+     * included) runs on main, so blocking main here could stall work the guardian's storage writer waits for.
+     */
     private fun idle() {
-        runBlocking { withTimeout(20_000) { repeat(2) { runtime.awaitIdle() } } }
+        val done = CoroutineScope(Dispatchers.Default).async { withTimeout(20_000) { repeat(2) { runtime.awaitIdle() } } }
+        while (!done.isCompleted) {
+            shadowOf(Looper.getMainLooper()).idle()
+            Thread.sleep(2)
+        }
+        runBlocking { done.await() }
         shadowOf(Looper.getMainLooper()).idle()
     }
 
@@ -82,7 +94,7 @@ class RideSessionServiceTest {
             check(System.currentTimeMillis() < deadline) { "timed out waiting for $what" }
             shadowOf(Looper.getMainLooper()).idle()
             Thread.sleep(10)
-            runBlocking { runtime.awaitIdle() }
+            idle()
         }
     }
 
@@ -218,11 +230,16 @@ class RideSessionServiceTest {
     }
 
     @Test
-    fun `Read fares on a notification opens RideMate directly instead of going through the receiver`() {
+    fun `capture buttons on a notification go through the transparent activity so the shade collapses first`() {
         val pending = GuardianIntents.buttonPendingIntent(context, "ongoing", 0, SessionOp(SessionOpKind.READ_FARES))
         assertTrue(shadowOf(pending).isActivityIntent)
-        assertEquals(GuardianIntents.DESTINATION_READ_FARES, shadowOf(pending).savedIntent.getStringExtra(GuardianIntents.EXTRA_DESTINATION))
+        assertEquals(GuardianActionActivity::class.java.name, shadowOf(pending).savedIntent.component?.className)
+        assertEquals(SessionOp(SessionOpKind.READ_FARES), GuardianIntents.target(shadowOf(pending).savedIntent))
+        val showMe = GuardianIntents.buttonPendingIntent(context, "card", 1, GuardianTap(TapScope.LEG, "l1", UiAction.SHOW_ME))
+        assertEquals(GuardianActionActivity::class.java.name, shadowOf(showMe).savedIntent.component?.className)
         assertTrue(shadowOf(GuardianIntents.buttonPendingIntent(context, "c", 0, SessionOp(SessionOpKind.STOP))).isBroadcastIntent)
+        val open = GuardianIntents.buttonPendingIntent(context, "c", 2, SessionOp(SessionOpKind.OPEN_GUARDIAN))
+        assertEquals(GuardianIntents.DESTINATION_GUARDIAN, shadowOf(open).savedIntent.getStringExtra(GuardianIntents.EXTRA_DESTINATION))
     }
 
     @Test

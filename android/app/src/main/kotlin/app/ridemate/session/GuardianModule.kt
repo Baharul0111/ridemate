@@ -1,9 +1,8 @@
 package app.ridemate.session
 
 import androidx.core.content.ContextCompat
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.ProcessLifecycleOwner
 import app.ridemate.AppGraph
+import app.ridemate.launch.ProcessForeground
 import app.ridemate.notify.CancelStepsSource
 import app.ridemate.notify.GuardianNotifier
 import app.ridemate.notify.GuardianPresenter
@@ -41,9 +40,15 @@ class GuardianModule(private val graph: AppGraph) {
         GuardianNotifier(context, ::presenter) { provider, purpose -> graph.guardianBindings.opener.intentFor(provider, purpose) }
     }
 
-    val keepSearching: KeepSearchingPreference by lazy { KeepSearchingPreference(context) }
+    val keepSearching: KeepSearchingPreference by lazy {
+        val settings = graph.appShell.settingsStore
+        KeepSearchingPreference({ settings.keepSearchingDefault.value }, settings::setKeepSearchingDefault)
+    }
 
     private val journal by lazy { UiJournalStore(context) }
+
+    /** The same foreground test the launcher uses (Android 15 background-start rule). */
+    private val foreground = ProcessForeground()
 
     val runtime: GuardianRuntime by lazy {
         GuardianRuntime(
@@ -70,9 +75,7 @@ class GuardianModule(private val graph: AppGraph) {
             serviceStarter = ServiceStarter { RideSessionService.ensureRunning(context) },
             sessionActivity = graph.sessionActivity,
             keepSearchingPreference = keepSearching,
-            appOpener = GuardianAppOpener(context, graph.guardianBindings, notifier, ::presenter) {
-                ProcessLifecycleOwner.get().lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)
-            },
+            appOpener = GuardianAppOpener(context, graph.guardianBindings, notifier, ::presenter) { foreground.isForeground },
             captureGate = ServiceCaptureGate(context),
             mainExecutor = ContextCompat.getMainExecutor(context),
             crash = graph.crashReporter,

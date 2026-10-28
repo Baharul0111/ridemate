@@ -8,7 +8,9 @@ import app.ridemate.ondc.OndcPhase
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -25,9 +27,14 @@ class DemoAndroidTest {
         script.providers.values.flatMap { it.screens.values }.forEach { path ->
             assertArrayEquals(path, BundledAssets.bytes(path), assets.bytes(path))
         }
-        // No recorded reads are bundled until the owner records them (eval/recorded/channel_a is empty).
-        val sha = DemoImages.sha256(assets.bytes("demo/pepper/fare_options.png"))
-        assertNull(assets.recordedRead(sha))
+        // The owner's metered Muse Spark Open recordings (eval/recorded/channel_a) are bundled as the offline fallback,
+        // one per screen, each bound to its image's SHA-256.
+        script.providers.values.flatMap { it.screens.values }.forEach { path ->
+            val sha = DemoImages.sha256(assets.bytes(path))
+            assertNotNull("recorded read of $path", assets.recordedRead(sha))
+        }
+        val pepper = assets.recordedRead(DemoImages.sha256(assets.bytes("demo/pepper/fare_options.png")))!!
+        assertEquals(3, pepper.options.size)
         assertNull(assets.recordedRead("../../config/fee_rules"))
     }
 
@@ -35,9 +42,7 @@ class DemoAndroidTest {
     fun `the graph builds the demo, ONDC and owner messaging lazily, without Firebase`() {
         val graph = RideMateApp.graph(context)
         val demo = graph.demoController
-        assertFalse(demo.isBound)
-        assertEquals(DemoStartResult.NOT_READY, demo.start())
-        assertEquals(DemoUnavailable.NOT_READY, demo.state.value.unavailable)
+        assertTrue("bound to the capture area's OCR and the guardian", demo.isBound)
         assertEquals(OndcPhase.IDLE, graph.ondcClient.view.value.phase)
         // Signed out: an alert push is not shown and a token is not sent.
         assertFalse(graph.ownerMessaging.onMessage(mapOf("type" to "owner_alert", "alert" to "test"), null, null))

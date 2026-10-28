@@ -17,6 +17,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * The ride session's foreground service (§4.2 RideSessionService, M7).
@@ -84,7 +85,14 @@ class RideSessionService : LifecycleService() {
             capturing = false
             promote()
         }
+        if (!on) recheck()
         return ok
+    }
+
+    /** Stops the service when nothing needs it any more (after a capture or a capture hold ended). */
+    private fun recheck() {
+        if (stopping) return
+        lifecycleScope.launch { onGuardian(module.runtime.status.value, module.runtime.uiState.value) }
     }
 
     private fun promote(): Boolean {
@@ -117,7 +125,7 @@ class RideSessionService : LifecycleService() {
     }
 
     private fun onGuardian(status: GuardianStatus, ui: GuardianUiState) {
-        if (!status.shouldRunService) {
+        if (!status.shouldRunService && !capturing && captureHolds.get() == 0) {
             stopNow()
             return
         }
@@ -140,6 +148,26 @@ class RideSessionService : LifecycleService() {
 
         @Volatile
         private var running: RideSessionService? = null
+
+        /** Captures outside a ride session (developer capture test, golden captures) keep the service up. */
+        private val captureHolds = AtomicInteger(0)
+
+        /**
+         * Starts the service (from the foreground) and keeps it running until the returned handle is closed, so a
+         * capture outside a ride session can add the mediaProjection type after consent.
+         */
+        fun holdForCapture(context: Context): AutoCloseable {
+            captureHolds.incrementAndGet()
+            ensureRunning(context)
+            var closed = false
+            return AutoCloseable {
+                if (!closed) {
+                    closed = true
+                    captureHolds.decrementAndGet()
+                    running?.recheck()
+                }
+            }
+        }
 
         val isRunning: Boolean get() = running != null
 

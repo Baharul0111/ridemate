@@ -9,9 +9,6 @@ import app.ridemate.dev.OwnerEmails
 import app.ridemate.dev.OwnerPushTokens
 import app.ridemate.dev.RecorderSink
 import app.ridemate.dev.RoomRecorderSink
-import app.ridemate.home.AndroidConnectivity
-import app.ridemate.home.DefaultPreSessionGate
-import app.ridemate.home.PackageManagerRideApps
 import app.ridemate.home.PreSessionGate
 import app.ridemate.onboarding.AndroidPermissionChecker
 import app.ridemate.onboarding.AndroidSelfTestNotifier
@@ -21,7 +18,6 @@ import app.ridemate.onboarding.OnboardingController
 import app.ridemate.onboarding.OnboardingStore
 import app.ridemate.onboarding.PermissionChecker
 import app.ridemate.onboarding.RideWatchSelfTest
-import app.ridemate.onboarding.SelfTestRegistry
 import app.ridemate.onboarding.SignInReoffer
 import app.ridemate.privacy.LocalDataWiper
 import app.ridemate.settings.DefaultLanguageController
@@ -34,7 +30,6 @@ import java.io.File
  * The app shell's singletons (onboarding, home, settings, developer mode), reached as `graph.appShell`. Other areas
  * use:
  * - [recorderSink]: RideWatch hands every allowlisted post to it while `isRecording` (§4.19 a);
- * - [selfTestRegistry]: RideWatch reports RideMate's own `rm_selftest` post to it (onboarding health check);
  * - [settingsStore]: `keepSearchingDefault`;
  * - [signInReoffer]: the one-time Google sign-in offer at the first "Read fares";
  * - [developerMode]: `isEnabled()` / `isRecording()`.
@@ -49,10 +44,8 @@ class AppShell(private val graph: AppGraph) {
     val settingsStore: SettingsStore by lazy { SettingsStore(SharedPrefsKeyValueStore(context, SettingsStore.PREFS_NAME)) }
     val language: LanguageController by lazy { DefaultLanguageController.create(context, settingsStore) }
 
-    val selfTestRegistry: SelfTestRegistry = SelfTestRegistry()
-
-    /** A3's RideWatchStatus when bound, else the registry RideWatch feeds. */
-    val rideWatchSelfTest: RideWatchSelfTest get() = graph.featureBindings.rideWatchSelfTest ?: selfTestRegistry
+    /** A3's RideWatchStatus: has the listener seen RideMate's own self-test post? */
+    val rideWatchSelfTest: RideWatchSelfTest get() = graph.featureBindings.rideWatchSelfTest
 
     val healthCheck: HealthCheck by lazy { HealthCheck(permissions, AndroidSelfTestNotifier(context), { rideWatchSelfTest }) }
     val signInReoffer: SignInReoffer by lazy { SignInReoffer(onboardingStore, graph.authGateway.state) }
@@ -74,12 +67,8 @@ class AppShell(private val graph: AppGraph) {
     val exports: DevExports by lazy { DevExports(context) }
     val ownerPushTokens: OwnerPushTokens by lazy { FirebaseOwnerPushTokens() }
 
-    private val defaultPreSessionGate: PreSessionGate by lazy {
-        DefaultPreSessionGate(permissions, PackageManagerRideApps(context), AndroidConnectivity(context))
-    }
-
-    /** A2's PreSessionCheck when bound, else the permission-based default. */
-    val preSessionGate: PreSessionGate get() = graph.featureBindings.preSessionGate ?: defaultPreSessionGate
+    /** A2's PreSessionCheck (permissions, installed apps, a RideWatch ping), as Home's Compare gate. */
+    val preSessionGate: PreSessionGate get() = graph.featureBindings.preSessionGate
 
     fun onboardingController(scope: CoroutineScope): OnboardingController =
         OnboardingController(onboardingStore, permissions, device, graph.authGateway, healthCheck, scope)

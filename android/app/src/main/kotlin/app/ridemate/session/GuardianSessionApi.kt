@@ -178,6 +178,9 @@ fun interface CaptureRequester {
 /** Executes ONDC book/cancel commands after the user's tap (the ONDC area binds this). */
 fun interface OndcCommandSink {
     fun execute(command: GuardianEffect.OndcCommand)
+
+    /** The user kept the ride after seeing the network's cancellation fee (ONDC_KEEP_RIDE). */
+    fun keepRide(legId: String) = Unit
 }
 
 /** "Compare again (same trip)": the compare area reopens the trip's apps. */
