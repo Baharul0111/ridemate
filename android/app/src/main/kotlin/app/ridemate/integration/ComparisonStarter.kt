@@ -43,8 +43,14 @@ class ComparisonStarter(
     private val onError: (Throwable) -> Unit = {},
     private val newSessionId: () -> String = { UUID.randomUUID().toString() },
 ) {
-    /** Starts the comparison of [plan]; returns its session id (the comparison screen shows it). */
-    fun start(plan: TripPlan, keepSearching: Boolean = keepSearchingDefault()): String {
+    /**
+     * Starts the comparison of [plan]; returns its session id (the comparison screen shows it), or null when the
+     * previous session still has bookings to cancel (I8). The guardian then keeps that session and says why (its
+     * "finish cancelling first" notice); no app is opened and no network search starts for a session that won't exist.
+     */
+    fun start(plan: TripPlan, keepSearching: Boolean = keepSearchingDefault()): String? {
+        val previous = guardian.status.value
+        val refused = previous.sessionOpen && previous.needsForegroundService
         val sessionId = newSessionId()
         val spec = SessionSpec(
             pickup = placeOf(plan.pickup),
@@ -55,6 +61,7 @@ class ComparisonStarter(
             sessionId = sessionId,
         )
         guardian.startSession(spec)
+        if (refused) return null
         val pickupPoint = plan.pickup.point
         val dropPoint = plan.drop.point
         if (plan.includeOndc && pickupPoint != null && dropPoint != null) {

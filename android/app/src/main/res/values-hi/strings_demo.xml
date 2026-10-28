@@ -20,7 +20,7 @@
 
     <string name="demo_unavailable_not_ready">RideMate के इस संस्करण में डेमो उपलब्ध नहीं है। ऐप अपडेट करें, फिर दोबारा कोशिश करें।</string>
     <string name="demo_unavailable_switched_off">डेमो अभी बंद है। बाद में दोबारा कोशिश करें।</string>
-    <string name="demo_unavailable_session_busy">पहले अपनी चल रही राइड बुकिंग रद्द करना पूरा करें, फिर डेमो शुरू करें।</string>
+    <string name="demo_unavailable_session_busy">RideMate अभी आपकी राइड बुकिंग सँभाल रहा है। पहले उन्हें पूरा या रद्द करें, फिर डेमो शुरू करें।</string>
     <string name="demo_unavailable_assets_broken">डेमो की फ़ाइलें खराब हैं। उन्हें वापस लाने के लिए RideMate दोबारा इंस्टॉल करें।</string>
 
     <string name="demo_step_book">चरण %2$d में से %1$d: %3$s में कीमतें पढ़ें, फिर \"यहाँ बुक किया\" दबाएँ।</string>

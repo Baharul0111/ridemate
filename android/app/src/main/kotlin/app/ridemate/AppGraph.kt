@@ -7,7 +7,9 @@ import androidx.lifecycle.LifecycleOwner
 import app.ridemate.auth.AuthGateway
 import app.ridemate.auth.AuthState
 import app.ridemate.auth.DefaultAuthGateway
+import app.ridemate.compare.ActiveComparison
 import app.ridemate.compare.FareReadingModule
+import app.ridemate.compare.RoomActiveComparison
 import app.ridemate.config.ConfigKeys
 import app.ridemate.config.ConfigRepository
 import app.ridemate.core.config.SanityBandsConfig
@@ -277,6 +279,8 @@ class AppGraph(
                 onError = { crashReporter.recordNonFatal(it, CrashSite.OTHER) },
             )
             module.capture.foregroundHost = GuardianCaptureHost { guardianRuntime }
+            // "Read fares" reads the app RideMate opened last (the guardian's notion, shared with "Booked here").
+            module.activeComparison = ActiveComparison { RoomActiveComparison(db) { guardianRuntime.openedLegId }.current() }
         }
     }
 
@@ -361,7 +365,8 @@ class AppGraph(
             showMe = { fareReading.showMe },
             commands = { guardianRuntime },
             sessionId = { guardianRuntime.status.value.sessionId },
-            tripKm = { fareReading.activeComparison.current()?.tripKm },
+            // The session's own distance: its legs are booked by now, so the fare reader's active leg is gone.
+            tripKm = ::sessionTripKm,
             pointTarget = { provider -> cancelCards()?.cardFor(provider.packageName)?.pointTarget ?: DemoController.DEFAULT_POINT_TARGET },
             cancelledKeywords = { provider -> cancelCards()?.cardFor(provider.packageName)?.cancelledKeywords.orEmpty() },
             clock = clock,
@@ -372,6 +377,16 @@ class AppGraph(
     }
 
     private fun cancelCards() = configRepository.resolve(ConfigKeys.CANCEL_CARDS, ::parseCancelCards)?.value
+
+    /**
+     * The guardian session's straight-line trip distance for the gate's ₹/km band, whatever state its legs are in
+     * (a Check screen reads a booked leg, which the fare reader's active-leg lookup no longer returns). Null only for
+     * a typed place without coordinates, or when no session is stored.
+     */
+    suspend fun sessionTripKm(): Double? {
+        val sessionId = guardianRuntime.status.value.sessionId ?: return null
+        return db.sessionDao().get(sessionId)?.let { RoomActiveComparison.tripKmOf(it) }
+    }
 
     /** The Compare tap after the trip screen's check: guardian session, ONDC search, first app opened. */
     val comparisonStarter: ComparisonStarter by lazy {

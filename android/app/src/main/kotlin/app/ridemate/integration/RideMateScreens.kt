@@ -55,7 +55,10 @@ class RideMateScreens(private val graph: AppGraph) : FeatureScreens {
         ScreenScaffold(title = stringResource(R.string.ui_feature_trip), onBack = navigator::back, scrollable = false) {
             Box(Modifier.fillMaxSize()) {
                 TripRoute(
-                    onStartComparison = { plan -> navigator.comparison(graph.comparisonStarter.start(plan)) },
+                    onStartComparison = { plan ->
+                        // Refused (I8): the guardian shows the bookings still to cancel.
+                        graph.comparisonStarter.start(plan)?.let(navigator::comparison) ?: navigator.guardian(null)
+                    },
                     onTryDemo = navigator::demo,
                 )
             }

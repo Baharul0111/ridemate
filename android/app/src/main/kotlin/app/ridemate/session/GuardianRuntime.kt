@@ -144,6 +144,9 @@ class GuardianRuntime(
     private var startRefused = false
     private var sessionRow: SessionEntity? = null
     private var closedAtUtc: Long? = null
+
+    /** Written on the guardian thread; read by the fare reader from any thread ([openedLegId]). */
+    @Volatile
     private var lastOpenedLegId: String? = null
     private val captureTaps = HashMap<String, TapId>()
     private val pendingOpens = mutableListOf<OpenRequest>()
@@ -290,6 +293,12 @@ class GuardianRuntime(
     override fun faresRead(provider: Provider) = enqueue { legOf(provider)?.let(guardian::markQuoted) }
 
     // Leg-id forms of the commands, for callers that already know the leg (the launcher, Try the demo).
+
+    /**
+     * The leg whose app RideMate opened last in this session (null after a new session starts or Erase): the app on
+     * screen as far as RideMate knows. "Booked here" from the bubble and the fare reader's "Read fares" both mean it.
+     */
+    val openedLegId: String? get() = lastOpenedLegId
 
     /** RideMate opened leg [legId]'s app (SELECTED → OPENED); "Booked here" then means this app. */
     fun markOpenedLeg(legId: String) = enqueue {

@@ -12,8 +12,11 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
@@ -22,6 +25,7 @@ import app.ridemate.RideMateApp
 import app.ridemate.bubble.TapIds
 import app.ridemate.core.model.Provider
 import app.ridemate.core.model.VehicleClass
+import app.ridemate.onboarding.SignInOfferRoute
 import app.ridemate.ui.RideMateTheme
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
@@ -34,13 +38,22 @@ class ComparisonActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        val module = RideMateApp.graph(this).fareReading
+        val graph = RideMateApp.graph(this)
+        val module = graph.fareReading
         val sessionId = intent.getStringExtra(EXTRA_SESSION_ID)
         val manualProvider = intent.getStringExtra(EXTRA_MANUAL_PROVIDER)?.let(Provider::fromWireId)
+        // Google sign-in is offered once more at the first "Read fares" that has to fall back to typing (§4.2
+        // onboarding: "offered again at the first Read fares"); either answer leads on to the price form.
+        val offerSignIn = savedInstanceState == null && manualProvider != null && graph.appShell.signInReoffer.shouldOfferAtFirstRead()
         setContent {
             RideMateTheme {
-                Surface(Modifier.fillMaxSize()) {
-                    ComparisonRoute(module, sessionId, manualProvider, Modifier.safeDrawingPadding())
+                var offering by rememberSaveable { mutableStateOf(offerSignIn) }
+                if (offering) {
+                    SignInOfferRoute(graph) { offering = false }
+                } else {
+                    Surface(Modifier.fillMaxSize()) {
+                        ComparisonRoute(module, sessionId, manualProvider, Modifier.safeDrawingPadding())
+                    }
                 }
             }
         }

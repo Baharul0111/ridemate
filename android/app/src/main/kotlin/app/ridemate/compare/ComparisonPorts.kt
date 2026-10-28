@@ -56,15 +56,24 @@ fun interface ActiveComparison {
 }
 
 /**
- * Default [ActiveComparison] over Room: the newest ACTIVE session, and its leg most recently opened (OPENED or
- * QUOTED, latest `last_event_at` first). ONDC legs are never read from a screen.
+ * Default [ActiveComparison] over Room: the newest ACTIVE session, and its leg whose app RideMate opened last
+ * ([openedLegId], the guardian's notion of the app on screen, which "Booked here" uses too) while that leg can still
+ * be read; otherwise the readable leg with the latest `last_event_at`. ONDC legs are never read from a screen.
+ *
+ * `last_event_at` alone can't tell the apps apart before booking: it only moves with a ride-app notification, so
+ * without [openedLegId] every unbooked leg ties and the first app would be read for every app.
  */
-class RoomActiveComparison(private val db: RideMateDb) : ActiveComparison {
+class RoomActiveComparison(
+    private val db: RideMateDb,
+    private val openedLegId: () -> String? = { null },
+) : ActiveComparison {
     override suspend fun current(): ActiveLeg? {
         val session = db.sessionDao().active().firstOrNull() ?: return null
-        val leg = db.legDao().forSession(session.id)
-            .filter { !it.provider.isNetwork && it.state in READABLE }
-            .maxByOrNull { it.lastEventAt ?: Long.MIN_VALUE } ?: return null
+        val readable = db.legDao().forSession(session.id).filter { !it.provider.isNetwork && it.state in READABLE }
+        val opened = openedLegId()
+        val leg = readable.firstOrNull { it.id == opened }
+            ?: readable.maxByOrNull { it.lastEventAt ?: Long.MIN_VALUE }
+            ?: return null
         return activeLegOf(session, leg)
     }
 

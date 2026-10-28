@@ -59,7 +59,7 @@ class DemoScreenTest {
     @Test
     fun unavailable_saysWhatToDoNext() {
         compose.setContent { DemoScreenContent(DemoUiState(phase = DemoPhase.UNAVAILABLE, unavailable = DemoUnavailable.SESSION_BUSY), actions) }
-        compose.onNodeWithText("Finish cancelling your current ride bookings first, then start the demo.").assertIsDisplayed()
+        compose.onNodeWithText("RideMate is still looking after your ride bookings. Finish or cancel them first, then start the demo.").assertIsDisplayed()
     }
 
     @Test

@@ -43,7 +43,9 @@ import app.ridemate.precheck.IssueSeverity
 import app.ridemate.precheck.PreSessionCheck
 import app.ridemate.precheck.PrecheckKind
 import app.ridemate.precheck.PrecheckRequest
+import app.ridemate.notify.GuardianUiState
 import app.ridemate.session.GuardianRuntime
+import app.ridemate.session.GuardianStatus
 import app.ridemate.session.SessionSpec
 import app.ridemate.util.Clock
 import kotlinx.coroutines.CoroutineDispatcher
@@ -160,9 +162,8 @@ class GuardianDemoHost(
 
     override fun startDemoSession(sessionId: String, providers: List<Provider>, keepSearching: Boolean): Map<Provider, String>? {
         val r = runtime()
-        val status = r.status.value
-        // I8: a live session that still has bookings to cancel keeps running; the demo waits for it.
-        if (status.sessionOpen && !status.demo && status.needsForegroundService) return null
+        // Starting the demo replaces the guardian's session: never while it still looks after real bookings.
+        if (liveBookingsGuarded(r.status.value, r.uiState.value)) return null
         val t = trip()
         val pickup = t?.pickup?.let { Place(it.label, it.point) } ?: Place("Demo pickup", LatLng(26.1445, 91.7362))
         val drop = t?.drop?.let { Place(it.label, it.point) } ?: Place("Demo drop", LatLng(26.1158, 91.7086))
@@ -187,6 +188,17 @@ class GuardianDemoHost(
 
     companion object {
         private val DEMO_CLASSES = listOf(VehicleClass.BIKE, VehicleClass.AUTO, VehicleClass.CAB_ECONOMY)
+
+        /**
+         * True while the open live session still looks after real bookings: an extra booking to cancel (I8), or a
+         * booking that is still searching, assigned or riding (the guardian must still ask "Cancel the others?", warn
+         * on a lost ride and hand over the payment). The demo would close that session, so it waits instead.
+         */
+        fun liveBookingsGuarded(status: GuardianStatus, ui: GuardianUiState): Boolean {
+            if (!status.sessionOpen || status.demo) return false
+            if (status.needsForegroundService) return true
+            return ui.legs.any { it.booked && !it.dismissed && !it.state.isTerminal }
+        }
     }
 }
 

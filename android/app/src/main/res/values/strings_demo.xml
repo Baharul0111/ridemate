@@ -22,7 +22,7 @@
     <!-- Why the demo can't start; each says what to do next. -->
     <string name="demo_unavailable_not_ready">The demo isn\'t available in this version of RideMate. Update the app, then try again.</string>
     <string name="demo_unavailable_switched_off">The demo is switched off for now. Try again later.</string>
-    <string name="demo_unavailable_session_busy">Finish cancelling your current ride bookings first, then start the demo.</string>
+    <string name="demo_unavailable_session_busy">RideMate is still looking after your ride bookings. Finish or cancel them first, then start the demo.</string>
     <string name="demo_unavailable_assets_broken">The demo files are damaged. Reinstall RideMate to restore them.</string>
 
     <!-- Where the user is. -->
