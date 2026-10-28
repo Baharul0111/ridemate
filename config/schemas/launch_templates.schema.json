@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:ridemate:config:launch_templates",
+  "title": "launch_templates (contracts §2.6)",
+  "description": "How AppLauncher opens each app. uri: {plat},{plng},{pname},{dlat},{dlng},{dname} are URL-encoded by the phone. launch_paste: plain launch + 'Paste drop' chip. launch: plain launch. Only these three modes exist on the phone (core LaunchMode); demo providers have no entry because DemoSource shows assets/demo/<provider>/ itself (contracts §5).",
+  "type": "object",
+  "required": ["schema", "apps"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {"type": "string", "pattern": "^1\\.[0-9]+$"},
+    "notes": {"$ref": "#/$defs/notes"},
+    "apps": {
+      "type": "object",
+      "propertyNames": {"$ref": "#/$defs/package"},
+      "additionalProperties": {"$ref": "#/$defs/launch"}
+    }
+  },
+  "$defs": {
+    "package": {"type": "string", "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)+$"},
+    "notes": {
+      "type": "object",
+      "propertyNames": {"$ref": "#/$defs/package"},
+      "additionalProperties": {"type": "string", "minLength": 1}
+    },
+    "launch": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["mode", "uri", "fallback"],
+          "additionalProperties": false,
+          "properties": {
+            "mode": {"const": "uri"},
+            "uri": {
+              "type": "string",
+              "pattern": "^https://[^\\s]+$",
+              "description": "Only the placeholders {plat} {plng} {pname} {dlat} {dlng} {dname} may appear."
+            },
+            "fallback": {"enum": ["launch", "launch_paste"]}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["mode"],
+          "additionalProperties": false,
+          "properties": {"mode": {"enum": ["launch", "launch_paste"]}}
+        }
+      ]
+    }
+  }
+}

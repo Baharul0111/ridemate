@@ -1,0 +1,72 @@
+{
+  "image_sha256": "23ef930b5cc30c8100fe637c3e8136959da8b3b3a75488539d773b8ba2d1efcd",
+  "model": "synthetic-perfect-reader",
+  "recorded_at": "2026-10-28T00:00:00Z",
+  "read": {
+    "app": "demo_pepper",
+    "screen_type": "fare_options",
+    "options": [
+      {
+        "vehicle_class": "bike",
+        "label_text": "Bike",
+        "price_min": 112,
+        "price_max": 112,
+        "price_struck_text": "₹135",
+        "eta_min": 2,
+        "bbox_0_1000": [
+          30,
+          442,
+          970,
+          518
+        ]
+      },
+      {
+        "vehicle_class": "auto",
+        "label_text": "Auto",
+        "price_min": 180,
+        "price_max": 210,
+        "price_struck_text": null,
+        "eta_min": 4,
+        "bbox_0_1000": [
+          30,
+          521,
+          970,
+          597
+        ]
+      },
+      {
+        "vehicle_class": "cab_economy",
+        "label_text": "Kestrel Mini",
+        "price_min": 289,
+        "price_max": 289,
+        "price_struck_text": null,
+        "eta_min": 6,
+        "bbox_0_1000": [
+          30,
+          600,
+          970,
+          676
+        ]
+      }
+    ],
+    "fee_text": null,
+    "driver_eta_min": null,
+    "driver_distance_text": null
+  },
+  "usage": {
+    "input_tokens": 0,
+    "cached_input_tokens": 0,
+    "output_tokens": 0
+  },
+  "cost_usd": 0.0,
+  "expect": {
+    "rows": [
+      "UNREADABLE",
+      "UNREADABLE",
+      "UNREADABLE"
+    ],
+    "reason": "app_mismatch",
+    "rule": "a"
+  },
+  "variant": "wrong_app"
+}

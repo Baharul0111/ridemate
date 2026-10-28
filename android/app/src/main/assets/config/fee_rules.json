@@ -1,0 +1,49 @@
+{
+  "schema": "1.0",
+  "notes": {
+    "com.ubercab": "Fee window from contracts §2.5; unverified until recorded with the owner's Recorder. The fee note always says 'may apply, up to'.",
+    "com.olacabs.customer": "Fee window from contracts §2.5; unverified until recorded with the owner's Recorder.",
+    "com.rapido.passenger": "Fee window from contracts §2.5; unverified until recorded with the owner's Recorder.",
+    "demo.kestrel": "Fictional demo provider; no money ever moves in demo mode.",
+    "demo.pepper": "Fictional demo provider; matches the 'up to ₹50' note on assets/demo/pepper/cancel_flow.png.",
+    "demo.tamarind": "Fictional demo provider; no money ever moves in demo mode."
+  },
+  "default": {
+    "pct": 10,
+    "max_inr": 100,
+    "free_while_searching": true
+  },
+  "apps": {
+    "com.olacabs.customer": {
+      "free_within_s_after_accept": 180,
+      "free_if_driver_late_min": 5,
+      "max_inr": 100
+    },
+    "com.ubercab": {
+      "free_within_s_after_accept": 120,
+      "max_inr": 100
+    },
+    "com.rapido.passenger": {
+      "free_within_s_after_accept": 60,
+      "max_inr": 50
+    },
+    "demo.kestrel": {
+      "free_within_s_after_accept": 120,
+      "max_inr": 50
+    },
+    "demo.pepper": {
+      "free_within_s_after_accept": 180,
+      "free_if_driver_late_min": 5,
+      "max_inr": 50
+    },
+    "demo.tamarind": {
+      "free_within_s_after_accept": 60,
+      "max_inr": 75
+    }
+  },
+  "states": {
+    "AS": {
+      "max_inr": 100
+    }
+  }
+}

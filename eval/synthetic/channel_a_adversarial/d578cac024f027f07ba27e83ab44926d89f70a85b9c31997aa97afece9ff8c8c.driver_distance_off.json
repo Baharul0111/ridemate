@@ -1,0 +1,25 @@
+{
+  "image_sha256": "d578cac024f027f07ba27e83ab44926d89f70a85b9c31997aa97afece9ff8c8c",
+  "model": "synthetic-perfect-reader",
+  "recorded_at": "2026-10-28T00:00:00Z",
+  "read": {
+    "app": "demo_tamarind",
+    "screen_type": "driver_assigned",
+    "options": [],
+    "fee_text": null,
+    "driver_eta_min": 2,
+    "driver_distance_text": "1.6 km"
+  },
+  "usage": {
+    "input_tokens": 0,
+    "cached_input_tokens": 0,
+    "output_tokens": 0
+  },
+  "cost_usd": 0.0,
+  "expect": {
+    "driver_eta": "VERIFIED",
+    "driver_distance": "SEE_IN_APP",
+    "rule": "f"
+  },
+  "variant": "driver_distance_off"
+}

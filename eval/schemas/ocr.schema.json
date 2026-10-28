@@ -1,0 +1,118 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:ridemate:eval:ocr",
+  "title": "OCR tokens (contracts §6): synthetic, noisy or recorded ML Kit",
+  "type": "object",
+  "required": [
+    "image_sha256",
+    "width",
+    "height",
+    "engine",
+    "recorded_at",
+    "tokens"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "image_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "width": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "height": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "engine": {
+      "enum": [
+        "synthetic",
+        "mlkit-text-v2"
+      ]
+    },
+    "recorded_at": {
+      "type": "string"
+    },
+    "tokens": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "text",
+          "box",
+          "line",
+          "block"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "text": {
+            "type": "string",
+            "minLength": 1
+          },
+          "box": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            },
+            "minItems": 4,
+            "maxItems": 4
+          },
+          "line": {
+            "type": "integer"
+          },
+          "block": {
+            "type": "integer"
+          }
+        }
+      }
+    },
+    "variant": {
+      "type": "string"
+    },
+    "expect": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "rows": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "VERIFIED",
+              "UNREADABLE",
+              "NOT_WRONG"
+            ]
+          }
+        },
+        "driver_eta": {
+          "enum": [
+            "VERIFIED",
+            "SEE_IN_APP"
+          ]
+        },
+        "driver_distance": {
+          "enum": [
+            "VERIFIED",
+            "SEE_IN_APP"
+          ]
+        },
+        "reason": {
+          "type": "string"
+        },
+        "rule": {
+          "enum": [
+            "a",
+            "b",
+            "c",
+            "d",
+            "e",
+            "f"
+          ]
+        },
+        "model_text_displayed": {
+          "const": false
+        }
+      }
+    }
+  }
+}

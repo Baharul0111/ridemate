@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:ridemate:config:cap_profile",
+  "title": "cap_profile (contracts §2.7)",
+  "description": "Spend cap profile. Stored as {\"value\": ...}; published as a Remote Config scalar.",
+  "type": "object",
+  "required": [
+    "value"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "value": {
+      "enum": [
+        "normal",
+        "judging"
+      ]
+    }
+  }
+}

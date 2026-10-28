@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:ridemate:config:notification_templates",
+  "title": "notification_templates (contracts §2.1)",
+  "description": "Per-app, per-versionCode RE2 templates matched against title + \"\\n\" + text of a ride-app post. Within an entry the first matching template (list order) wins.",
+  "type": "object",
+  "required": ["schema", "apps"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {"$ref": "#/$defs/schemaVersion"},
+    "notes": {"$ref": "#/$defs/notes"},
+    "apps": {
+      "type": "object",
+      "propertyNames": {"$ref": "#/$defs/package"},
+      "additionalProperties": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/versionEntry"}}
+    }
+  },
+  "$defs": {
+    "schemaVersion": {"type": "string", "pattern": "^1\\.[0-9]+$"},
+    "package": {"type": "string", "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)+$"},
+    "notes": {
+      "type": "object",
+      "propertyNames": {"$ref": "#/$defs/package"},
+      "additionalProperties": {"type": "string", "minLength": 1}
+    },
+    "event": {
+      "enum": ["SEARCHING", "ASSIGNED", "ARRIVING", "DRIVER_CANCELLED", "NO_DRIVERS", "CANCELLED", "ENDED", "TRIP_STARTED"]
+    },
+    "versionEntry": {
+      "type": "object",
+      "required": ["min_version_code", "templates", "redacted", "cancelled_keywords", "ongoing_channel_ids"],
+      "additionalProperties": false,
+      "properties": {
+        "min_version_code": {"type": "integer", "minimum": 0},
+        "max_known_version_code": {"type": ["integer", "null"], "minimum": 0},
+        "templates": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/template"}},
+        "redacted": {"type": "array", "items": {"$ref": "#/$defs/redacted"}},
+        "cancelled_keywords": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
+        "ongoing_channel_ids": {"type": "array", "items": {"type": "string", "minLength": 1}}
+      }
+    },
+    "template": {
+      "type": "object",
+      "required": ["id", "event", "pattern", "channel_id", "ongoing"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {"type": "string", "pattern": "^[a-z0-9_]+(\\.[a-z0-9_]+)+$"},
+        "event": {"$ref": "#/$defs/event"},
+        "pattern": {"type": "string", "minLength": 1, "x-re2": {"groups": ["eta", "dist", "plate", "name"]}},
+        "channel_id": {"type": ["string", "null"], "minLength": 1},
+        "ongoing": {"type": ["boolean", "null"]},
+        "category": {"type": ["string", "null"], "minLength": 1}
+      }
+    },
+    "redacted": {
+      "type": "object",
+      "required": ["event", "channel_id", "ongoing", "category"],
+      "additionalProperties": false,
+      "properties": {
+        "event": {"$ref": "#/$defs/event"},
+        "channel_id": {"type": ["string", "null"], "minLength": 1},
+        "ongoing": {"type": ["boolean", "null"]},
+        "category": {"type": ["string", "null"], "minLength": 1}
+      }
+    }
+  }
+}

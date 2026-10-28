@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:ridemate:config:judge_allowlist",
+  "title": "judge_allowlist (contracts §2.7)",
+  "description": "SHA-256 (hex) of lower-cased judge/tester emails that get the judge fair share.",
+  "type": "object",
+  "required": [
+    "schema",
+    "sha256_emails"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "type": "string",
+      "pattern": "^1\\.[0-9]+$"
+    },
+    "sha256_emails": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{64}$"
+      }
+    }
+  }
+}

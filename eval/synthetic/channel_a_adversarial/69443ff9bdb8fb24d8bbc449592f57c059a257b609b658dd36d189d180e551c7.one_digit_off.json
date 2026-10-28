@@ -1,0 +1,72 @@
+{
+  "image_sha256": "69443ff9bdb8fb24d8bbc449592f57c059a257b609b658dd36d189d180e551c7",
+  "model": "synthetic-perfect-reader",
+  "recorded_at": "2026-10-28T00:00:00Z",
+  "read": {
+    "app": "demo_pepper",
+    "screen_type": "fare_options",
+    "options": [
+      {
+        "vehicle_class": "auto",
+        "label_text": "ऑटो",
+        "price_min": 173,
+        "price_max": 173,
+        "price_struck_text": null,
+        "eta_min": 3,
+        "bbox_0_1000": [
+          30,
+          442,
+          970,
+          518
+        ]
+      },
+      {
+        "vehicle_class": "cab_economy",
+        "label_text": "Pepper Go",
+        "price_min": 264,
+        "price_max": 264,
+        "price_struck_text": "₹299",
+        "eta_min": 5,
+        "bbox_0_1000": [
+          30,
+          521,
+          970,
+          597
+        ]
+      },
+      {
+        "vehicle_class": "cab_premium",
+        "label_text": "Pepper Prime Sedan",
+        "price_min": 398,
+        "price_max": 398,
+        "price_struck_text": null,
+        "eta_min": 7,
+        "bbox_0_1000": [
+          30,
+          600,
+          970,
+          676
+        ]
+      }
+    ],
+    "fee_text": null,
+    "driver_eta_min": null,
+    "driver_distance_text": null
+  },
+  "usage": {
+    "input_tokens": 0,
+    "cached_input_tokens": 0,
+    "output_tokens": 0
+  },
+  "cost_usd": 0.0,
+  "expect": {
+    "rows": [
+      "UNREADABLE",
+      "VERIFIED",
+      "VERIFIED"
+    ],
+    "reason": "price_digits_mismatch",
+    "rule": "b"
+  },
+  "variant": "one_digit_off"
+}

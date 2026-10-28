@@ -1,0 +1,334 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:ridemate:eval:demo_script",
+  "title": "DemoSource timeline (android/app/src/main/assets/demo/script.json); documented in eval/demo/README.md",
+  "type": "object",
+  "required": [
+    "schema",
+    "trip",
+    "providers",
+    "user_steps",
+    "tracks"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "type": "string",
+      "pattern": "^1\\.[0-9]+$"
+    },
+    "notes": {
+      "type": "string"
+    },
+    "trip": {
+      "type": "object",
+      "required": [
+        "pickup",
+        "drop",
+        "trip_km"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "pickup": {
+          "$ref": "#/$defs/place"
+        },
+        "drop": {
+          "$ref": "#/$defs/place"
+        },
+        "trip_km": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Straight-line (haversine) km between pickup and drop, as the phone computes it. The gate multiplies it by sanity_bands.road_factor itself (contracts §2.3), so it is never pre-multiplied."
+        }
+      }
+    },
+    "providers": {
+      "type": "object",
+      "propertyNames": {
+        "enum": [
+          "demo.kestrel",
+          "demo.pepper",
+          "demo.tamarind"
+        ]
+      },
+      "additionalProperties": {
+        "type": "object",
+        "required": [
+          "name",
+          "wire_id",
+          "version_code",
+          "screens",
+          "cancel_flow_from",
+          "booked"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "wire_id": {
+            "enum": [
+              "demo_kestrel",
+              "demo_pepper",
+              "demo_tamarind"
+            ]
+          },
+          "version_code": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "screens": {
+            "type": "object",
+            "required": [
+              "fare_options",
+              "searching",
+              "driver_assigned",
+              "cancel_flow",
+              "cancelled"
+            ],
+            "additionalProperties": {
+              "type": "string",
+              "pattern": "^demo/[a-z]+/[a-z_]+\\.png$"
+            }
+          },
+          "cancel_flow_from": {
+            "enum": [
+              "searching",
+              "driver_assigned"
+            ]
+          },
+          "booked": {
+            "type": "object",
+            "required": [
+              "vehicle_class",
+              "label",
+              "price_min",
+              "price_max"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "vehicle_class": {
+                "enum": [
+                  "bike",
+                  "auto",
+                  "cab_economy",
+                  "cab_premium",
+                  "cab_xl",
+                  "other"
+                ]
+              },
+              "label": {
+                "type": "string"
+              },
+              "price_min": {
+                "type": "integer"
+              },
+              "price_max": {
+                "type": "integer"
+              }
+            }
+          }
+        }
+      }
+    },
+    "user_steps": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "tracks": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/track"
+      }
+    }
+  },
+  "$defs": {
+    "place": {
+      "type": "object",
+      "required": [
+        "label",
+        "lat",
+        "lng"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "label": {
+          "type": "string"
+        },
+        "lat": {
+          "type": "number"
+        },
+        "lng": {
+          "type": "number"
+        }
+      }
+    },
+    "userStep": {
+      "type": "string",
+      "pattern": "^(book:demo\\.[a-z]+|cancel_others:(yes|not_now)|tapped_cancel:demo\\.[a-z]+|better_ride:yes)$"
+    },
+    "track": {
+      "type": "object",
+      "required": [
+        "id",
+        "description",
+        "requires",
+        "events",
+        "checkpoints"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "requires": {
+          "type": "object",
+          "required": [
+            "keep_searching"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "keep_searching": {
+              "type": "boolean"
+            }
+          }
+        },
+        "events": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/event"
+          }
+        },
+        "checkpoints": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "after_user_step",
+              "expect"
+            ],
+            "properties": {
+              "after_user_step": {
+                "$ref": "#/$defs/userStep"
+              },
+              "expect": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "event": {
+      "type": "object",
+      "required": [
+        "id",
+        "t_ms",
+        "requires_user_step",
+        "action",
+        "package",
+        "sbn_key",
+        "channel_id",
+        "category",
+        "ongoing",
+        "title",
+        "text"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "t_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "requires_user_step": {
+          "$ref": "#/$defs/userStep"
+        },
+        "action": {
+          "enum": [
+            "post",
+            "remove"
+          ]
+        },
+        "package": {
+          "enum": [
+            "demo.kestrel",
+            "demo.pepper",
+            "demo.tamarind"
+          ]
+        },
+        "sbn_key": {
+          "type": "string",
+          "pattern": "^0\\|demo\\.[a-z]+\\|[0-9]+\\|[a-z]+\\|[0-9]+$"
+        },
+        "channel_id": {
+          "type": "string"
+        },
+        "category": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "ongoing": {
+          "type": "boolean"
+        },
+        "title": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        },
+        "expect_event": {
+          "enum": [
+            "SEARCHING",
+            "ASSIGNED",
+            "ARRIVING",
+            "DRIVER_CANCELLED",
+            "NO_DRIVERS",
+            "CANCELLED",
+            "ENDED",
+            "TRIP_STARTED"
+          ]
+        },
+        "expect_groups": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "screen": {
+          "type": "string"
+        },
+        "removal_reason": {
+          "const": "REASON_APP_CANCEL"
+        }
+      },
+      "if": {
+        "properties": {
+          "action": {
+            "const": "remove"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "removal_reason"
+        ]
+      },
+      "else": {
+        "required": [
+          "expect_event"
+        ]
+      }
+    }
+  }
+}

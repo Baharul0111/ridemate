@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:ridemate:config:fee_rules",
+  "title": "fee_rules (contracts §2.5)",
+  "description": "Cancellation fee exposure. An app rule overrides the default field by field; a state rule caps max_inr.",
+  "type": "object",
+  "required": ["schema", "default", "apps", "states"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {"type": "string", "pattern": "^1\\.[0-9]+$"},
+    "notes": {"$ref": "#/$defs/notes"},
+    "default": {
+      "type": "object",
+      "required": ["pct", "max_inr", "free_while_searching"],
+      "additionalProperties": false,
+      "properties": {
+        "pct": {"type": "number", "minimum": 0, "maximum": 100},
+        "max_inr": {"type": "integer", "minimum": 0},
+        "free_while_searching": {"type": "boolean"}
+      }
+    },
+    "apps": {
+      "type": "object",
+      "propertyNames": {"$ref": "#/$defs/package"},
+      "additionalProperties": {"$ref": "#/$defs/appRule"}
+    },
+    "states": {
+      "type": "object",
+      "propertyNames": {"type": "string", "pattern": "^[A-Z]{2}$"},
+      "additionalProperties": {
+        "type": "object",
+        "required": ["max_inr"],
+        "additionalProperties": false,
+        "properties": {"max_inr": {"type": "integer", "minimum": 0}}
+      }
+    }
+  },
+  "$defs": {
+    "package": {"type": "string", "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)+$"},
+    "notes": {
+      "type": "object",
+      "propertyNames": {"$ref": "#/$defs/package"},
+      "additionalProperties": {"type": "string", "minLength": 1}
+    },
+    "appRule": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "pct": {"type": "number", "minimum": 0, "maximum": 100},
+        "max_inr": {"type": "integer", "minimum": 0},
+        "free_while_searching": {"type": "boolean"},
+        "free_within_s_after_accept": {"type": "integer", "minimum": 0},
+        "free_if_driver_late_min": {"type": "integer", "minimum": 0}
+      }
+    }
+  }
+}

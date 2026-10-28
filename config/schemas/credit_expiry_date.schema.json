@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:ridemate:config:credit_expiry_date",
+  "title": "credit_expiry_date (contracts §2.7)",
+  "description": "Modal credit expiry date or 'unknown'. Stored as {\"value\": ...}; published as a Remote Config scalar.",
+  "type": "object",
+  "required": [
+    "value"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "value": {
+      "oneOf": [
+        {
+          "type": "string",
+          "pattern": "^20[0-9]{2}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$"
+        },
+        {
+          "const": "unknown"
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:ridemate:config:budget_horizon_days",
+  "title": "budget_horizon_days (contracts §2.7)",
+  "description": "Pacing horizon in days. Stored as {\"value\": ...}; published as a Remote Config scalar.",
+  "type": "object",
+  "required": [
+    "value"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "value": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 3650
+    }
+  }
+}

@@ -1,0 +1,5 @@
+{
+  "schema": "1.0",
+  "read": "modal_spark_open",
+  "parse": "modal_spark_open"
+}

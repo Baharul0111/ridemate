@@ -1,0 +1,21 @@
+{
+  "schema": "1.0",
+  "notes": {
+    "com.ubercab": "Universal-link format from Uber's public deep-link docs; prefill without client_id is unverified until recorded with the owner's Recorder (day-1 spike 3). Falls back to a plain launch.",
+    "com.olacabs.customer": "Plain launch + 'Paste drop' chip; any prefill is unverified until recorded with the owner's Recorder.",
+    "com.rapido.passenger": "Plain launch + 'Paste drop' chip; any prefill is unverified until recorded with the owner's Recorder."
+  },
+  "apps": {
+    "com.ubercab": {
+      "mode": "uri",
+      "uri": "https://m.uber.com/ul/?action=setPickup&pickup[latitude]={plat}&pickup[longitude]={plng}&pickup[nickname]={pname}&dropoff[latitude]={dlat}&dropoff[longitude]={dlng}&dropoff[nickname]={dname}",
+      "fallback": "launch"
+    },
+    "com.olacabs.customer": {
+      "mode": "launch_paste"
+    },
+    "com.rapido.passenger": {
+      "mode": "launch_paste"
+    }
+  }
+}

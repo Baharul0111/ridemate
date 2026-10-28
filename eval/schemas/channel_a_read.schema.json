@@ -1,0 +1,155 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:ridemate:eval:channel_a_read",
+  "title": "ChannelARead (contracts §1.3)",
+  "type": "object",
+  "required": [
+    "app",
+    "screen_type",
+    "options"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "app": {
+      "anyOf": [
+        {
+          "enum": [
+            "uber",
+            "ola",
+            "rapido",
+            "demo_kestrel",
+            "demo_pepper",
+            "demo_tamarind"
+          ]
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "screen_type": {
+      "anyOf": [
+        {
+          "enum": [
+            "fare_options",
+            "searching",
+            "driver_assigned",
+            "cancel_flow",
+            "cancelled",
+            "home",
+            "other",
+            "unreadable"
+          ]
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "options": {
+      "type": "array",
+      "maxItems": 12,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "vehicle_class",
+          "label_text",
+          "price_min",
+          "price_max",
+          "price_struck_text",
+          "eta_min",
+          "bbox_0_1000"
+        ],
+        "properties": {
+          "vehicle_class": {
+            "anyOf": [
+              {
+                "enum": [
+                  "bike",
+                  "auto",
+                  "cab_economy",
+                  "cab_premium",
+                  "cab_xl",
+                  "other"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "label_text": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "price_min": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "price_max": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "price_struck_text": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "eta_min": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "bbox_0_1000": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 1000
+                },
+                "minItems": 4,
+                "maxItems": 4
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "fee_text": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "driver_eta_min": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "driver_distance_text": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  }
+}

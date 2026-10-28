@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:ridemate:config:owner_emails_sha256",
+  "type": "array",
+  "uniqueItems": true,
+  "items": {
+    "type": "string",
+    "pattern": "^[0-9a-f]{64}$"
+  },
+  "title": "owner_emails_sha256 (contracts §2.7)",
+  "description": "JSON list of SHA-256 (hex) of lower-cased owner emails; enables developer mode. A bare list per the contract, so it carries no schema field."
+}

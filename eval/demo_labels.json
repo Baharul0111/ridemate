@@ -1,0 +1,461 @@
+{
+  "schema": "1.0",
+  "screens": [
+    {
+      "file": "android/app/src/main/assets/demo/kestrel/fare_options.png",
+      "sha256": "23ef930b5cc30c8100fe637c3e8136959da8b3b3a75488539d773b8ba2d1efcd",
+      "app": "demo_kestrel",
+      "screen_type": "fare_options",
+      "frame_w": 1080,
+      "frame_h": 2400,
+      "trip_km": 10.81,
+      "rows": [
+        {
+          "vehicle_class": "bike",
+          "label": "Bike",
+          "price_min": 112,
+          "price_max": 112,
+          "eta_min": 2,
+          "struck_price": 135,
+          "bbox_0_1000": [
+            30,
+            442,
+            970,
+            518
+          ]
+        },
+        {
+          "vehicle_class": "auto",
+          "label": "Auto",
+          "price_min": 180,
+          "price_max": 210,
+          "eta_min": 4,
+          "struck_price": null,
+          "bbox_0_1000": [
+            30,
+            521,
+            970,
+            597
+          ]
+        },
+        {
+          "vehicle_class": "cab_economy",
+          "label": "Kestrel Mini",
+          "price_min": 289,
+          "price_max": 289,
+          "eta_min": 6,
+          "struck_price": null,
+          "bbox_0_1000": [
+            30,
+            600,
+            970,
+            676
+          ]
+        }
+      ],
+      "driver_eta_min": null,
+      "driver_distance_text": null,
+      "fee_text": null,
+      "tags": [
+        "demo",
+        "eta",
+        "strikethrough",
+        "range"
+      ]
+    },
+    {
+      "file": "android/app/src/main/assets/demo/kestrel/searching.png",
+      "sha256": "aebe95d8df30f936666733b4ae737b44ee4931e91aeacda641eae2f90faa8594",
+      "app": "demo_kestrel",
+      "screen_type": "searching",
+      "frame_w": 1080,
+      "frame_h": 2400,
+      "trip_km": 10.81,
+      "rows": [],
+      "driver_eta_min": null,
+      "driver_distance_text": null,
+      "fee_text": null,
+      "tags": [
+        "demo"
+      ]
+    },
+    {
+      "file": "android/app/src/main/assets/demo/kestrel/driver_assigned.png",
+      "sha256": "0a40b32865dc7992183409979a8372bf57955e56ea2d8c4885e3e0f017419bfc",
+      "app": "demo_kestrel",
+      "screen_type": "driver_assigned",
+      "frame_w": 1080,
+      "frame_h": 2400,
+      "trip_km": 10.81,
+      "rows": [],
+      "driver_eta_min": 4,
+      "driver_distance_text": "1.6 km",
+      "fee_text": null,
+      "tags": [
+        "demo",
+        "driver_eta",
+        "driver_distance",
+        "pii_plate",
+        "pii_phone",
+        "pii_otp"
+      ]
+    },
+    {
+      "file": "android/app/src/main/assets/demo/kestrel/cancel_flow.png",
+      "sha256": "8edc0a8f619698f39056733d6e6facf2aa07528ced949f212907b5baa3283add",
+      "app": "demo_kestrel",
+      "screen_type": "cancel_flow",
+      "frame_w": 1080,
+      "frame_h": 2400,
+      "trip_km": 10.81,
+      "rows": [],
+      "driver_eta_min": null,
+      "driver_distance_text": null,
+      "fee_text": "Free to cancel while we search",
+      "tags": [
+        "demo",
+        "show_me_target"
+      ],
+      "targets": {
+        "cancel_button": [
+          56,
+          742,
+          944,
+          796
+        ]
+      }
+    },
+    {
+      "file": "android/app/src/main/assets/demo/kestrel/cancelled.png",
+      "sha256": "d4b13df48fdf47360c3e208e6681e0e62c4900d04cfa7c7310e93d0116ebdef4",
+      "app": "demo_kestrel",
+      "screen_type": "cancelled",
+      "frame_w": 1080,
+      "frame_h": 2400,
+      "trip_km": 10.81,
+      "rows": [],
+      "driver_eta_min": null,
+      "driver_distance_text": null,
+      "fee_text": null,
+      "tags": [
+        "demo"
+      ]
+    },
+    {
+      "file": "android/app/src/main/assets/demo/pepper/fare_options.png",
+      "sha256": "69443ff9bdb8fb24d8bbc449592f57c059a257b609b658dd36d189d180e551c7",
+      "app": "demo_pepper",
+      "screen_type": "fare_options",
+      "frame_w": 1080,
+      "frame_h": 2400,
+      "trip_km": 10.81,
+      "rows": [
+        {
+          "vehicle_class": "auto",
+          "label": "ऑटो",
+          "price_min": 172,
+          "price_max": 172,
+          "eta_min": 3,
+          "struck_price": null,
+          "bbox_0_1000": [
+            30,
+            442,
+            970,
+            518
+          ]
+        },
+        {
+          "vehicle_class": "cab_economy",
+          "label": "Pepper Go",
+          "price_min": 264,
+          "price_max": 264,
+          "eta_min": 5,
+          "struck_price": 299,
+          "bbox_0_1000": [
+            30,
+            521,
+            970,
+            597
+          ]
+        },
+        {
+          "vehicle_class": "cab_premium",
+          "label": "Pepper Prime Sedan",
+          "price_min": 398,
+          "price_max": 398,
+          "eta_min": 7,
+          "struck_price": null,
+          "bbox_0_1000": [
+            30,
+            600,
+            970,
+            676
+          ]
+        }
+      ],
+      "driver_eta_min": null,
+      "driver_distance_text": null,
+      "fee_text": null,
+      "tags": [
+        "demo",
+        "eta",
+        "devanagari_digits",
+        "strikethrough"
+      ]
+    },
+    {
+      "file": "android/app/src/main/assets/demo/pepper/searching.png",
+      "sha256": "b8986903b724187070bf8f2c6e1845a7e185a50023fb16082ec850bd16027ef4",
+      "app": "demo_pepper",
+      "screen_type": "searching",
+      "frame_w": 1080,
+      "frame_h": 2400,
+      "trip_km": 10.81,
+      "rows": [],
+      "driver_eta_min": null,
+      "driver_distance_text": null,
+      "fee_text": null,
+      "tags": [
+        "demo"
+      ]
+    },
+    {
+      "file": "android/app/src/main/assets/demo/pepper/driver_assigned.png",
+      "sha256": "e51eaf82d40c9fd6b6554505b54ecf0950a5d515254538dc21347dec6f16b963",
+      "app": "demo_pepper",
+      "screen_type": "driver_assigned",
+      "frame_w": 1080,
+      "frame_h": 2400,
+      "trip_km": 10.81,
+      "rows": [],
+      "driver_eta_min": 9,
+      "driver_distance_text": "2.8 km",
+      "fee_text": null,
+      "tags": [
+        "demo",
+        "driver_eta",
+        "driver_distance",
+        "pii_plate",
+        "pii_phone",
+        "pii_otp"
+      ]
+    },
+    {
+      "file": "android/app/src/main/assets/demo/pepper/cancel_flow.png",
+      "sha256": "467d6211aa2f882c95aa994d01e19831187700ea5e2d0ffda3ba882c82f7c33b",
+      "app": "demo_pepper",
+      "screen_type": "cancel_flow",
+      "frame_w": 1080,
+      "frame_h": 2400,
+      "trip_km": 10.81,
+      "rows": [],
+      "driver_eta_min": null,
+      "driver_distance_text": null,
+      "fee_text": "Cancellation fee up to ₹50 may apply",
+      "tags": [
+        "demo",
+        "show_me_target"
+      ],
+      "targets": {
+        "cancel_button": [
+          56,
+          742,
+          944,
+          796
+        ]
+      }
+    },
+    {
+      "file": "android/app/src/main/assets/demo/pepper/cancelled.png",
+      "sha256": "871c0c4f75853cc0f828d723016f52f8ef45e60e37b3afeb87ff22e08a3a7501",
+      "app": "demo_pepper",
+      "screen_type": "cancelled",
+      "frame_w": 1080,
+      "frame_h": 2400,
+      "trip_km": 10.81,
+      "rows": [],
+      "driver_eta_min": null,
+      "driver_distance_text": null,
+      "fee_text": null,
+      "tags": [
+        "demo"
+      ]
+    },
+    {
+      "file": "android/app/src/main/assets/demo/tamarind/fare_options.png",
+      "sha256": "63d3306c5057dc99706c96dde86c7e939f05a4deb1564f98c1381c9c284c854a",
+      "app": "demo_tamarind",
+      "screen_type": "fare_options",
+      "frame_w": 1080,
+      "frame_h": 2400,
+      "trip_km": 10.81,
+      "rows": [
+        {
+          "vehicle_class": "bike",
+          "label": "Moto",
+          "price_min": 104,
+          "price_max": 104,
+          "eta_min": 3,
+          "struck_price": null,
+          "bbox_0_1000": [
+            30,
+            442,
+            970,
+            518
+          ]
+        },
+        {
+          "vehicle_class": "auto",
+          "label": "Auto",
+          "price_min": 176,
+          "price_max": 176,
+          "eta_min": 5,
+          "struck_price": 205,
+          "bbox_0_1000": [
+            30,
+            521,
+            970,
+            597
+          ]
+        },
+        {
+          "vehicle_class": "cab_economy",
+          "label": "Tamarind Cab",
+          "price_min": 272,
+          "price_max": 272,
+          "eta_min": 4,
+          "struck_price": null,
+          "bbox_0_1000": [
+            30,
+            600,
+            970,
+            676
+          ]
+        },
+        {
+          "vehicle_class": "cab_xl",
+          "label": "Tamarind XL",
+          "price_min": 1040,
+          "price_max": 1040,
+          "eta_min": 8,
+          "struck_price": null,
+          "bbox_0_1000": [
+            30,
+            679,
+            970,
+            755
+          ]
+        }
+      ],
+      "driver_eta_min": null,
+      "driver_distance_text": null,
+      "fee_text": null,
+      "tags": [
+        "demo",
+        "eta",
+        "strikethrough",
+        "grouping"
+      ]
+    },
+    {
+      "file": "android/app/src/main/assets/demo/tamarind/searching.png",
+      "sha256": "7c8430d05cb4cd4151a262623bb18be75eb53b2f5b656a4d14d01ecbf1ec99b2",
+      "app": "demo_tamarind",
+      "screen_type": "searching",
+      "frame_w": 1080,
+      "frame_h": 2400,
+      "trip_km": 10.81,
+      "rows": [],
+      "driver_eta_min": null,
+      "driver_distance_text": null,
+      "fee_text": null,
+      "tags": [
+        "demo"
+      ]
+    },
+    {
+      "file": "android/app/src/main/assets/demo/tamarind/driver_assigned.png",
+      "sha256": "d578cac024f027f07ba27e83ab44926d89f70a85b9c31997aa97afece9ff8c8c",
+      "app": "demo_tamarind",
+      "screen_type": "driver_assigned",
+      "frame_w": 1080,
+      "frame_h": 2400,
+      "trip_km": 10.81,
+      "rows": [],
+      "driver_eta_min": 2,
+      "driver_distance_text": "0.6 km",
+      "fee_text": null,
+      "tags": [
+        "demo",
+        "driver_eta",
+        "driver_distance",
+        "pii_plate",
+        "pii_phone",
+        "pii_otp"
+      ]
+    },
+    {
+      "file": "android/app/src/main/assets/demo/tamarind/cancel_flow.png",
+      "sha256": "3117f35244bfb2bafb4a131c3eebf045595762e5afa37d3c98af0980355d9b6b",
+      "app": "demo_tamarind",
+      "screen_type": "cancel_flow",
+      "frame_w": 1080,
+      "frame_h": 2400,
+      "trip_km": 10.81,
+      "rows": [],
+      "driver_eta_min": null,
+      "driver_distance_text": null,
+      "fee_text": "Free to cancel while we search",
+      "tags": [
+        "demo",
+        "show_me_target"
+      ],
+      "targets": {
+        "cancel_button": [
+          56,
+          742,
+          944,
+          796
+        ]
+      }
+    },
+    {
+      "file": "android/app/src/main/assets/demo/tamarind/cancelled.png",
+      "sha256": "831792e72f9c166c82283d927a3ad9ac7f3e7c7020b511c4dd974d0b90f78ef5",
+      "app": "demo_tamarind",
+      "screen_type": "cancelled",
+      "frame_w": 1080,
+      "frame_h": 2400,
+      "trip_km": 10.81,
+      "rows": [],
+      "driver_eta_min": null,
+      "driver_distance_text": null,
+      "fee_text": null,
+      "tags": [
+        "demo"
+      ]
+    },
+    {
+      "file": "android/app/src/main/assets/demo/pepper/driver_assigned_better.png",
+      "sha256": "23efe5ca9ebd8a10a6d4bebe4afcdcfdad183eb6ce097879f3e6c1c96a09ce4e",
+      "app": "demo_pepper",
+      "screen_type": "driver_assigned",
+      "frame_w": 1080,
+      "frame_h": 2400,
+      "trip_km": 10.81,
+      "rows": [],
+      "driver_eta_min": 3,
+      "driver_distance_text": "0.5 km",
+      "fee_text": null,
+      "tags": [
+        "demo",
+        "driver_eta",
+        "driver_distance",
+        "pii_plate",
+        "pii_phone",
+        "pii_otp",
+        "better_driver"
+      ]
+    }
+  ]
+}

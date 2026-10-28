@@ -1,0 +1,206 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:ridemate:eval:labels",
+  "title": "Ground-truth labels (contracts §6): eval/demo_labels.json and the private golden labels.json",
+  "type": "object",
+  "required": [
+    "schema",
+    "screens"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "type": "string",
+      "pattern": "^1\\.[0-9]+$"
+    },
+    "screens": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/screen"
+      }
+    }
+  },
+  "$defs": {
+    "screen": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "file",
+        "sha256",
+        "app",
+        "screen_type",
+        "frame_w",
+        "frame_h",
+        "trip_km",
+        "rows",
+        "driver_eta_min",
+        "driver_distance_text",
+        "tags"
+      ],
+      "properties": {
+        "file": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "app": {
+          "enum": [
+            "uber",
+            "ola",
+            "rapido",
+            "demo_kestrel",
+            "demo_pepper",
+            "demo_tamarind"
+          ]
+        },
+        "screen_type": {
+          "enum": [
+            "fare_options",
+            "searching",
+            "driver_assigned",
+            "cancel_flow",
+            "cancelled",
+            "home",
+            "other",
+            "unreadable"
+          ]
+        },
+        "frame_w": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "frame_h": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "trip_km": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "description": "Straight-line (haversine) km between pickup and drop, as the phone computes it. The gate multiplies it by sanity_bands.road_factor itself (contracts §2.3), so it is never pre-multiplied."
+        },
+        "rows": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "vehicle_class",
+              "label",
+              "price_min",
+              "price_max",
+              "eta_min",
+              "struck_price"
+            ],
+            "properties": {
+              "vehicle_class": {
+                "enum": [
+                  "bike",
+                  "auto",
+                  "cab_economy",
+                  "cab_premium",
+                  "cab_xl",
+                  "other"
+                ]
+              },
+              "label": {
+                "type": "string",
+                "minLength": 1
+              },
+              "price_min": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "price_max": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "eta_min": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0
+              },
+              "struck_price": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0
+              },
+              "bbox_0_1000": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 1000
+                },
+                "minItems": 4,
+                "maxItems": 4
+              },
+              "expect": {
+                "enum": [
+                  "VERIFIED",
+                  "UNREADABLE",
+                  "NOT_WRONG"
+                ]
+              }
+            }
+          }
+        },
+        "driver_eta_min": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "driver_distance_text": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "fee_text": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "targets": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1000
+            },
+            "minItems": 4,
+            "maxItems": 4
+          }
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
+        "injected_text": {
+          "type": "string"
+        },
+        "variant": {
+          "type": "object"
+        }
+      }
+    }
+  }
+}

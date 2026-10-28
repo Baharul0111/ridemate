@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:ridemate:config:min_supported_version",
+  "title": "min_supported_version (contracts §2.7)",
+  "description": "Oldest supported versionCode. Stored as {\"value\": ...}; published as a Remote Config scalar.",
+  "type": "object",
+  "required": [
+    "value"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "value": {
+      "type": "integer",
+      "minimum": 1
+    }
+  }
+}

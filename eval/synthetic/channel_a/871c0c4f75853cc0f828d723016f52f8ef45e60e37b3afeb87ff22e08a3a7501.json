@@ -1,0 +1,22 @@
+{
+  "image_sha256": "871c0c4f75853cc0f828d723016f52f8ef45e60e37b3afeb87ff22e08a3a7501",
+  "model": "synthetic-perfect-reader",
+  "recorded_at": "2026-10-28T00:00:00Z",
+  "read": {
+    "app": "demo_pepper",
+    "screen_type": "cancelled",
+    "options": [],
+    "fee_text": null,
+    "driver_eta_min": null,
+    "driver_distance_text": null
+  },
+  "usage": {
+    "input_tokens": 0,
+    "cached_input_tokens": 0,
+    "output_tokens": 0
+  },
+  "cost_usd": 0.0,
+  "expect": {
+    "rows": []
+  }
+}

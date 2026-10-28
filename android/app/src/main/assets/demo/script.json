@@ -1,0 +1,737 @@
+{
+  "schema": "1.0",
+  "notes": "Fictional demo providers only (labelled DEMO). Posts go straight into the RideWatch pipeline from DemoSource and never mix with live legs. Wordings match the demo.* notification_templates. trip_km is the straight-line (haversine) distance; the gate applies road_factor itself.",
+  "trip": {
+    "pickup": {
+      "label": "Riverside Gate",
+      "lat": 26.1445,
+      "lng": 91.7362
+    },
+    "drop": {
+      "label": "Airport Terminal",
+      "lat": 26.1112,
+      "lng": 91.63442
+    },
+    "trip_km": 10.81
+  },
+  "providers": {
+    "demo.kestrel": {
+      "name": "Kestrel Go",
+      "wire_id": "demo_kestrel",
+      "version_code": 1,
+      "screens": {
+        "fare_options": "demo/kestrel/fare_options.png",
+        "searching": "demo/kestrel/searching.png",
+        "driver_assigned": "demo/kestrel/driver_assigned.png",
+        "cancel_flow": "demo/kestrel/cancel_flow.png",
+        "cancelled": "demo/kestrel/cancelled.png"
+      },
+      "cancel_flow_from": "searching",
+      "booked": {
+        "vehicle_class": "auto",
+        "label": "Auto",
+        "price_min": 180,
+        "price_max": 210
+      }
+    },
+    "demo.pepper": {
+      "name": "Pepper Rides",
+      "wire_id": "demo_pepper",
+      "version_code": 1,
+      "screens": {
+        "fare_options": "demo/pepper/fare_options.png",
+        "searching": "demo/pepper/searching.png",
+        "driver_assigned": "demo/pepper/driver_assigned.png",
+        "cancel_flow": "demo/pepper/cancel_flow.png",
+        "cancelled": "demo/pepper/cancelled.png",
+        "driver_assigned_better": "demo/pepper/driver_assigned_better.png"
+      },
+      "cancel_flow_from": "driver_assigned",
+      "booked": {
+        "vehicle_class": "auto",
+        "label": "ऑटो",
+        "price_min": 172,
+        "price_max": 172
+      }
+    },
+    "demo.tamarind": {
+      "name": "Tamarind Cabs",
+      "wire_id": "demo_tamarind",
+      "version_code": 1,
+      "screens": {
+        "fare_options": "demo/tamarind/fare_options.png",
+        "searching": "demo/tamarind/searching.png",
+        "driver_assigned": "demo/tamarind/driver_assigned.png",
+        "cancel_flow": "demo/tamarind/cancel_flow.png",
+        "cancelled": "demo/tamarind/cancelled.png"
+      },
+      "cancel_flow_from": "searching",
+      "booked": {
+        "vehicle_class": "auto",
+        "label": "Auto",
+        "price_min": 176,
+        "price_max": 176
+      }
+    }
+  },
+  "user_steps": {
+    "book:<package>": "The user taps 'Booked here' after reading that provider's fare screen.",
+    "cancel_others:yes": "The user taps 'Yes, cancel the others' on the first-driver sheet.",
+    "cancel_others:not_now": "The user keeps searching instead (only offered when keep searching is on).",
+    "tapped_cancel:<package>": "On that provider's demo cancel screen the user taps 'Cancel ride'.",
+    "better_ride:yes": "The user accepts the better-ride offer."
+  },
+  "tracks": [
+    {
+      "id": "main",
+      "description": "Book all three; Pepper finds the first driver; 'Cancel the others?' → Yes; Kestrel and Tamarind are cancelled with proof (rung 2); reminders while any is pending; Pepper's ride ends → pay in Pepper Rides.",
+      "requires": {
+        "keep_searching": false
+      },
+      "events": [
+        {
+          "id": "kestrel_searching_1",
+          "t_ms": 1200,
+          "requires_user_step": "book:demo.kestrel",
+          "action": "post",
+          "package": "demo.kestrel",
+          "sbn_key": "0|demo.kestrel|7001|ride|10501",
+          "channel_id": "kestrel_trip",
+          "category": "status",
+          "ongoing": true,
+          "title": "Kestrel Go",
+          "text": "Finding a rider for your Auto…",
+          "expect_event": "SEARCHING",
+          "screen": "searching"
+        },
+        {
+          "id": "pepper_searching_2",
+          "t_ms": 1200,
+          "requires_user_step": "book:demo.pepper",
+          "action": "post",
+          "package": "demo.pepper",
+          "sbn_key": "0|demo.pepper|7101|ride|10502",
+          "channel_id": "pepper_ride_status",
+          "category": "status",
+          "ongoing": true,
+          "title": "Pepper Rides",
+          "text": "Searching for nearby drivers…",
+          "expect_event": "SEARCHING",
+          "screen": "searching"
+        },
+        {
+          "id": "tamarind_searching_3",
+          "t_ms": 1200,
+          "requires_user_step": "book:demo.tamarind",
+          "action": "post",
+          "package": "demo.tamarind",
+          "sbn_key": "0|demo.tamarind|7201|ride|10503",
+          "channel_id": "tamarind_live",
+          "category": "status",
+          "ongoing": true,
+          "title": "Tamarind Cabs",
+          "text": "ड्राइवर खोज रहे हैं · Looking for a driver…",
+          "expect_event": "SEARCHING",
+          "screen": "searching"
+        },
+        {
+          "id": "pepper_assigned_4",
+          "t_ms": 9000,
+          "requires_user_step": "book:demo.tamarind",
+          "action": "post",
+          "package": "demo.pepper",
+          "sbn_key": "0|demo.pepper|7101|ride|10502",
+          "channel_id": "pepper_ride_status",
+          "category": "status",
+          "ongoing": true,
+          "title": "Driver assigned",
+          "text": "Ravi · XX 00 DM 4821 · arriving in 9 min · 2.8 km away",
+          "expect_event": "ASSIGNED",
+          "expect_groups": {
+            "plate": "XX 00 DM 4821",
+            "eta": "9",
+            "dist": "2.8 km"
+          },
+          "screen": "driver_assigned"
+        },
+        {
+          "id": "kestrel_cancelled_5",
+          "t_ms": 1500,
+          "requires_user_step": "tapped_cancel:demo.kestrel",
+          "action": "post",
+          "package": "demo.kestrel",
+          "sbn_key": "0|demo.kestrel|7002|alert|10501",
+          "channel_id": "kestrel_alerts",
+          "category": null,
+          "ongoing": false,
+          "title": "Trip cancelled",
+          "text": "Your Kestrel Go trip was cancelled. No fee charged.",
+          "expect_event": "CANCELLED",
+          "screen": "cancelled"
+        },
+        {
+          "id": "kestrel_ongoing_removed_6",
+          "t_ms": 1600,
+          "requires_user_step": "tapped_cancel:demo.kestrel",
+          "action": "remove",
+          "package": "demo.kestrel",
+          "sbn_key": "0|demo.kestrel|7001|ride|10501",
+          "channel_id": "kestrel_trip",
+          "category": "status",
+          "ongoing": true,
+          "title": "Kestrel Go",
+          "text": "Finding a rider for your Auto…",
+          "removal_reason": "REASON_APP_CANCEL"
+        },
+        {
+          "id": "tamarind_cancelled_7",
+          "t_ms": 1500,
+          "requires_user_step": "tapped_cancel:demo.tamarind",
+          "action": "post",
+          "package": "demo.tamarind",
+          "sbn_key": "0|demo.tamarind|7202|alert|10503",
+          "channel_id": "tamarind_info",
+          "category": null,
+          "ongoing": false,
+          "title": "राइड रद्द · Ride cancelled",
+          "text": "Your Tamarind Cabs booking was cancelled.",
+          "expect_event": "CANCELLED",
+          "screen": "cancelled"
+        },
+        {
+          "id": "tamarind_ongoing_removed_8",
+          "t_ms": 1600,
+          "requires_user_step": "tapped_cancel:demo.tamarind",
+          "action": "remove",
+          "package": "demo.tamarind",
+          "sbn_key": "0|demo.tamarind|7201|ride|10503",
+          "channel_id": "tamarind_live",
+          "category": "status",
+          "ongoing": true,
+          "title": "Tamarind Cabs",
+          "text": "ड्राइवर खोज रहे हैं · Looking for a driver…",
+          "removal_reason": "REASON_APP_CANCEL"
+        },
+        {
+          "id": "pepper_arriving_9",
+          "t_ms": 10000,
+          "requires_user_step": "tapped_cancel:demo.tamarind",
+          "action": "post",
+          "package": "demo.pepper",
+          "sbn_key": "0|demo.pepper|7101|ride|10502",
+          "channel_id": "pepper_ride_status",
+          "category": "status",
+          "ongoing": true,
+          "title": "Driver has arrived",
+          "text": "Ravi is at your pickup point. Your PIN is 5302.",
+          "expect_event": "ARRIVING"
+        },
+        {
+          "id": "pepper_trip_started_10",
+          "t_ms": 25000,
+          "requires_user_step": "tapped_cancel:demo.tamarind",
+          "action": "post",
+          "package": "demo.pepper",
+          "sbn_key": "0|demo.pepper|7101|ride|10502",
+          "channel_id": "pepper_ride_status",
+          "category": "status",
+          "ongoing": true,
+          "title": "Ride started",
+          "text": "Have a safe ride!",
+          "expect_event": "TRIP_STARTED"
+        },
+        {
+          "id": "pepper_ended_11",
+          "t_ms": 45000,
+          "requires_user_step": "tapped_cancel:demo.tamarind",
+          "action": "post",
+          "package": "demo.pepper",
+          "sbn_key": "0|demo.pepper|7102|alert|10502",
+          "channel_id": "pepper_updates",
+          "category": null,
+          "ongoing": false,
+          "title": "Ride completed",
+          "text": "Please pay ₹172 in Pepper Rides.",
+          "expect_event": "ENDED"
+        },
+        {
+          "id": "pepper_ongoing_removed_12",
+          "t_ms": 45100,
+          "requires_user_step": "tapped_cancel:demo.tamarind",
+          "action": "remove",
+          "package": "demo.pepper",
+          "sbn_key": "0|demo.pepper|7101|ride|10502",
+          "channel_id": "pepper_ride_status",
+          "category": "status",
+          "ongoing": true,
+          "title": "Ride started",
+          "text": "Have a safe ride!",
+          "removal_reason": "REASON_APP_CANCEL"
+        }
+      ],
+      "checkpoints": [
+        {
+          "after_user_step": "book:demo.tamarind",
+          "at_ms": 9000,
+          "expect": "first_driver_sheet",
+          "package": "demo.pepper",
+          "driver_eta_min": 9,
+          "driver_distance_text": "2.8 km"
+        },
+        {
+          "after_user_step": "cancel_others:yes",
+          "expect": "cancel_chain",
+          "order": [
+            "demo.kestrel",
+            "demo.tamarind"
+          ]
+        },
+        {
+          "after_user_step": "cancel_others:yes",
+          "at_ms": [
+            30000,
+            60000,
+            120000,
+            240000
+          ],
+          "expect": "reminder_while_pending",
+          "packages": [
+            "demo.kestrel",
+            "demo.tamarind"
+          ]
+        },
+        {
+          "after_user_step": "tapped_cancel:demo.kestrel",
+          "at_ms": 1500,
+          "expect": "cancel_confirmed",
+          "package": "demo.kestrel",
+          "rung": 2
+        },
+        {
+          "after_user_step": "tapped_cancel:demo.tamarind",
+          "at_ms": 1500,
+          "expect": "cancel_confirmed",
+          "package": "demo.tamarind",
+          "rung": 2
+        },
+        {
+          "after_user_step": "tapped_cancel:demo.tamarind",
+          "at_ms": 45000,
+          "expect": "pay_handoff_offer",
+          "package": "demo.pepper"
+        }
+      ]
+    },
+    {
+      "id": "keep_searching",
+      "description": "Keep searching is on: Pepper's driver is 9 min away, the user keeps searching, Tamarind then finds a driver 2 min away → better-ride offer → Yes → Kestrel and Pepper are cancelled with proof; Tamarind carries the trip to payment.",
+      "requires": {
+        "keep_searching": true
+      },
+      "events": [
+        {
+          "id": "kestrel_searching_1",
+          "t_ms": 1200,
+          "requires_user_step": "book:demo.kestrel",
+          "action": "post",
+          "package": "demo.kestrel",
+          "sbn_key": "0|demo.kestrel|7001|ride|10501",
+          "channel_id": "kestrel_trip",
+          "category": "status",
+          "ongoing": true,
+          "title": "Kestrel Go",
+          "text": "Finding a rider for your Auto…",
+          "expect_event": "SEARCHING",
+          "screen": "searching"
+        },
+        {
+          "id": "pepper_searching_2",
+          "t_ms": 1200,
+          "requires_user_step": "book:demo.pepper",
+          "action": "post",
+          "package": "demo.pepper",
+          "sbn_key": "0|demo.pepper|7101|ride|10502",
+          "channel_id": "pepper_ride_status",
+          "category": "status",
+          "ongoing": true,
+          "title": "Pepper Rides",
+          "text": "Searching for nearby drivers…",
+          "expect_event": "SEARCHING",
+          "screen": "searching"
+        },
+        {
+          "id": "tamarind_searching_3",
+          "t_ms": 1200,
+          "requires_user_step": "book:demo.tamarind",
+          "action": "post",
+          "package": "demo.tamarind",
+          "sbn_key": "0|demo.tamarind|7201|ride|10503",
+          "channel_id": "tamarind_live",
+          "category": "status",
+          "ongoing": true,
+          "title": "Tamarind Cabs",
+          "text": "ड्राइवर खोज रहे हैं · Looking for a driver…",
+          "expect_event": "SEARCHING",
+          "screen": "searching"
+        },
+        {
+          "id": "pepper_assigned_4",
+          "t_ms": 9000,
+          "requires_user_step": "book:demo.tamarind",
+          "action": "post",
+          "package": "demo.pepper",
+          "sbn_key": "0|demo.pepper|7101|ride|10502",
+          "channel_id": "pepper_ride_status",
+          "category": "status",
+          "ongoing": true,
+          "title": "Driver assigned",
+          "text": "Ravi · XX 00 DM 4821 · arriving in 9 min · 2.8 km away",
+          "expect_event": "ASSIGNED",
+          "expect_groups": {
+            "plate": "XX 00 DM 4821",
+            "eta": "9",
+            "dist": "2.8 km"
+          },
+          "screen": "driver_assigned"
+        },
+        {
+          "id": "tamarind_assigned_5",
+          "t_ms": 8000,
+          "requires_user_step": "cancel_others:not_now",
+          "action": "post",
+          "package": "demo.tamarind",
+          "sbn_key": "0|demo.tamarind|7201|ride|10503",
+          "channel_id": "tamarind_live",
+          "category": "status",
+          "ongoing": true,
+          "title": "ड्राइवर मिल गया · Driver found",
+          "text": "Sunil · XX 00 DM 2290 · 2 मिनट दूर · 0.6 km",
+          "expect_event": "ASSIGNED",
+          "expect_groups": {
+            "plate": "XX 00 DM 2290",
+            "eta": "2",
+            "dist": "0.6 km"
+          },
+          "screen": "driver_assigned"
+        },
+        {
+          "id": "kestrel_cancelled_6",
+          "t_ms": 1500,
+          "requires_user_step": "tapped_cancel:demo.kestrel",
+          "action": "post",
+          "package": "demo.kestrel",
+          "sbn_key": "0|demo.kestrel|7002|alert|10501",
+          "channel_id": "kestrel_alerts",
+          "category": null,
+          "ongoing": false,
+          "title": "Trip cancelled",
+          "text": "Your Kestrel Go trip was cancelled. No fee charged.",
+          "expect_event": "CANCELLED",
+          "screen": "cancelled"
+        },
+        {
+          "id": "kestrel_ongoing_removed_7",
+          "t_ms": 1600,
+          "requires_user_step": "tapped_cancel:demo.kestrel",
+          "action": "remove",
+          "package": "demo.kestrel",
+          "sbn_key": "0|demo.kestrel|7001|ride|10501",
+          "channel_id": "kestrel_trip",
+          "category": "status",
+          "ongoing": true,
+          "title": "Kestrel Go",
+          "text": "Finding a rider for your Auto…",
+          "removal_reason": "REASON_APP_CANCEL"
+        },
+        {
+          "id": "pepper_cancelled_8",
+          "t_ms": 1500,
+          "requires_user_step": "tapped_cancel:demo.pepper",
+          "action": "post",
+          "package": "demo.pepper",
+          "sbn_key": "0|demo.pepper|7102|alert|10502",
+          "channel_id": "pepper_updates",
+          "category": null,
+          "ongoing": false,
+          "title": "Booking cancelled",
+          "text": "Your Pepper Rides booking is cancelled. No charge applied.",
+          "expect_event": "CANCELLED",
+          "screen": "cancelled"
+        },
+        {
+          "id": "pepper_ongoing_removed_9",
+          "t_ms": 1600,
+          "requires_user_step": "tapped_cancel:demo.pepper",
+          "action": "remove",
+          "package": "demo.pepper",
+          "sbn_key": "0|demo.pepper|7101|ride|10502",
+          "channel_id": "pepper_ride_status",
+          "category": "status",
+          "ongoing": true,
+          "title": "Driver assigned",
+          "text": "Ravi · XX 00 DM 4821 · arriving in 9 min · 2.8 km away",
+          "removal_reason": "REASON_APP_CANCEL"
+        },
+        {
+          "id": "tamarind_arriving_10",
+          "t_ms": 10000,
+          "requires_user_step": "tapped_cancel:demo.pepper",
+          "action": "post",
+          "package": "demo.tamarind",
+          "sbn_key": "0|demo.tamarind|7201|ride|10503",
+          "channel_id": "tamarind_live",
+          "category": "status",
+          "ongoing": true,
+          "title": "ड्राइवर पहुँच गया · Driver arrived",
+          "text": "Your Tamarind cab is at the pickup point.",
+          "expect_event": "ARRIVING"
+        },
+        {
+          "id": "tamarind_trip_started_11",
+          "t_ms": 25000,
+          "requires_user_step": "tapped_cancel:demo.pepper",
+          "action": "post",
+          "package": "demo.tamarind",
+          "sbn_key": "0|demo.tamarind|7201|ride|10503",
+          "channel_id": "tamarind_live",
+          "category": "status",
+          "ongoing": true,
+          "title": "यात्रा शुरू · Trip started",
+          "text": "Have a good trip with Tamarind Cabs.",
+          "expect_event": "TRIP_STARTED"
+        },
+        {
+          "id": "tamarind_ended_12",
+          "t_ms": 45000,
+          "requires_user_step": "tapped_cancel:demo.pepper",
+          "action": "post",
+          "package": "demo.tamarind",
+          "sbn_key": "0|demo.tamarind|7202|alert|10503",
+          "channel_id": "tamarind_info",
+          "category": null,
+          "ongoing": false,
+          "title": "Trip ended",
+          "text": "Please pay ₹176 in Tamarind Cabs.",
+          "expect_event": "ENDED"
+        },
+        {
+          "id": "tamarind_ongoing_removed_13",
+          "t_ms": 45100,
+          "requires_user_step": "tapped_cancel:demo.pepper",
+          "action": "remove",
+          "package": "demo.tamarind",
+          "sbn_key": "0|demo.tamarind|7201|ride|10503",
+          "channel_id": "tamarind_live",
+          "category": "status",
+          "ongoing": true,
+          "title": "यात्रा शुरू · Trip started",
+          "text": "Have a good trip with Tamarind Cabs.",
+          "removal_reason": "REASON_APP_CANCEL"
+        }
+      ],
+      "checkpoints": [
+        {
+          "after_user_step": "book:demo.tamarind",
+          "at_ms": 9000,
+          "expect": "first_driver_sheet",
+          "package": "demo.pepper",
+          "driver_eta_min": 9,
+          "driver_distance_text": "2.8 km"
+        },
+        {
+          "after_user_step": "cancel_others:not_now",
+          "at_ms": 8000,
+          "expect": "better_ride_offer",
+          "current": "demo.pepper",
+          "better": "demo.tamarind",
+          "eta_gain_min": 7
+        },
+        {
+          "after_user_step": "better_ride:yes",
+          "expect": "cancel_chain",
+          "order": [
+            "demo.kestrel",
+            "demo.pepper"
+          ]
+        },
+        {
+          "after_user_step": "tapped_cancel:demo.kestrel",
+          "at_ms": 1500,
+          "expect": "cancel_confirmed",
+          "package": "demo.kestrel",
+          "rung": 2
+        },
+        {
+          "after_user_step": "tapped_cancel:demo.pepper",
+          "at_ms": 1500,
+          "expect": "cancel_confirmed",
+          "package": "demo.pepper",
+          "rung": 2
+        },
+        {
+          "after_user_step": "tapped_cancel:demo.pepper",
+          "at_ms": 45000,
+          "expect": "pay_handoff_offer",
+          "package": "demo.tamarind"
+        }
+      ]
+    },
+    {
+      "id": "rematch",
+      "description": "Pepper only: the first driver cancels, Pepper re-matches with a much closer driver (new plate → new generation, driver_assigned_better.png), then the ride ends → pay in Pepper Rides.",
+      "requires": {
+        "keep_searching": false
+      },
+      "events": [
+        {
+          "id": "pepper_searching_1",
+          "t_ms": 1200,
+          "requires_user_step": "book:demo.pepper",
+          "action": "post",
+          "package": "demo.pepper",
+          "sbn_key": "0|demo.pepper|7101|ride|10502",
+          "channel_id": "pepper_ride_status",
+          "category": "status",
+          "ongoing": true,
+          "title": "Pepper Rides",
+          "text": "Searching for nearby drivers…",
+          "expect_event": "SEARCHING",
+          "screen": "searching"
+        },
+        {
+          "id": "pepper_assigned_2",
+          "t_ms": 9000,
+          "requires_user_step": "book:demo.pepper",
+          "action": "post",
+          "package": "demo.pepper",
+          "sbn_key": "0|demo.pepper|7101|ride|10502",
+          "channel_id": "pepper_ride_status",
+          "category": "status",
+          "ongoing": true,
+          "title": "Driver assigned",
+          "text": "Ravi · XX 00 DM 4821 · arriving in 9 min · 2.8 km away",
+          "expect_event": "ASSIGNED",
+          "expect_groups": {
+            "plate": "XX 00 DM 4821",
+            "eta": "9",
+            "dist": "2.8 km"
+          },
+          "screen": "driver_assigned"
+        },
+        {
+          "id": "pepper_driver_cancelled_3",
+          "t_ms": 20000,
+          "requires_user_step": "book:demo.pepper",
+          "action": "post",
+          "package": "demo.pepper",
+          "sbn_key": "0|demo.pepper|7101|ride|10502",
+          "channel_id": "pepper_ride_status",
+          "category": "status",
+          "ongoing": true,
+          "title": "Driver cancelled",
+          "text": "Your driver cancelled. Finding you a new driver…",
+          "expect_event": "DRIVER_CANCELLED",
+          "screen": "searching"
+        },
+        {
+          "id": "pepper_assigned_4",
+          "t_ms": 30000,
+          "requires_user_step": "book:demo.pepper",
+          "action": "post",
+          "package": "demo.pepper",
+          "sbn_key": "0|demo.pepper|7101|ride|10502",
+          "channel_id": "pepper_ride_status",
+          "category": "status",
+          "ongoing": true,
+          "title": "Driver assigned",
+          "text": "Imran · XX 00 DM 7305 · arriving in 3 min · 0.5 km away",
+          "expect_event": "ASSIGNED",
+          "expect_groups": {
+            "plate": "XX 00 DM 7305",
+            "eta": "3",
+            "dist": "0.5 km"
+          },
+          "screen": "driver_assigned_better"
+        },
+        {
+          "id": "pepper_arriving_5",
+          "t_ms": 40000,
+          "requires_user_step": "book:demo.pepper",
+          "action": "post",
+          "package": "demo.pepper",
+          "sbn_key": "0|demo.pepper|7101|ride|10502",
+          "channel_id": "pepper_ride_status",
+          "category": "status",
+          "ongoing": true,
+          "title": "Driver has arrived",
+          "text": "Imran is at your pickup point. Your PIN is 5302.",
+          "expect_event": "ARRIVING"
+        },
+        {
+          "id": "pepper_trip_started_6",
+          "t_ms": 55000,
+          "requires_user_step": "book:demo.pepper",
+          "action": "post",
+          "package": "demo.pepper",
+          "sbn_key": "0|demo.pepper|7101|ride|10502",
+          "channel_id": "pepper_ride_status",
+          "category": "status",
+          "ongoing": true,
+          "title": "Ride started",
+          "text": "Have a safe ride!",
+          "expect_event": "TRIP_STARTED"
+        },
+        {
+          "id": "pepper_ended_7",
+          "t_ms": 75000,
+          "requires_user_step": "book:demo.pepper",
+          "action": "post",
+          "package": "demo.pepper",
+          "sbn_key": "0|demo.pepper|7102|alert|10502",
+          "channel_id": "pepper_updates",
+          "category": null,
+          "ongoing": false,
+          "title": "Ride completed",
+          "text": "Please pay ₹172 in Pepper Rides.",
+          "expect_event": "ENDED"
+        },
+        {
+          "id": "pepper_ongoing_removed_8",
+          "t_ms": 75100,
+          "requires_user_step": "book:demo.pepper",
+          "action": "remove",
+          "package": "demo.pepper",
+          "sbn_key": "0|demo.pepper|7101|ride|10502",
+          "channel_id": "pepper_ride_status",
+          "category": "status",
+          "ongoing": true,
+          "title": "Ride started",
+          "text": "Have a safe ride!",
+          "removal_reason": "REASON_APP_CANCEL"
+        }
+      ],
+      "checkpoints": [
+        {
+          "after_user_step": "book:demo.pepper",
+          "at_ms": 20000,
+          "expect": "driver_cancelled_notice",
+          "package": "demo.pepper"
+        },
+        {
+          "after_user_step": "book:demo.pepper",
+          "at_ms": 30000,
+          "expect": "assigned_new_generation",
+          "package": "demo.pepper",
+          "driver_eta_min": 3,
+          "driver_distance_text": "0.5 km"
+        },
+        {
+          "after_user_step": "book:demo.pepper",
+          "at_ms": 75000,
+          "expect": "pay_handoff_offer",
+          "package": "demo.pepper"
+        }
+      ]
+    }
+  ]
+}

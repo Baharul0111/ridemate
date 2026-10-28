@@ -1,0 +1,2 @@
+# Built by build_template.py --api-base-url; deploy.sh regenerates it, so it is never committed.
+remoteconfig.template.json

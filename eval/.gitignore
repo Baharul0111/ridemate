@@ -1,0 +1,5 @@
+# Default golden output (also ignored at the repo root): never commit golden data (L6).
+private/
+# The repo-root rule `golden/` (for a private golden clone) would also hide eval/golden/, which holds only the
+# generator and its README. Re-include it; the generator refuses to write output there.
+!golden/

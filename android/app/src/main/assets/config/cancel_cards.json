@@ -1,0 +1,127 @@
+{
+  "schema": "1.0",
+  "notes": {
+    "com.ubercab": "Generic steps from general knowledge; unverified until recorded with the owner's Recorder.",
+    "com.olacabs.customer": "Generic steps from general knowledge; unverified until recorded with the owner's Recorder.",
+    "com.rapido.passenger": "Generic steps from general knowledge; unverified until recorded with the owner's Recorder.",
+    "demo.kestrel": "Fictional demo provider; matches assets/demo/kestrel/cancel_flow.png and cancelled.png.",
+    "demo.pepper": "Fictional demo provider; matches assets/demo/pepper/cancel_flow.png and cancelled.png.",
+    "demo.tamarind": "Fictional demo provider; matches assets/demo/tamarind/cancel_flow.png and cancelled.png."
+  },
+  "apps": {
+    "com.ubercab": {
+      "steps": {
+        "en": [
+          "Open the trip panel at the bottom",
+          "Tap **Cancel ride**",
+          "Choose **Booked another ride** if asked",
+          "Tap **Confirm**"
+        ],
+        "hi": [
+          "नीचे ट्रिप पैनल खोलें",
+          "**Cancel ride** पर टैप करें",
+          "पूछे जाने पर **Booked another ride** चुनें",
+          "**Confirm** पर टैप करें"
+        ]
+      },
+      "point_target": "cancel_button",
+      "cancelled_keywords": [
+        "cancelled",
+        "canceled",
+        "रद्द"
+      ]
+    },
+    "com.olacabs.customer": {
+      "steps": {
+        "en": [
+          "Tap **Cancel** on the ride screen",
+          "Pick a reason such as **Booked another ride**",
+          "Tap **Cancel ride** to confirm"
+        ],
+        "hi": [
+          "राइड स्क्रीन पर **Cancel** पर टैप करें",
+          "**Booked another ride** जैसा कारण चुनें",
+          "पुष्टि के लिए **Cancel ride** पर टैप करें"
+        ]
+      },
+      "point_target": "cancel_button",
+      "cancelled_keywords": [
+        "cancelled",
+        "canceled",
+        "रद्द"
+      ]
+    },
+    "com.rapido.passenger": {
+      "steps": {
+        "en": [
+          "Tap **Cancel Ride**",
+          "Pick a reason such as **Booked another ride**",
+          "Tap **Cancel Ride** again to confirm"
+        ],
+        "hi": [
+          "**Cancel Ride** पर टैप करें",
+          "**Booked another ride** जैसा कारण चुनें",
+          "पुष्टि के लिए फिर से **Cancel Ride** पर टैप करें"
+        ]
+      },
+      "point_target": "cancel_button",
+      "cancelled_keywords": [
+        "cancelled",
+        "canceled",
+        "रद्द"
+      ]
+    },
+    "demo.kestrel": {
+      "steps": {
+        "en": [
+          "Choose **Booked another ride**",
+          "Tap **Cancel ride**"
+        ],
+        "hi": [
+          "**Booked another ride** चुनें",
+          "**Cancel ride** पर टैप करें"
+        ]
+      },
+      "point_target": "cancel_button",
+      "cancelled_keywords": [
+        "trip cancelled",
+        "cancelled"
+      ]
+    },
+    "demo.pepper": {
+      "steps": {
+        "en": [
+          "Choose **Booked another ride**",
+          "Tap **Cancel ride**"
+        ],
+        "hi": [
+          "**Booked another ride** चुनें",
+          "**Cancel ride** पर टैप करें"
+        ]
+      },
+      "point_target": "cancel_button",
+      "cancelled_keywords": [
+        "booking cancelled",
+        "cancelled"
+      ]
+    },
+    "demo.tamarind": {
+      "steps": {
+        "en": [
+          "Choose **Booked another ride**",
+          "Tap **Cancel ride**"
+        ],
+        "hi": [
+          "**Booked another ride** चुनें",
+          "**Cancel ride** पर टैप करें"
+        ]
+      },
+      "point_target": "cancel_button",
+      "cancelled_keywords": [
+        "ride cancelled",
+        "cancelled",
+        "रद्द"
+      ]
+    }
+  }
+}

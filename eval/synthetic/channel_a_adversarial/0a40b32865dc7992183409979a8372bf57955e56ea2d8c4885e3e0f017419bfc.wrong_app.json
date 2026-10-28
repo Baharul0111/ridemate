@@ -1,0 +1,27 @@
+{
+  "image_sha256": "0a40b32865dc7992183409979a8372bf57955e56ea2d8c4885e3e0f017419bfc",
+  "model": "synthetic-perfect-reader",
+  "recorded_at": "2026-10-28T00:00:00Z",
+  "read": {
+    "app": "demo_pepper",
+    "screen_type": "driver_assigned",
+    "options": [],
+    "fee_text": null,
+    "driver_eta_min": 4,
+    "driver_distance_text": "1.6 km"
+  },
+  "usage": {
+    "input_tokens": 0,
+    "cached_input_tokens": 0,
+    "output_tokens": 0
+  },
+  "cost_usd": 0.0,
+  "expect": {
+    "rows": [],
+    "reason": "app_mismatch",
+    "rule": "a",
+    "driver_eta": "SEE_IN_APP",
+    "driver_distance": "SEE_IN_APP"
+  },
+  "variant": "wrong_app"
+}

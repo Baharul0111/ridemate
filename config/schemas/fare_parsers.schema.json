@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:ridemate:config:fare_parsers",
+  "title": "fare_parsers (contracts §2.2)",
+  "description": "Channel B rules over OCR tokens, per app and versionCode. vehicle_labels are tried in list order; the first match decides the class.",
+  "type": "object",
+  "required": ["schema", "apps"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {"$ref": "#/$defs/schemaVersion"},
+    "notes": {"$ref": "#/$defs/notes"},
+    "apps": {
+      "type": "object",
+      "propertyNames": {"$ref": "#/$defs/package"},
+      "additionalProperties": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/versionEntry"}}
+    }
+  },
+  "$defs": {
+    "schemaVersion": {"type": "string", "pattern": "^1\\.[0-9]+$"},
+    "package": {"type": "string", "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)+$"},
+    "notes": {
+      "type": "object",
+      "propertyNames": {"$ref": "#/$defs/package"},
+      "additionalProperties": {"type": "string", "minLength": 1}
+    },
+    "vehicleClass": {"enum": ["bike", "auto", "cab_economy", "cab_premium", "cab_xl", "other"]},
+    "screenType": {"enum": ["fare_options", "searching", "driver_assigned", "cancel_flow", "cancelled", "home", "other"]},
+    "versionEntry": {
+      "type": "object",
+      "required": [
+        "min_version_code", "vehicle_labels", "price_token_pattern", "eta_pattern", "strike_height_ratio",
+        "row_gap_ratio", "driver_eta_anchors", "driver_distance_pattern", "screen_keywords"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "min_version_code": {"type": "integer", "minimum": 0},
+        "max_known_version_code": {"type": ["integer", "null"], "minimum": 0},
+        "vehicle_labels": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["pattern", "vehicle_class"],
+            "additionalProperties": false,
+            "properties": {
+              "pattern": {"type": "string", "minLength": 1, "x-re2": {"groups": []}},
+              "vehicle_class": {"$ref": "#/$defs/vehicleClass"}
+            }
+          }
+        },
+        "price_token_pattern": {"type": "string", "minLength": 1, "x-re2": {"groups": []}},
+        "eta_pattern": {"type": "string", "minLength": 1, "x-re2": {"groups": [], "minGroups": 1}},
+        "strike_height_ratio": {"type": "number", "exclusiveMinimum": 0, "exclusiveMaximum": 1},
+        "row_gap_ratio": {"type": "number", "exclusiveMinimum": 0, "maximum": 10},
+        "driver_eta_anchors": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
+        "driver_distance_pattern": {"type": "string", "minLength": 1, "x-re2": {"groups": [], "minGroups": 2}},
+        "screen_keywords": {
+          "type": "object",
+          "propertyNames": {"$ref": "#/$defs/screenType"},
+          "required": ["fare_options", "searching", "driver_assigned", "cancelled"],
+          "additionalProperties": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}}
+        }
+      }
+    }
+  }
+}

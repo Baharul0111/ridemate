@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:ridemate:config:cancel_cards",
+  "title": "cancel_cards (contracts §2.4)",
+  "description": "Per-app guided-cancel instruction cards. **text** marks the control to tap. cancelled_keywords feed evidence rung 3 (OCR of a capture).",
+  "type": "object",
+  "required": ["schema", "apps"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {"type": "string", "pattern": "^1\\.[0-9]+$"},
+    "notes": {"$ref": "#/$defs/notes"},
+    "apps": {
+      "type": "object",
+      "propertyNames": {"$ref": "#/$defs/package"},
+      "additionalProperties": {"$ref": "#/$defs/card"}
+    }
+  },
+  "$defs": {
+    "package": {"type": "string", "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)+$"},
+    "notes": {
+      "type": "object",
+      "propertyNames": {"$ref": "#/$defs/package"},
+      "additionalProperties": {"type": "string", "minLength": 1}
+    },
+    "steps": {"type": "array", "minItems": 1, "maxItems": 6, "items": {"type": "string", "minLength": 1, "maxLength": 120}},
+    "card": {
+      "type": "object",
+      "required": ["steps", "point_target", "cancelled_keywords"],
+      "additionalProperties": false,
+      "properties": {
+        "steps": {
+          "type": "object",
+          "required": ["en", "hi"],
+          "additionalProperties": false,
+          "properties": {"en": {"$ref": "#/$defs/steps"}, "hi": {"$ref": "#/$defs/steps"}}
+        },
+        "point_target": {"enum": ["cancel_button"]},
+        "cancelled_keywords": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}}
+      }
+    }
+  }
+}

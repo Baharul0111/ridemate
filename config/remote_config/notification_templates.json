@@ -1,0 +1,461 @@
+{
+  "schema": "1.0",
+  "notes": {
+    "com.ubercab": "Best-effort initial patterns from general knowledge (English + Hindi), unverified until recorded with the owner's Recorder. Kept conservative so misses fall to the MAYBE prompts.",
+    "com.olacabs.customer": "Best-effort initial patterns from general knowledge (English + Hindi), unverified until recorded with the owner's Recorder. Kept conservative so misses fall to the MAYBE prompts.",
+    "com.rapido.passenger": "Best-effort initial patterns from general knowledge (English + Hindi), unverified until recorded with the owner's Recorder. Kept conservative so misses fall to the MAYBE prompts.",
+    "demo.kestrel": "Fictional demo provider; matches the bundled screens in assets/demo/kestrel and assets/demo/script.json exactly.",
+    "demo.pepper": "Fictional demo provider; matches the bundled screens in assets/demo/pepper and assets/demo/script.json exactly.",
+    "demo.tamarind": "Fictional demo provider; matches the bundled screens in assets/demo/tamarind and assets/demo/script.json exactly."
+  },
+  "apps": {
+    "com.ubercab": [
+      {
+        "min_version_code": 0,
+        "templates": [
+          {
+            "id": "uber.driver_cancelled.v1",
+            "event": "DRIVER_CANCELLED",
+            "pattern": "(?i)(?:^|\\n)(?:your )?driver (?:has )?cancell?ed|cancell?ed by (?:the |your )?driver|(?:^|\\n)ड्राइवर ने (?:राइड|ट्रिप) (?:रद्द|कैंसिल)",
+            "channel_id": null,
+            "ongoing": null
+          },
+          {
+            "id": "uber.no_drivers.v1",
+            "event": "NO_DRIVERS",
+            "pattern": "(?i)(?:^|\\n)(?:no (?:drivers|cars|rides) (?:are )?available|(?:we )?couldn'?t find (?:a|any) (?:driver|ride)s?)|(?:^|\\n)कोई ड्राइवर उपलब्ध नहीं",
+            "channel_id": null,
+            "ongoing": null
+          },
+          {
+            "id": "uber.cancelled.v1",
+            "event": "CANCELLED",
+            "pattern": "(?i)^(?:your )?(?:trip|ride|request) (?:has been |was |is )?cancell?ed|^(?:ट्रिप|राइड) (?:रद्द|कैंसिल)",
+            "channel_id": null,
+            "ongoing": null
+          },
+          {
+            "id": "uber.ended.v1",
+            "event": "ENDED",
+            "pattern": "(?i)(?:^|\\n)(?:thanks for riding|you(?:'ve| have) arrived|(?:your )?trip (?:has )?ended|trip completed)|(?:^|\\n)(?:आप पहुँच गए|ट्रिप पूरी)",
+            "channel_id": null,
+            "ongoing": null
+          },
+          {
+            "id": "uber.trip_started.v1",
+            "event": "TRIP_STARTED",
+            "pattern": "(?i)(?:^|\\n)(?:your )?trip (?:has )?started|(?:^|\\n)enjoy your (?:trip|ride)|(?:^|\\n)ट्रिप शुरू",
+            "channel_id": null,
+            "ongoing": null
+          },
+          {
+            "id": "uber.arriving.v1",
+            "event": "ARRIVING",
+            "pattern": "(?i)(?:^|\\n)(?:your )?(?:driver|uber) (?:is )?(?:arriving now|here|has arrived)|(?:^|\\n)ड्राइवर पहुँच गए",
+            "channel_id": null,
+            "ongoing": null
+          },
+          {
+            "id": "uber.assigned.v1",
+            "event": "ASSIGNED",
+            "pattern": "(?i)(?:^|\\n)(?:your )?driver[^\\n]{0,40}?(?:is on (?:the|their) way|is en route|accepted your (?:trip|request|ride)|is (?P<eta>\\d{1,2}) ?min(?:ute)?s? away)(?:.*?(?P<dist>\\d+(?:\\.\\d+)? ?k?m)\\b)?|(?:^|\\n)ड्राइवर[^\\n]{0,40}?रास्ते में (?:है|हैं)",
+            "channel_id": null,
+            "ongoing": null
+          },
+          {
+            "id": "uber.searching.v1",
+            "event": "SEARCHING",
+            "pattern": "(?i)(?:^|\\n)(?:finding|looking for|searching for|connecting you (?:to|with)) (?:a |your |nearby )?(?:drivers?|ride|car)|(?:^|\\n)(?:ड्राइवर|राइड) (?:ढूंढ|खोज)",
+            "channel_id": null,
+            "ongoing": null
+          }
+        ],
+        "redacted": [],
+        "cancelled_keywords": [
+          "cancelled",
+          "canceled",
+          "रद्द",
+          "कैंसिल"
+        ],
+        "ongoing_channel_ids": []
+      }
+    ],
+    "com.olacabs.customer": [
+      {
+        "min_version_code": 0,
+        "templates": [
+          {
+            "id": "ola.driver_cancelled.v1",
+            "event": "DRIVER_CANCELLED",
+            "pattern": "(?i)(?:^|\\n)(?:your )?(?:ola )?driver (?:has )?cancell?ed|cancell?ed by (?:the |your )?driver|(?:^|\\n)ड्राइवर ने (?:राइड|बुकिंग) (?:रद्द|कैंसिल)",
+            "channel_id": null,
+            "ongoing": null
+          },
+          {
+            "id": "ola.no_drivers.v1",
+            "event": "NO_DRIVERS",
+            "pattern": "(?i)(?:^|\\n)(?:no (?:cabs|autos|bikes|drivers) (?:are )?available|(?:all )?(?:cabs|drivers) are busy|(?:we )?couldn'?t find (?:a )?(?:cab|ride|driver))|(?:^|\\n)कोई (?:कैब|ऑटो|बाइक) उपलब्ध नहीं",
+            "channel_id": null,
+            "ongoing": null
+          },
+          {
+            "id": "ola.cancelled.v1",
+            "event": "CANCELLED",
+            "pattern": "(?i)^(?:your )?(?:ola )?(?:ride|booking)(?: crn ?\\d+)? (?:has been |was |is )?cancell?ed|^(?:राइड|बुकिंग) (?:रद्द|कैंसिल)",
+            "channel_id": null,
+            "ongoing": null
+          },
+          {
+            "id": "ola.ended.v1",
+            "event": "ENDED",
+            "pattern": "(?i)(?:^|\\n)(?:(?:your )?ride (?:has )?(?:ended|completed)|thank you for riding|total (?:fare|bill))|(?:^|\\n)राइड पूरी",
+            "channel_id": null,
+            "ongoing": null
+          },
+          {
+            "id": "ola.trip_started.v1",
+            "event": "TRIP_STARTED",
+            "pattern": "(?i)(?:^|\\n)(?:your )?ride (?:has )?started|(?:^|\\n)राइड शुरू",
+            "channel_id": null,
+            "ongoing": null
+          },
+          {
+            "id": "ola.arriving.v1",
+            "event": "ARRIVING",
+            "pattern": "(?i)(?:^|\\n)(?:your )?(?:cab|auto|bike|driver) (?:has )?(?:arrived|is here)|(?:^|\\n)(?:कैब|ड्राइवर) पहुँच (?:गई|गया)",
+            "channel_id": null,
+            "ongoing": null
+          },
+          {
+            "id": "ola.assigned.v1",
+            "event": "ASSIGNED",
+            "pattern": "(?i)(?:^|\\n)(?:your )?(?:ola |driver |cab |auto |bike )[^\\n]{0,60}?(?:is on (?:the|its|his|her) way|has been (?:allotted|assigned)|will (?:reach|arrive) in (?P<eta>\\d{1,2}) ?mins?)(?:.*?(?P<plate>[a-z]{2} ?\\d{1,2} ?[a-z]{1,3} ?\\d{4}))?|(?:^|\\n)(?:कैब|ड्राइवर)[^\\n]{0,40}?रास्ते में है",
+            "channel_id": null,
+            "ongoing": null
+          },
+          {
+            "id": "ola.searching.v1",
+            "event": "SEARCHING",
+            "pattern": "(?i)(?:^|\\n)(?:finding|looking for|searching for|connecting you (?:to|with)) (?:a |an |your |nearby )?(?:cab|auto|bike|driver|ride)s?\\b|(?:^|\\n)(?:कैब|ड्राइवर|राइड) (?:ढूंढ|खोज)",
+            "channel_id": null,
+            "ongoing": null
+          }
+        ],
+        "redacted": [],
+        "cancelled_keywords": [
+          "cancelled",
+          "canceled",
+          "रद्द",
+          "कैंसिल"
+        ],
+        "ongoing_channel_ids": []
+      }
+    ],
+    "com.rapido.passenger": [
+      {
+        "min_version_code": 0,
+        "templates": [
+          {
+            "id": "rapido.driver_cancelled.v1",
+            "event": "DRIVER_CANCELLED",
+            "pattern": "(?i)(?:^|\\n)(?:your )?captain (?:has )?cancell?ed|cancell?ed by (?:the |your )?captain|(?:^|\\n)कैप्टन ने (?:राइड )?(?:रद्द|कैंसिल)",
+            "channel_id": null,
+            "ongoing": null
+          },
+          {
+            "id": "rapido.no_drivers.v1",
+            "event": "NO_DRIVERS",
+            "pattern": "(?i)(?:^|\\n)(?:no captains? (?:are |is )?(?:available|found|nearby)|(?:all )?captains are busy|(?:we )?couldn'?t find (?:a )?captain)|(?:^|\\n)कोई कैप्टन (?:उपलब्ध नहीं|नहीं मिला)",
+            "channel_id": null,
+            "ongoing": null
+          },
+          {
+            "id": "rapido.cancelled.v1",
+            "event": "CANCELLED",
+            "pattern": "(?i)^(?:your )?(?:ride|order|booking) (?:has been |was |is )?cancell?ed|^(?:राइड|ऑर्डर) (?:रद्द|कैंसिल)",
+            "channel_id": null,
+            "ongoing": null
+          },
+          {
+            "id": "rapido.ended.v1",
+            "event": "ENDED",
+            "pattern": "(?i)(?:^|\\n)(?:(?:your )?ride (?:has )?(?:ended|completed)|you(?:'ve| have) reached|thanks for riding)|(?:^|\\n)राइड पूरी",
+            "channel_id": null,
+            "ongoing": null
+          },
+          {
+            "id": "rapido.trip_started.v1",
+            "event": "TRIP_STARTED",
+            "pattern": "(?i)(?:^|\\n)(?:your )?ride (?:has )?started|(?:^|\\n)राइड शुरू",
+            "channel_id": null,
+            "ongoing": null
+          },
+          {
+            "id": "rapido.arriving.v1",
+            "event": "ARRIVING",
+            "pattern": "(?i)(?:^|\\n)(?:your )?captain (?:has )?(?:arrived|reached)|(?:^|\\n)(?:your )?captain is (?:here|at (?:the|your) pickup)|(?:^|\\n)कैप्टन पहुँच (?:गए|गया)",
+            "channel_id": null,
+            "ongoing": null
+          },
+          {
+            "id": "rapido.assigned.v1",
+            "event": "ASSIGNED",
+            "pattern": "(?i)(?:^|\\n)(?:your )?captain (?:(?P<name>[a-z][a-z .']{0,30}?) )?(?:is on the way|is arriving|has accepted|accepted your ride)(?:.*?(?P<eta>\\d{1,2})\\s*min)?(?:.*?(?P<plate>[a-z]{2} ?\\d{1,2} ?[a-z]{1,3} ?\\d{4}))?|(?:^|\\n)कैप्टन[^\\n]{0,40}?(?:रास्ते में (?:है|हैं)|आ रहे हैं)",
+            "channel_id": null,
+            "ongoing": null
+          },
+          {
+            "id": "rapido.searching.v1",
+            "event": "SEARCHING",
+            "pattern": "(?i)(?:^|\\n)(?:looking for|finding|searching for|connecting you (?:to|with)) (?:a |your |nearby )?captains?|(?:^|\\n)कैप्टन (?:ढूंढ|खोज)",
+            "channel_id": null,
+            "ongoing": null
+          }
+        ],
+        "redacted": [],
+        "cancelled_keywords": [
+          "cancelled",
+          "canceled",
+          "रद्द",
+          "कैंसिल"
+        ],
+        "ongoing_channel_ids": []
+      }
+    ],
+    "demo.kestrel": [
+      {
+        "min_version_code": 0,
+        "templates": [
+          {
+            "id": "demo_kestrel.searching.v1",
+            "event": "SEARCHING",
+            "pattern": "(?i)^kestrel go\\nfinding a rider\\b",
+            "channel_id": null,
+            "ongoing": null
+          },
+          {
+            "id": "demo_kestrel.assigned.v1",
+            "event": "ASSIGNED",
+            "pattern": "(?i)^rider on the way\\n(?:.*?(?P<plate>[a-z]{2} ?\\d{2} ?[a-z]{1,2} ?\\d{4}))?(?:.*?(?P<eta>\\d{1,2}) min away)?(?:.*?(?P<dist>\\d+(?:\\.\\d+)? ?k?m)\\b)?",
+            "channel_id": null,
+            "ongoing": null
+          },
+          {
+            "id": "demo_kestrel.arriving.v1",
+            "event": "ARRIVING",
+            "pattern": "(?i)^rider has arrived\\n",
+            "channel_id": null,
+            "ongoing": null
+          },
+          {
+            "id": "demo_kestrel.driver_cancelled.v1",
+            "event": "DRIVER_CANCELLED",
+            "pattern": "(?i)^rider cancelled\\n",
+            "channel_id": null,
+            "ongoing": null
+          },
+          {
+            "id": "demo_kestrel.no_drivers.v1",
+            "event": "NO_DRIVERS",
+            "pattern": "(?i)^no riders nearby\\n",
+            "channel_id": null,
+            "ongoing": null
+          },
+          {
+            "id": "demo_kestrel.cancelled.v1",
+            "event": "CANCELLED",
+            "pattern": "(?i)^trip cancelled\\nyour kestrel go trip was cancelled\\b",
+            "channel_id": null,
+            "ongoing": null
+          },
+          {
+            "id": "demo_kestrel.trip_started.v1",
+            "event": "TRIP_STARTED",
+            "pattern": "(?i)^trip started\\n",
+            "channel_id": null,
+            "ongoing": null
+          },
+          {
+            "id": "demo_kestrel.ended.v1",
+            "event": "ENDED",
+            "pattern": "(?i)^trip completed\\n",
+            "channel_id": null,
+            "ongoing": null
+          }
+        ],
+        "redacted": [
+          {
+            "event": "ASSIGNED",
+            "channel_id": "kestrel_trip",
+            "ongoing": true,
+            "category": "status"
+          }
+        ],
+        "cancelled_keywords": [
+          "trip cancelled",
+          "cancelled"
+        ],
+        "ongoing_channel_ids": [
+          "kestrel_trip"
+        ]
+      }
+    ],
+    "demo.pepper": [
+      {
+        "min_version_code": 0,
+        "templates": [
+          {
+            "id": "demo_pepper.searching.v1",
+            "event": "SEARCHING",
+            "pattern": "(?i)^pepper rides\\nsearching for nearby drivers\\b",
+            "channel_id": null,
+            "ongoing": null
+          },
+          {
+            "id": "demo_pepper.assigned.v1",
+            "event": "ASSIGNED",
+            "pattern": "(?i)^driver assigned\\n(?:.*?(?P<plate>[a-z]{2} ?\\d{2} ?[a-z]{1,2} ?\\d{4}))?(?:.*?arriving in (?P<eta>\\d{1,2}) min)?(?:.*?(?P<dist>\\d+(?:\\.\\d+)? ?k?m)\\b)?",
+            "channel_id": null,
+            "ongoing": null
+          },
+          {
+            "id": "demo_pepper.arriving.v1",
+            "event": "ARRIVING",
+            "pattern": "(?i)^driver has arrived\\n",
+            "channel_id": null,
+            "ongoing": null
+          },
+          {
+            "id": "demo_pepper.driver_cancelled.v1",
+            "event": "DRIVER_CANCELLED",
+            "pattern": "(?i)^driver cancelled\\n",
+            "channel_id": null,
+            "ongoing": null
+          },
+          {
+            "id": "demo_pepper.no_drivers.v1",
+            "event": "NO_DRIVERS",
+            "pattern": "(?i)^no drivers found\\n",
+            "channel_id": null,
+            "ongoing": null
+          },
+          {
+            "id": "demo_pepper.cancelled.v1",
+            "event": "CANCELLED",
+            "pattern": "(?i)^booking cancelled\\nyour pepper rides booking is cancelled\\b",
+            "channel_id": null,
+            "ongoing": null
+          },
+          {
+            "id": "demo_pepper.trip_started.v1",
+            "event": "TRIP_STARTED",
+            "pattern": "(?i)^ride started\\n",
+            "channel_id": null,
+            "ongoing": null
+          },
+          {
+            "id": "demo_pepper.ended.v1",
+            "event": "ENDED",
+            "pattern": "(?i)^ride completed\\n",
+            "channel_id": null,
+            "ongoing": null
+          }
+        ],
+        "redacted": [
+          {
+            "event": "ASSIGNED",
+            "channel_id": "pepper_ride_status",
+            "ongoing": true,
+            "category": "status"
+          }
+        ],
+        "cancelled_keywords": [
+          "booking cancelled",
+          "cancelled"
+        ],
+        "ongoing_channel_ids": [
+          "pepper_ride_status"
+        ]
+      }
+    ],
+    "demo.tamarind": [
+      {
+        "min_version_code": 0,
+        "templates": [
+          {
+            "id": "demo_tamarind.searching.v1",
+            "event": "SEARCHING",
+            "pattern": "(?i)^tamarind cabs\\n(?:ड्राइवर खोज रहे हैं · )?looking for a driver\\b",
+            "channel_id": null,
+            "ongoing": null
+          },
+          {
+            "id": "demo_tamarind.assigned.v1",
+            "event": "ASSIGNED",
+            "pattern": "(?i)^(?:ड्राइवर मिल गया · )?driver found\\n(?:.*?(?P<plate>[a-z]{2} ?\\d{2} ?[a-z]{1,2} ?\\d{4}))?(?:.*?(?P<eta>[0-9०-९]{1,2}) (?:मिनट|min))?(?:.*?(?P<dist>\\d+(?:\\.\\d+)? ?k?m)\\b)?",
+            "channel_id": null,
+            "ongoing": null
+          },
+          {
+            "id": "demo_tamarind.arriving.v1",
+            "event": "ARRIVING",
+            "pattern": "(?i)^(?:ड्राइवर पहुँच गया · )?driver arrived\\n",
+            "channel_id": null,
+            "ongoing": null
+          },
+          {
+            "id": "demo_tamarind.driver_cancelled.v1",
+            "event": "DRIVER_CANCELLED",
+            "pattern": "(?i)^driver cancelled\\n",
+            "channel_id": null,
+            "ongoing": null
+          },
+          {
+            "id": "demo_tamarind.no_drivers.v1",
+            "event": "NO_DRIVERS",
+            "pattern": "(?i)^no cabs available\\n",
+            "channel_id": null,
+            "ongoing": null
+          },
+          {
+            "id": "demo_tamarind.cancelled.v1",
+            "event": "CANCELLED",
+            "pattern": "(?i)^(?:राइड रद्द · )?ride cancelled\\nyour tamarind cabs booking was cancelled\\b",
+            "channel_id": null,
+            "ongoing": null
+          },
+          {
+            "id": "demo_tamarind.trip_started.v1",
+            "event": "TRIP_STARTED",
+            "pattern": "(?i)^(?:यात्रा शुरू · )?trip started\\n",
+            "channel_id": null,
+            "ongoing": null
+          },
+          {
+            "id": "demo_tamarind.ended.v1",
+            "event": "ENDED",
+            "pattern": "(?i)^trip ended\\n",
+            "channel_id": null,
+            "ongoing": null
+          }
+        ],
+        "redacted": [
+          {
+            "event": "ASSIGNED",
+            "channel_id": "tamarind_live",
+            "ongoing": true,
+            "category": "status"
+          }
+        ],
+        "cancelled_keywords": [
+          "ride cancelled",
+          "cancelled",
+          "रद्द"
+        ],
+        "ongoing_channel_ids": [
+          "tamarind_live"
+        ]
+      }
+    ]
+  }
+}

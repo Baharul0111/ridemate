@@ -1,0 +1,24 @@
+[project]
+name = "ridemate-eval"
+version = "0.1.0"
+description = "RideMate eval tooling: demo screens, synthetic/golden fixtures, Remote Config checks and the eval harness."
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "google-re2>=1.1",
+    "jsonschema>=4.23",
+    "pillow>=11",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests", "../config/tests"]
+addopts = "--import-mode=importlib"
+filterwarnings = ["ignore::DeprecationWarning"]
+
+[tool.ruff]
+line-length = 110
+target-version = "py312"

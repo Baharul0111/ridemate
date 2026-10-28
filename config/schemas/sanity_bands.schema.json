@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:ridemate:config:sanity_bands",
+  "title": "sanity_bands (contracts §2.3)",
+  "description": "A price p passes if price_min_inr <= p <= price_max_inr and, with trip distance d km (haversine x road_factor), per_km_min*d - base_allowance_inr <= p <= per_km_max*d + base_allowance_inr.",
+  "type": "object",
+  "required": ["schema", "price_min_inr", "price_max_inr", "eta_max_min", "road_factor", "base_allowance_inr", "per_km_inr"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {"type": "string", "pattern": "^1\\.[0-9]+$"},
+    "price_min_inr": {"type": "integer", "minimum": 0},
+    "price_max_inr": {"type": "integer", "minimum": 1},
+    "eta_max_min": {"type": "integer", "minimum": 1},
+    "road_factor": {"type": "number", "minimum": 1, "maximum": 3},
+    "base_allowance_inr": {"type": "integer", "minimum": 0},
+    "per_km_inr": {
+      "type": "object",
+      "required": ["bike", "auto", "cab_economy", "cab_premium", "cab_xl", "other"],
+      "additionalProperties": false,
+      "properties": {
+        "bike": {"$ref": "#/$defs/band"},
+        "auto": {"$ref": "#/$defs/band"},
+        "cab_economy": {"$ref": "#/$defs/band"},
+        "cab_premium": {"$ref": "#/$defs/band"},
+        "cab_xl": {"$ref": "#/$defs/band"},
+        "other": {"$ref": "#/$defs/band"}
+      }
+    }
+  },
+  "$defs": {
+    "band": {
+      "type": "array",
+      "prefixItems": [{"type": "number", "minimum": 0}, {"type": "number", "minimum": 0}],
+      "minItems": 2,
+      "maxItems": 2
+    }
+  }
+}

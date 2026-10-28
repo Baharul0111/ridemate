@@ -1,0 +1,130 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:ridemate:eval:channel_a",
+  "title": "Recorded or synthetic Channel A output (contracts §6)",
+  "type": "object",
+  "required": [
+    "image_sha256",
+    "model",
+    "recorded_at",
+    "read",
+    "usage",
+    "cost_usd"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "image_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "model": {
+      "type": "string",
+      "minLength": 1
+    },
+    "recorded_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "read": {
+      "$ref": "urn:ridemate:eval:channel_a_read"
+    },
+    "usage": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "required": [
+            "input_tokens",
+            "cached_input_tokens",
+            "output_tokens"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "input_tokens": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "cached_input_tokens": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "output_tokens": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        }
+      ]
+    },
+    "cost_usd": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "source": {
+      "enum": [
+        "live",
+        "cache",
+        "recorded"
+      ]
+    },
+    "request_id": {
+      "type": "string"
+    },
+    "latency_ms": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "variant": {
+      "type": "string"
+    },
+    "expect": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "rows": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "VERIFIED",
+              "UNREADABLE",
+              "NOT_WRONG"
+            ]
+          }
+        },
+        "driver_eta": {
+          "enum": [
+            "VERIFIED",
+            "SEE_IN_APP"
+          ]
+        },
+        "driver_distance": {
+          "enum": [
+            "VERIFIED",
+            "SEE_IN_APP"
+          ]
+        },
+        "reason": {
+          "type": "string"
+        },
+        "rule": {
+          "enum": [
+            "a",
+            "b",
+            "c",
+            "d",
+            "e",
+            "f"
+          ]
+        },
+        "model_text_displayed": {
+          "const": false
+        }
+      }
+    }
+  }
+}

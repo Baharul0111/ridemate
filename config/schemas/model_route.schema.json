@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:ridemate:config:model_route",
+  "title": "model_route (contracts §2.7)",
+  "description": "Provider route per AI task; lets a funded provider be added without code changes.",
+  "type": "object",
+  "required": [
+    "schema",
+    "read",
+    "parse"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "type": "string",
+      "pattern": "^1\\.[0-9]+$"
+    },
+    "read": {
+      "$ref": "#/$defs/route"
+    },
+    "parse": {
+      "$ref": "#/$defs/route"
+    }
+  },
+  "$defs": {
+    "route": {
+      "enum": [
+        "modal_spark_open"
+      ]
+    }
+  }
+}
