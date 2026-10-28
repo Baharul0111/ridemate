@@ -1,0 +1,75 @@
+{
+  "image_sha256": "63d3306c5057dc99706c96dde86c7e939f05a4deb1564f98c1381c9c284c854a",
+  "model": "meta-models/Muse-Spark-Open-816B-A42B",
+  "recorded_at": "2026-10-28T17:01:05Z",
+  "read": {
+    "app": "demo_tamarind",
+    "screen_type": "fare_options",
+    "options": [
+      {
+        "vehicle_class": "bike",
+        "label_text": "Moto",
+        "price_min": 104,
+        "price_max": 104,
+        "price_struck_text": null,
+        "eta_min": 3,
+        "bbox_0_1000": [
+          30,
+          450,
+          970,
+          500
+        ]
+      },
+      {
+        "vehicle_class": "auto",
+        "label_text": "Auto",
+        "price_min": 176,
+        "price_max": 176,
+        "price_struck_text": "₹205",
+        "eta_min": 5,
+        "bbox_0_1000": [
+          30,
+          513,
+          970,
+          595
+        ]
+      },
+      {
+        "vehicle_class": "cab_economy",
+        "label_text": "Tamarind Cab",
+        "price_min": 272,
+        "price_max": 272,
+        "price_struck_text": null,
+        "eta_min": 4,
+        "bbox_0_1000": [
+          30,
+          605,
+          970,
+          670
+        ]
+      },
+      {
+        "vehicle_class": "cab_xl",
+        "label_text": "Tamarind XL",
+        "price_min": 1040,
+        "price_max": 1040,
+        "price_struck_text": null,
+        "eta_min": 8,
+        "bbox_0_1000": [
+          30,
+          685,
+          970,
+          750
+        ]
+      }
+    ],
+    "fee_text": null,
+    "driver_eta_min": null,
+    "driver_distance_text": null
+  },
+  "usage": null,
+  "cost_usd": 0.006902,
+  "source": "live",
+  "request_id": "eval-run:793f4c6948e04a55:fffcada7a3d146098608fb7f81ec6201",
+  "latency_ms": 50969
+}

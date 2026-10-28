@@ -1,0 +1,61 @@
+{
+  "image_sha256": "69443ff9bdb8fb24d8bbc449592f57c059a257b609b658dd36d189d180e551c7",
+  "model": "meta-models/Muse-Spark-Open-816B-A42B",
+  "recorded_at": "2026-10-28T16:53:31Z",
+  "read": {
+    "app": "demo_pepper",
+    "screen_type": "fare_options",
+    "options": [
+      {
+        "vehicle_class": "auto",
+        "label_text": "ऑटो",
+        "price_min": 172,
+        "price_max": 172,
+        "price_struck_text": null,
+        "eta_min": 3,
+        "bbox_0_1000": [
+          29,
+          437,
+          971,
+          515
+        ]
+      },
+      {
+        "vehicle_class": "cab_economy",
+        "label_text": "Pepper Go",
+        "price_min": 264,
+        "price_max": 264,
+        "price_struck_text": "₹299",
+        "eta_min": 5,
+        "bbox_0_1000": [
+          61,
+          531,
+          958,
+          597
+        ]
+      },
+      {
+        "vehicle_class": "cab_premium",
+        "label_text": "Pepper Prime Sedan",
+        "price_min": 398,
+        "price_max": 398,
+        "price_struck_text": null,
+        "eta_min": 7,
+        "bbox_0_1000": [
+          62,
+          612,
+          958,
+          672
+        ]
+      }
+    ],
+    "fee_text": null,
+    "driver_eta_min": null,
+    "driver_distance_text": null
+  },
+  "usage": null,
+  "cost_usd": 0.006881,
+  "source": "live",
+  "request_id": "eval-run:793f4c6948e04a55:51878db6a9094133ac927457daa58057",
+  "latency_ms": 48865
+}

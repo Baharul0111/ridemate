@@ -1,0 +1,18 @@
+{
+  "image_sha256": "871c0c4f75853cc0f828d723016f52f8ef45e60e37b3afeb87ff22e08a3a7501",
+  "model": "meta-models/Muse-Spark-Open-816B-A42B",
+  "recorded_at": "2026-10-28T16:59:35Z",
+  "read": {
+    "app": "demo_pepper",
+    "screen_type": "cancelled",
+    "options": [],
+    "fee_text": null,
+    "driver_eta_min": null,
+    "driver_distance_text": null
+  },
+  "usage": null,
+  "cost_usd": 0.005478,
+  "source": "live",
+  "request_id": "eval-run:793f4c6948e04a55:a78452ec0e704295bd17c0bda097e049",
+  "latency_ms": 50138
+}
