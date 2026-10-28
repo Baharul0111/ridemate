@@ -36,11 +36,16 @@ class OndcMessagesTest {
         OndcUnavailableReason.entries.forEach { reason ->
             val en = context.getString(OndcMessages.unavailableRes(reason))
             val hi = hindi.getString(OndcMessages.unavailableRes(reason))
-            assertTrue(en, en.contains("ride app") || en.contains("Sign in"))
+            // Each names the next step: book elsewhere, sign in, tap Cancel ride again, or wait for RideMate's reminder.
+            assertTrue(en, listOf("ride app", "Sign in", "Tap Cancel ride again", "will remind you").any { it in en })
             assertTrue(hi, hi.isNotBlank() && hi != en)
         }
         val row = OndcMessages.status(context, OndcView(phase = OndcPhase.UNAVAILABLE, unavailable = OndcUnavailableReason.OFFLINE))
         assertEquals("ONDC unavailable. You're offline. Connect and search again, or book in a ride app.", row)
+        assertEquals(
+            "ONDC उपलब्ध नहीं। खुले नेटवर्क ने अभी तक आपका रद्द करना पक्का नहीं किया है, इसलिए आपकी राइड शायद अभी भी बुक है। RideMate जाँच करता रहेगा और आपको याद दिलाएगा।",
+            OndcMessages.status(hindi, OndcView(phase = OndcPhase.UNAVAILABLE, unavailable = OndcUnavailableReason.CANCEL_UNCONFIRMED)),
+        )
     }
 
     @Test

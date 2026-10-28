@@ -34,6 +34,8 @@ import app.ridemate.integration.GuardianDemoHost
 import app.ridemate.integration.GuardianLegOpenedSink
 import app.ridemate.integration.NetworkSearch
 import app.ridemate.integration.OcrEngineDemoOcr
+import app.ridemate.integration.OndcResume
+import app.ridemate.integration.OndcTxnMemory
 import app.ridemate.integration.PrecheckGate
 import app.ridemate.integration.RideMateScreens
 import app.ridemate.integration.RouteFareLauncher
@@ -63,6 +65,7 @@ import app.ridemate.messaging.FirebaseFcmTokenSource
 import app.ridemate.messaging.OwnerAccess
 import app.ridemate.messaging.OwnerAlertNotifier
 import app.ridemate.messaging.OwnerMessaging
+import app.ridemate.messaging.OwnerSignInWatcher
 import app.ridemate.messaging.OwnerTokenRegistrar
 import app.ridemate.net.ApiClient
 import app.ridemate.net.OkHttpApiClient
@@ -258,6 +261,7 @@ class AppGraph(
 
     init {
         localWipers.add(LocalDataWiper { recentPlaces.clear() })
+        localWipers.add(LocalDataWiper { ondcTxnMemory.clear() })
     }
 
     // ---- fare reading (bubble, capture, OCR + masking, Read fares, comparison list) ----
@@ -429,20 +433,40 @@ class AppGraph(
             ondcEnabled = configRepository.ondcEnabled,
             clock = clock,
             scope = mainScope,
-        ).also { client -> client.bind { legId, event -> guardianRuntime.onProtocolEvent(legId, event) } }
+        ).also { client ->
+            client.bind { legId, event -> guardianRuntime.onProtocolEvent(legId, event) }
+            // Remember the transaction (ids only) so a booked network ride survives a process restart.
+            mainScope.launch {
+                client.view.collect { view -> OndcResume.toRemember(view)?.let { (legId, txnId) -> ondcTxnMemory.remember(legId, txnId) } }
+            }
+        }
+    }
+
+    /** The network leg's ONDC transaction id, for re-attaching after a restart; Erase wipes it. */
+    val ondcTxnMemory: OndcTxnMemory by lazy {
+        OndcTxnMemory(app.getSharedPreferences(OndcTxnMemory.PREFS_NAME, Context.MODE_PRIVATE))
+    }
+
+    /** Whether the signed-in user is the owner (`owner_emails_sha256`; fails closed). */
+    val ownerAccess: OwnerAccess by lazy {
+        OwnerAccess(
+            authState = { authGateway.state.value },
+            ownerEmailHashes = { OwnerAccess.parseHashes(configRepository.string(ConfigKeys.OWNER_EMAILS_SHA256)) },
+        )
     }
 
     /** Owner alert pushes and the owner's FCM token registration ([app.ridemate.messaging.OwnerMessagingService]). */
     val ownerMessaging: OwnerMessaging by lazy {
-        val owner = OwnerAccess(
-            authState = { authGateway.state.value },
-            ownerEmailHashes = { OwnerAccess.parseHashes(configRepository.string(ConfigKeys.OWNER_EMAILS_SHA256)) },
-        )
         OwnerMessaging(
-            registrar = OwnerTokenRegistrar(apiClient, owner, FirebaseFcmTokenSource),
-            owner = owner,
+            registrar = OwnerTokenRegistrar(apiClient, ownerAccess, FirebaseFcmTokenSource),
+            owner = ownerAccess,
             notify = OwnerAlertNotifier(app)::show,
         )
+    }
+
+    /** Registers the owner's FCM token when the owner signs in ([start] runs it; [ownerMessaging] is built only then). */
+    val ownerSignInWatcher: OwnerSignInWatcher by lazy {
+        OwnerSignInWatcher(isOwner = ownerAccess::isOwner, register = { ownerMessaging.registerCurrentToken() })
     }
 
     @Volatile
@@ -471,6 +495,15 @@ class AppGraph(
 
         eraseUseCase // registers the ERASE_SERVER outbox handler
         guardian.start() // registers the guardian's outbox handlers and restores an active ride session
+        appScope.launch {
+            // A booked ONDC ride of the restored session: listen to its transaction again (status, fee, on_cancel).
+            guardianRuntime.awaitIdle()
+            OndcResume.resumeTarget(guardianRuntime.status.value, guardianRuntime.uiState.value, ondcTxnMemory)?.let { (legId, txnId) ->
+                withContext(dispatchers.main) { ondcClient.resume(legId, txnId) }
+            }
+        }
+
+        appScope.launch { ownerSignInWatcher.run(authGateway.state, configRepository.epoch) }
 
         appScope.launch {
             authGateway.state.collect { state ->
@@ -480,10 +513,6 @@ class AppGraph(
                     is AuthState.Google -> SignInKind.GOOGLE
                 }
                 crashReporter.setKey(CrashKey.AUTH_KIND, kind)
-                // The owner's phone receives owner alerts: register its FCM token once the owner is signed in.
-                if (state is AuthState.Google && ownerMessaging.isOwner()) {
-                    appScope.launch { ownerMessaging.registerCurrentToken() }
-                }
             }
         }
 

@@ -21,7 +21,7 @@ object OndcMessages {
         val price = row.price?.let { IndianFormat.rupeeRange(it) }.orEmpty()
         val eta = row.eta?.let { context.getString(R.string.ondc_eta, it) } ?: context.getString(R.string.ondc_eta_unknown)
         val seller = row.displayLabel.ifBlank { context.getString(R.string.ondc_name) }
-        return context.getString(R.string.ondc_row_description, seller, className, "$price, $eta", quoteLabel(context, quote))
+        return context.getString(R.string.ondc_row_description, seller, className, price, eta, quoteLabel(context, quote))
     }
 
     @StringRes
@@ -34,6 +34,8 @@ object OndcMessages {
         OndcUnavailableReason.NOT_CONFIGURED -> R.string.ondc_unavailable_not_configured
         OndcUnavailableReason.LISTENER_FAILED -> R.string.ondc_unavailable_listener
         OndcUnavailableReason.QUOTA -> R.string.ondc_unavailable_quota
+        OndcUnavailableReason.CANCEL_NO_ANSWER -> R.string.ondc_unavailable_cancel_no_answer
+        OndcUnavailableReason.CANCEL_UNCONFIRMED -> R.string.ondc_unavailable_cancel_unconfirmed
     }
 
     /** The status line under the ONDC row, or null when quotes speak for themselves. */
@@ -51,8 +53,11 @@ object OndcMessages {
         OndcPhase.CANCELLING -> context.getString(R.string.ondc_cancelling)
         OndcPhase.CANCELLED -> context.getString(R.string.ondc_cancelled)
         OndcPhase.FAILED -> context.getString(R.string.ondc_failed)
-        OndcPhase.UNAVAILABLE -> context.getString(R.string.ondc_unavailable) + ". " +
-            context.getString(unavailableRes(view.unavailable ?: OndcUnavailableReason.SERVER))
+        OndcPhase.UNAVAILABLE -> context.getString(
+            R.string.ondc_unavailable_line,
+            context.getString(R.string.ondc_unavailable),
+            context.getString(unavailableRes(view.unavailable ?: OndcUnavailableReason.SERVER)),
+        )
     }
 
     /** "Cancelling now costs ₹X (the network's fee)…" or "Cancelling now is free…", shown before the user confirms. */

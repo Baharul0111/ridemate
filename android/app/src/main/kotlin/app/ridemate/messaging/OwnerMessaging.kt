@@ -24,9 +24,6 @@ class OwnerMessaging(
     suspend fun registerCurrentToken(): TokenRegistration =
         withTimeoutOrNull(deadlineMs) { registrar.registerCurrentToken() } ?: TokenRegistration.FAILED
 
-    /** True when the signed-in user is the owner (no network, no token read). */
-    fun isOwner(): Boolean = owner.isOwner()
-
     /** A push arrived: returns true when an owner alert was shown. */
     fun onMessage(data: Map<String, String>, notificationTitle: String?, notificationBody: String?): Boolean {
         val alert = OwnerAlert.parse(data, notificationTitle, notificationBody) ?: return false

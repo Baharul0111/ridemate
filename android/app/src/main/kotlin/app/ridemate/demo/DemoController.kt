@@ -20,6 +20,7 @@ import app.ridemate.net.PointRequest
 import app.ridemate.net.TapBudget
 import app.ridemate.util.Clock
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
@@ -28,6 +29,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import java.util.UUID
 
 /**
@@ -313,12 +315,16 @@ class DemoController(
                 CaptureReason.SHOW_ME -> showMePointer(effect.provider, path, sessionId)
                 CaptureReason.CANCEL_PROOF, CaptureReason.CHECK_SCREEN -> {
                     val text = try {
-                        ocr.recognize(assets.bytes(path)).tokens.joinToString(" ") { it.text }
+                        withTimeoutOrNull(DemoFareReader.OCR_TIMEOUT_MS) { ocr.recognize(assets.bytes(path)) }?.tokens?.joinToString(" ") { it.text }
+                    } catch (_: TimeoutCancellationException) {
+                        null
                     } catch (e: CancellationException) {
                         throw e
                     } catch (_: Exception) {
-                        return@launch
-                    }
+                        null
+                    } ?: return@launch
+                    // The demo was left (or restarted) while the screen was read: its ended session gets nothing.
+                    if (_state.value.sessionId != sessionId) return@launch
                     val keywords = cancelCards()?.cardFor(effect.provider.packageName)?.cancelledKeywords.orEmpty()
                     val found = CancelledKeywords.found(text, keywords)
                     val tapId = tap()
@@ -330,6 +336,7 @@ class DemoController(
                         } catch (_: Exception) {
                             null
                         }
+                        if (_state.value.sessionId != sessionId) return@launch
                         val driver = read?.driver
                         if (driver != null && (driver.etaMin != null || driver.distanceMeters != null)) {
                             host.verifiedDriverReading(view.legId, driver.etaMin, driver.distanceMeters, tapId)

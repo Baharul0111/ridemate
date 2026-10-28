@@ -115,8 +115,15 @@ object DemoText {
     fun rowSeenAt(context: Context, entry: ComparisonEntry): String =
         context.getString(R.string.demo_row_seen_at, entry.row.provider.displayName, IstTime.seenAt(entry.row.seenAtMs))
 
+    /**
+     * "old" in words (never colour alone), with what to do: tap Read fares while the demo app can still be read, or
+     * that it was read before booking once it has been [booked] (its fare screen is gone, so there is nothing to refresh).
+     */
+    fun staleText(context: Context, booked: Boolean): String =
+        context.getString(if (booked) R.string.demo_row_stale_booked else R.string.demo_row_stale)
+
     /** One sentence a screen reader can read for the row (state in words, never colour alone). */
-    fun rowDescription(context: Context, entry: ComparisonEntry): String {
+    fun rowDescription(context: Context, entry: ComparisonEntry, booked: Boolean = false): String {
         val extras = listOfNotNull(
             rowEta(context, entry),
             context.getString(R.string.demo_row_cheapest).takeIf { entry.cheapest },
@@ -125,7 +132,7 @@ object DemoText {
             context.getString(R.string.demo_row_description, rowLabel(context, entry), rowPrice(context, entry)),
             extras,
             rowSeenAt(context, entry),
-            context.getString(R.string.demo_row_stale).takeIf { entry.stale },
+            staleText(context, booked).takeIf { entry.stale },
         ).filter { it.isNotBlank() }.joinToString(". ")
     }
 

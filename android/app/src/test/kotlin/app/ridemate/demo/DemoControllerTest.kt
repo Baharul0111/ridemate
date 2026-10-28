@@ -401,6 +401,23 @@ class DemoControllerTest {
     }
 
     @Test
+    fun `a capture still being read when the demo is left never reaches the ended session`() = runTest {
+        val h = DemoHarness(this)
+        h.api.answerDemoReads()
+        val c = h.controller
+        c.start(DemoTrackChoice.MAIN)
+        h.runCurrent()
+        val kestrel = leg(h, DEMO_KESTREL)
+        c.onEffect(GuardianEffect.RequestCapture(kestrel, DEMO_KESTREL, app.ridemate.core.guardian.CaptureReason.CANCEL_PROOF))
+        c.onEffect(GuardianEffect.RequestCapture(kestrel, DEMO_KESTREL, app.ridemate.core.guardian.CaptureReason.CHECK_SCREEN))
+        c.stop()
+        h.runCurrent()
+        assertTrue(h.host.ended)
+        assertTrue(h.host.verdicts.isEmpty())
+        assertTrue(h.host.driverReadings.isEmpty())
+    }
+
+    @Test
     fun `live and other non-demo effects are ignored by the demo`() = runTest {
         val h = DemoHarness(this)
         h.api.answerDemoReads()

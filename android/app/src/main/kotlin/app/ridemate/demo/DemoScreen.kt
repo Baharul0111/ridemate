@@ -134,7 +134,7 @@ fun DemoScreenContent(
             } else {
                 Overview(state, actions)
             }
-            state.providers.mapNotNull { it.read }.forEach { ReadRows(it, nowMs) }
+            state.providers.forEach { view -> view.read?.let { ReadRows(it, booked = view.booked, nowMs = nowMs) } }
             Progress(state)
             OutlinedButton(
                 onClick = actions.leave,
@@ -360,7 +360,7 @@ private fun Overview(state: DemoUiState, actions: DemoScreenActions) {
 }
 
 @Composable
-private fun ReadRows(read: DemoReadResult, nowMs: () -> Long) {
+private fun ReadRows(read: DemoReadResult, booked: Boolean, nowMs: () -> Long) {
     val context = LocalContext.current
     val name = DemoText.providerName(context, read.provider)
     Card(modifier = Modifier.fillMaxWidth()) {
@@ -373,7 +373,7 @@ private fun ReadRows(read: DemoReadResult, nowMs: () -> Long) {
             DemoText.issue(read)?.let { Text(stringResource(it), style = MaterialTheme.typography.bodySmall) }
             val list = ComparisonList.build(read.rows, nowMs())
             list.groups.flatMap { it.entries }.forEach { entry ->
-                val description = DemoText.rowDescription(context, entry) + " · " + name
+                val description = context.getString(R.string.demo_row_description_with_app, DemoText.rowDescription(context, entry, booked), name)
                 Row(
                     modifier = Modifier.fillMaxWidth().heightIn(min = TouchTarget)
                         .alpha(if (entry.stale) STALE_ALPHA else 1f)
@@ -385,7 +385,7 @@ private fun ReadRows(read: DemoReadResult, nowMs: () -> Long) {
                         Text(DemoText.rowLabel(context, entry), fontWeight = FontWeight.Medium)
                         Text(DemoText.rowSeenAt(context, entry), style = MaterialTheme.typography.bodySmall)
                         // Stale rows say so in words, and are dimmed as well (never colour alone).
-                        if (entry.stale) Text(stringResource(R.string.demo_row_stale), style = MaterialTheme.typography.bodySmall)
+                        if (entry.stale) Text(DemoText.staleText(context, booked), style = MaterialTheme.typography.bodySmall)
                     }
                     Column(horizontalAlignment = Alignment.End) {
                         Text(DemoText.rowPrice(context, entry), fontWeight = if (entry.cheapest) FontWeight.Bold else FontWeight.Normal)

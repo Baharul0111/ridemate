@@ -135,6 +135,25 @@ class DemoScreenTest {
     }
 
     @Test
+    fun rows_ofABookedDemoApp_sayTheyWereReadBeforeBooking_notToTapAButtonThatIsGone() {
+        val now = DEMO_TEST_WALL_BASE
+        val row = GatedRow(Provider.DEMO_KESTREL, VehicleClass.BIKE, "Bike", true, 112..112, QuoteStatus.VERIFIED, 4, EtaSource.VERIFIED, now)
+        val read = DemoReadResult(
+            Provider.DEMO_KESTREL, DemoScreens.FARE_OPTIONS, listOf(row), DriverReading.NONE, ReadSource.LIVE,
+            recordedOnPhone = false, apiFailure = null, issue = DemoReadIssue.NONE, seenAtMs = now, imageSha256 = "x",
+        )
+        val state = runningState(booked = true).let { s ->
+            s.copy(phase = DemoPhase.WATCHING, providers = s.providers.map { if (it.provider == Provider.DEMO_KESTREL) it.copy(read = read) else it })
+        }
+        compose.setContent { DemoScreenContent(state, actions, nowMs = { now + 61_000 }) }
+        compose.onNodeWithText("old · read before you booked").performScrollTo().assertIsDisplayed()
+        assertEquals(0, compose.onAllNodesWithText("old · tap Read fares to refresh").fetchSemanticsNodes().size)
+        compose.onNodeWithContentDescription(
+            "Bike: ₹112. 4 min, cheapest. seen in Kestrel Go at 10:30:00 AM. old · read before you booked · Kestrel Go · DEMO",
+        ).assertExists()
+    }
+
+    @Test
     fun overview_listsEachDemoAppWithItsStatusAndOpenButton_andOffersPay() {
         val state = runningState(booked = true).let { s ->
             s.copy(

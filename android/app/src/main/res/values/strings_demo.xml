@@ -72,7 +72,7 @@
     <string name="demo_rows_label">%1$s · DEMO · %2$s</string>
 
     <!-- Why a read has no AI read or no rows; each says what to do next. -->
-    <string name="demo_issue_ai_switched_off">AI reading is switched off, so the demo uses a recorded read.</string>
+    <string name="demo_issue_ai_switched_off">AI reading is switched off and RideMate\'s server couldn\'t be reached, so the demo used the recorded read bundled in the app.</string>
     <string name="demo_issue_ai_unavailable">AI reading isn\'t available and no recorded read is bundled, so prices show as Couldn\'t read. Try again when you\'re online.</string>
     <string name="demo_issue_not_a_fare_screen">This doesn\'t look like a fare screen, so nothing was sent. Open the fare screen and try again.</string>
     <string name="demo_issue_ocr_failed">Your phone couldn\'t read the screen text. Tap Read fares again.</string>
@@ -85,8 +85,10 @@
     <string name="demo_row_eta_unknown">ETA: see in app</string>
     <string name="demo_row_seen_at">seen in %1$s at %2$s</string>
     <string name="demo_row_stale">old · tap Read fares to refresh</string>
+    <string name="demo_row_stale_booked">old · read before you booked</string>
     <string name="demo_row_cheapest">cheapest</string>
     <string name="demo_row_description">%1$s: %2$s</string>
+    <string name="demo_row_description_with_app">%1$s · %2$s</string>
     <string name="demo_class_bike">Bike</string>
     <string name="demo_class_auto">Auto</string>
     <string name="demo_class_cab_economy">Cab</string>
