@@ -3,6 +3,7 @@ package app.ridemate.home
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.ridemate.AppGraph
 import app.ridemate.onboarding.PermissionIntents
@@ -27,6 +28,11 @@ fun HomeRoute(graph: AppGraph, navigator: FeatureNavigator) {
     }
     val state by model.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    // Coming back from a settings screen a fix-it card opened: the cards show what is still wrong.
+    LifecycleResumeEffect(model) {
+        model.recheckIfShowing()
+        onPauseOrDispose { }
+    }
     HomeScreen(
         state = state,
         actions = HomeActions(

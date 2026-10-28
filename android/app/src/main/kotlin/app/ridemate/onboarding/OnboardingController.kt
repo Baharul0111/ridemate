@@ -41,8 +41,8 @@ data class OnboardingUiState(
     val health: HealthStatus,
 ) {
     /** "Step n of N" (null on the block and the end screen). */
-    val position: Int? get() = OnboardingFlow.position(step)
-    val total: Int get() = OnboardingFlow.ORDER.size
+    val position: Int? get() = OnboardingFlow.position(step, device)
+    val total: Int get() = OnboardingFlow.visibleOrder(device).size
 
     fun isGranted(permission: AppPermission): Boolean = permission in granted
 }

@@ -86,6 +86,20 @@
     <string name="dev_budget_ai_state">AI reading</string>
     <string name="dev_budget_ai_on">On</string>
     <string name="dev_budget_ai_off">Off</string>
+    <string name="dev_budget_ai_off_because">Off: %1$s</string>
+    <string name="dev_budget_ai_off_code">Off (server code %1$s)</string>
+    <string name="dev_reason_signed_out">not signed in</string>
+    <string name="dev_reason_anonymous">not signed in with Google</string>
+    <string name="dev_reason_kill_switch">switched off by the owner</string>
+    <string name="dev_reason_budget">credit budget used up</string>
+    <string name="dev_reason_day_cap">today\'s pacing cap reached</string>
+    <string name="dev_reason_tier_pause">paused for new and heavy accounts</string>
+    <string name="dev_reason_quota">this account\'s daily fair share is used</string>
+    <string name="dev_reason_breaker">the model endpoint is failing (circuit breaker open)</string>
+    <string name="dev_reason_meter">spend meter unreadable (fails closed)</string>
+    <string name="dev_reason_model_missing">the pinned model is missing</string>
+    <string name="dev_profile_normal">Normal</string>
+    <string name="dev_profile_judging">Judging week</string>
 
     <string name="dev_owner_alerts">Owner alerts</string>
     <string name="dev_owner_alerts_switch">Send owner alerts to this phone</string>
@@ -107,4 +121,5 @@
     <string name="dev_msg_golden_unavailable">Screen capture isn\'t available in this build yet.</string>
     <string name="dev_msg_golden_captured">Masked capture saved. Add its labels below.</string>
     <string name="dev_msg_export_failed">The export couldn\'t be written. Free some storage and try again.</string>
+    <string name="dev_msg_storage_failed">The phone\'s storage couldn\'t be read or written, so nothing changed. Free some storage and try again.</string>
 </resources>

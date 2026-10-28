@@ -144,6 +144,12 @@ class SettingsModelTest {
             assertEquals("आपकी गोपनीयता", wrapped.getString(R.string.onb_notice_title))
             assertEquals("Your privacy", context.getString(R.string.onb_notice_title))
             assertSame("Android 13+ uses the system per-app locale", context, LegacyLocale.wrap(context, sdkInt = 33))
+            assertEquals("the chosen language is the process default too", "hi", java.util.Locale.getDefault().language)
+
+            // Back to "Phone's language": nothing stored, and the process default follows the phone again.
+            context.getSharedPreferences(SettingsStore.PREFS_NAME, Context.MODE_PRIVATE).edit().remove(SettingsStore.K_LANGUAGE).commit()
+            assertSame(context, LegacyLocale.wrap(context, sdkInt = 31, systemLocale = { java.util.Locale.forLanguageTag("en-IN") }))
+            assertEquals(java.util.Locale.forLanguageTag("en-IN"), java.util.Locale.getDefault())
         } finally {
             java.util.Locale.setDefault(saved)
         }
@@ -174,7 +180,7 @@ class SettingsModelTest {
         val values = lines.map { it.substringAfter(": ") }
         assertTrue(values.all { it.matches(Regex("^[A-Za-z0-9_.()\\- ]+$")) })
         assertFalse(lines.any { "@" in it })
-        assertEquals("RideMate problem report (1.2.0)", ProblemReport.subject(input.build))
+        assertEquals("RideMate problem report (1.2.0)", ProblemReport.subject(context, input.build))
         val body = ProblemReport.body("Intro", input)
         assertTrue(body.startsWith("Intro\n"))
         assertTrue(body.endsWith(lines.last()))

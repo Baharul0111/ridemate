@@ -11,6 +11,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -21,6 +22,7 @@ import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
 import java.time.Instant
 import java.time.ZoneOffset
@@ -50,7 +52,20 @@ sealed interface OwnerAlertsStatus {
 }
 
 /** One-line outcomes of developer actions. */
-enum class DevMessage { RECORDER_EMPTY, RECORDER_CLEARED, GOLDEN_SAVED, GOLDEN_NOTHING_TO_EXPORT, GOLDEN_DENIED, GOLDEN_BLACK_FRAME, GOLDEN_UNAVAILABLE, GOLDEN_CAPTURED, EXPORT_FAILED }
+enum class DevMessage {
+    RECORDER_EMPTY,
+    RECORDER_CLEARED,
+    GOLDEN_SAVED,
+    GOLDEN_NOTHING_TO_EXPORT,
+    GOLDEN_DENIED,
+    GOLDEN_BLACK_FRAME,
+    GOLDEN_UNAVAILABLE,
+    GOLDEN_CAPTURED,
+    EXPORT_FAILED,
+
+    /** Reading or writing the phone's storage failed (full, or removed); nothing changed. */
+    STORAGE_FAILED,
+}
 
 data class DevState(
     val enabled: Boolean,
@@ -144,8 +159,7 @@ class DevModel(
     }
 
     fun clearRecorder(): Job = scope.launch {
-        withContext(io) { recorderClear() }
-        message.value = DevMessage.RECORDER_CLEARED
+        message.value = if (storage { withContext(io) { recorderClear() } }) DevMessage.RECORDER_CLEARED else DevMessage.STORAGE_FAILED
     }
 
     fun runCaptureTest(activity: Activity, tester: CaptureTester): Job = scope.launch {
@@ -171,9 +185,9 @@ class DevModel(
         }
         message.value = when (result) {
             is GoldenCaptureResult.Captured -> {
-                withContext(io) { golden.add(result.capture) }
+                val saved = storage { withContext(io) { golden.add(result.capture) } }
                 goldenScreens.value = golden.screens()
-                DevMessage.GOLDEN_CAPTURED
+                if (saved) DevMessage.GOLDEN_CAPTURED else DevMessage.STORAGE_FAILED
             }
             GoldenCaptureResult.Denied -> DevMessage.GOLDEN_DENIED
             GoldenCaptureResult.BlackFrame -> DevMessage.GOLDEN_BLACK_FRAME
@@ -181,15 +195,26 @@ class DevModel(
         }
     }
 
-    fun saveGolden(screen: GoldenScreen) {
-        golden.update(screen)
+    fun saveGolden(screen: GoldenScreen): Job = scope.launch {
+        val saved = storage { withContext(io) { golden.update(screen) } }
         goldenScreens.value = golden.screens()
-        message.value = DevMessage.GOLDEN_SAVED
+        message.value = if (saved) DevMessage.GOLDEN_SAVED else DevMessage.STORAGE_FAILED
     }
 
-    fun removeGolden(sha256: String) {
-        golden.remove(sha256)
+    fun removeGolden(sha256: String): Job = scope.launch {
+        val removed = storage { withContext(io) { golden.remove(sha256) } }
         goldenScreens.value = golden.screens()
+        if (!removed) message.value = DevMessage.STORAGE_FAILED
+    }
+
+    /** Runs a storage [block]; false (instead of a crash) when the phone's storage fails. */
+    private suspend fun storage(block: suspend () -> Unit): Boolean = try {
+        block()
+        true
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        false
     }
 
     /** Zips complete, labelled screens (contracts §6) and hands the file to [onReady]. */
@@ -217,15 +242,19 @@ class DevModel(
         }
     }
 
+    /**
+     * Owner alerts on: fetch this phone's FCM token and register it; off: delete the token so the server's copy stops
+     * working. Firebase calls get [PUSH_TOKEN_TIMEOUT_MS] (they can wait forever without Play services or network).
+     */
     fun setOwnerAlerts(on: Boolean): Job = scope.launch {
         ownerAlerts.value = OwnerAlertsStatus.Working
         if (!on) {
-            pushTokens.delete()
+            bounded { pushTokens.delete() }
             gate.setOwnerAlertsOn(false)
             ownerAlerts.value = OwnerAlertsStatus.Off
             return@launch
         }
-        val token = pushTokens.token()
+        val token = bounded { pushTokens.token() }
         if (token.isNullOrBlank()) {
             ownerAlerts.value = OwnerAlertsStatus.NoToken
             return@launch
@@ -239,6 +268,16 @@ class DevModel(
         }
     }
 
+    private suspend fun <T> bounded(block: suspend () -> T): T? = try {
+        withTimeoutOrNull(PUSH_TOKEN_TIMEOUT_MS) { block() }
+    } catch (e: TimeoutCancellationException) {
+        null
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        null
+    }
+
     private suspend fun <T> safe(block: suspend () -> ApiResult<T>): ApiResult<T> = try {
         block()
     } catch (e: CancellationException) {
@@ -249,7 +288,10 @@ class DevModel(
 
     private fun stamp(): String = STAMP.format(Instant.ofEpochMilli(clock.wallMs()))
 
-    private companion object {
-        val STAMP: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss").withZone(ZoneOffset.UTC)
+    companion object {
+        /** Ceiling for each Firebase Messaging call (token / delete). */
+        const val PUSH_TOKEN_TIMEOUT_MS = 10_000L
+
+        private val STAMP: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss").withZone(ZoneOffset.UTC)
     }
 }

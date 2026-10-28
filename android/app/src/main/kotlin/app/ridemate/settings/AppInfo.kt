@@ -3,6 +3,7 @@ package app.ridemate.settings
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
+import app.ridemate.R
 import app.ridemate.auth.AuthState
 import app.ridemate.config.KillSwitches
 import app.ridemate.core.model.Provider
@@ -57,7 +58,8 @@ object ProblemReport {
         val developerMode: Boolean,
     )
 
-    fun subject(build: BuildInfo): String = "RideMate problem report (${build.versionName})"
+    /** The email subject in the app's language (the version is the only detail in it). */
+    fun subject(context: Context, build: BuildInfo): String = context.getString(R.string.set_report_subject, build.versionName)
 
     /** `key: VALUE` lines; every value is a version number, a boolean or an enum name. */
     fun metadataLines(input: Input): List<String> = buildList {

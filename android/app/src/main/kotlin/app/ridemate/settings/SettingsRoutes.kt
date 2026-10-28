@@ -44,7 +44,7 @@ fun reportProblem(context: Context, graph: AppGraph) {
         developerMode = shell.developerMode.isEnabled(),
     )
     val body = ProblemReport.body(context.getString(R.string.set_report_intro), input)
-    val sent = SystemIntents.sendEmail(context, BuildConfig.PRIVACY_EMAIL, ProblemReport.subject(graph.build), body)
+    val sent = SystemIntents.sendEmail(context, BuildConfig.PRIVACY_EMAIL, ProblemReport.subject(context, graph.build), body)
     if (!sent) Toast.makeText(context, context.getString(R.string.set_no_email_app, BuildConfig.PRIVACY_EMAIL), Toast.LENGTH_LONG).show()
 }
 

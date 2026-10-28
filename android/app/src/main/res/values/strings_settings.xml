@@ -51,6 +51,7 @@
     <string name="set_about_summary">Version %1$s · Built with Muse Spark Open</string>
     <string name="set_report">Report a problem</string>
     <string name="set_report_summary">Sends only app and Android versions and settings states. No screenshots or text.</string>
+    <string name="set_report_subject">RideMate problem report (%1$s)</string>
     <string name="set_report_intro">Describe what happened here. RideMate added only the technical details below (versions and on/off states); please don\'t add phone numbers or OTPs.</string>
 
     <string name="set_version_label">Version</string>

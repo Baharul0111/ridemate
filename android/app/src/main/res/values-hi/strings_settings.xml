@@ -48,6 +48,7 @@
     <string name="set_about_summary">संस्करण %1$s · Built with Muse Spark Open</string>
     <string name="set_report">समस्या की रिपोर्ट करें</string>
     <string name="set_report_summary">केवल ऐप और Android के संस्करण तथा सेटिंग्स की स्थिति भेजता है। कोई स्क्रीनशॉट या टेक्स्ट नहीं।</string>
+    <string name="set_report_subject">RideMate समस्या रिपोर्ट (%1$s)</string>
     <string name="set_report_intro">यहाँ बताइए कि क्या हुआ। RideMate ने नीचे केवल तकनीकी जानकारी जोड़ी है (संस्करण और चालू/बंद स्थितियाँ); कृपया फ़ोन नंबर या OTP न जोड़ें।</string>
 
     <string name="set_version_label">संस्करण</string>

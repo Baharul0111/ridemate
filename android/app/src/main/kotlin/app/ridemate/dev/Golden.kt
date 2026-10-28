@@ -138,9 +138,10 @@ class GoldenStore(private val dir: File) {
 
     fun imageFile(sha256: String): File = File(dir, "$sha256.png")
 
-    /** The export document: complete screens only. */
+    /** The export document: complete screens whose masked image is still on the phone (labels and images match). */
     @Synchronized
-    fun labelsForExport(): GoldenLabels = GoldenLabels(screens = read().screens.filter(GoldenValidator::isComplete))
+    fun labelsForExport(): GoldenLabels =
+        GoldenLabels(screens = read().screens.filter { GoldenValidator.isComplete(it) && imageFile(it.sha256).isFile })
 
     fun labelsJson(labels: GoldenLabels): String = json.encodeToString(GoldenLabels.serializer(), labels)
 
@@ -156,7 +157,6 @@ class GoldenStore(private val dir: File) {
             zip.closeEntry()
             for (screen in labels.screens) {
                 val image = imageFile(screen.sha256)
-                if (!image.exists()) continue
                 zip.putNextEntry(ZipEntry(screen.file))
                 image.inputStream().use { it.copyTo(zip) }
                 zip.closeEntry()

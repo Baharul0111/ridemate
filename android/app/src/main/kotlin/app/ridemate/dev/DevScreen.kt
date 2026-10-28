@@ -2,6 +2,7 @@ package app.ridemate.dev
 
 import android.content.Context
 import android.graphics.BitmapFactory
+import androidx.annotation.StringRes
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -158,6 +159,7 @@ fun devMessageRes(message: DevMessage): Int = when (message) {
     DevMessage.GOLDEN_UNAVAILABLE -> R.string.dev_msg_golden_unavailable
     DevMessage.GOLDEN_CAPTURED -> R.string.dev_msg_golden_captured
     DevMessage.EXPORT_FAILED -> R.string.dev_msg_export_failed
+    DevMessage.STORAGE_FAILED -> R.string.dev_msg_storage_failed
 }
 
 @Composable
@@ -230,12 +232,40 @@ object BudgetLines {
                 context.getString(R.string.dev_budget_horizon) to
                     (UiFormat.isoDate(budget.horizonEnd) ?: context.getString(R.string.dev_budget_unknown)),
             )
-            add(context.getString(R.string.dev_budget_profile) to (check.capProfile ?: context.getString(R.string.dev_budget_unknown)))
-            add(
-                context.getString(R.string.dev_budget_ai_state) to
-                    if (check.aiEnabled) context.getString(R.string.dev_budget_ai_on) else (check.reason ?: context.getString(R.string.dev_budget_ai_off)),
-            )
+            add(context.getString(R.string.dev_budget_profile) to profileText(context, check.capProfile))
+            add(context.getString(R.string.dev_budget_ai_state) to aiStateText(context, check))
         }
+    }
+
+    /** The server's `cap_profile` in words; an unknown value is shown as sent (it is a server enum, never model text). */
+    fun profileText(context: Context, profile: String?): String = when (profile) {
+        null -> context.getString(R.string.dev_budget_unknown)
+        "normal" -> context.getString(R.string.dev_profile_normal)
+        "judging" -> context.getString(R.string.dev_profile_judging)
+        else -> profile
+    }
+
+    /** "On", or "Off: <why>" from the server's `reason` (contracts §1.3). */
+    fun aiStateText(context: Context, check: ConfigCheckResponse): String {
+        if (check.aiEnabled) return context.getString(R.string.dev_budget_ai_on)
+        val reason = check.reason ?: return context.getString(R.string.dev_budget_ai_off)
+        val res = reasonRes(reason) ?: return context.getString(R.string.dev_budget_ai_off_code, reason)
+        return context.getString(R.string.dev_budget_ai_off_because, context.getString(res))
+    }
+
+    @StringRes
+    fun reasonRes(reason: String): Int? = when (reason) {
+        "signed_out" -> R.string.dev_reason_signed_out
+        "anonymous" -> R.string.dev_reason_anonymous
+        "kill_switch" -> R.string.dev_reason_kill_switch
+        "budget" -> R.string.dev_reason_budget
+        "day_cap" -> R.string.dev_reason_day_cap
+        "tier_pause" -> R.string.dev_reason_tier_pause
+        "quota" -> R.string.dev_reason_quota
+        "breaker" -> R.string.dev_reason_breaker
+        "meter" -> R.string.dev_reason_meter
+        "model_missing" -> R.string.dev_reason_model_missing
+        else -> null
     }
 }
 

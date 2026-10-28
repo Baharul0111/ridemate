@@ -15,7 +15,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -71,15 +70,26 @@ object Routes {
     }
 }
 
-/** [FeatureNavigator] over a [NavHostController]. */
-class NavFeatureNavigator(private val nav: NavHostController) : FeatureNavigator {
+/**
+ * [FeatureNavigator] over a [NavHostController]. [isOnboarded] guards Home: until onboarding (18+ check, privacy
+ * notice) is completed, "home" means onboarding, so no screen can lead past it.
+ */
+class NavFeatureNavigator(
+    private val nav: NavHostController,
+    private val isOnboarded: () -> Boolean = { true },
+) : FeatureNavigator {
     override fun back() {
         if (!nav.popBackStack()) home()
     }
 
+    /** Home as the only screen on the back stack (Back from Home leaves the app). */
     override fun home() {
+        if (!isOnboarded()) {
+            restartOnboarding()
+            return
+        }
         nav.navigate(Routes.HOME) {
-            popUpTo(nav.graph.findStartDestination().id) { inclusive = true }
+            popUpTo(nav.graph.id) { inclusive = true }
             launchSingleTop = true
         }
     }
@@ -110,15 +120,21 @@ class NavFeatureNavigator(private val nav: NavHostController) : FeatureNavigator
 
 /**
  * The whole app: onboarding until it is completed, then Home; other areas' screens through
- * [AppGraph.featureBindings]; deep links from notifications ([deepLinks], cleared with [onDeepLinkHandled]); and the
- * blocking "please update" screen when this build is below `min_supported_version` and no session is active.
+ * [AppGraph.featureBindings]; deep links from notifications ([deepLinks], cleared with [onDeepLinkHandled]; dropped
+ * until onboarding is completed); and the blocking "please update" screen when this build is below
+ * `min_supported_version` and no session is active. [navController] is a parameter only so tests can inspect it.
  */
 @Composable
-fun RideMateRoot(graph: AppGraph, deepLinks: StateFlow<DeepLink?>, onDeepLinkHandled: () -> Unit) {
+fun RideMateRoot(
+    graph: AppGraph,
+    deepLinks: StateFlow<DeepLink?>,
+    onDeepLinkHandled: () -> Unit,
+    navController: NavHostController = rememberNavController(),
+) {
     val shell = graph.appShell
     val screens = graph.featureBindings.screens
-    val navController = rememberNavController()
-    val navigator = remember(navController) { NavFeatureNavigator(navController) }
+    val isOnboarded: () -> Boolean = { shell.onboardingStore.answers.value.completed }
+    val navigator = remember(navController) { NavFeatureNavigator(navController, isOnboarded) }
     val start = remember { if (shell.onboardingStore.answers.value.completed) Routes.HOME else Routes.ONBOARDING }
     val update by graph.updateChecker.state.collectAsStateWithLifecycle()
     val entry by navController.currentBackStackEntryAsState()
@@ -182,7 +198,9 @@ fun RideMateRoot(graph: AppGraph, deepLinks: StateFlow<DeepLink?>, onDeepLinkHan
     val pending by deepLinks.collectAsStateWithLifecycle()
     LaunchedEffect(pending) {
         pending?.let {
-            navigator.open(it)
+            // MainActivity is exported: a link must never lead past onboarding (18+ check, privacy notice). Before
+            // onboarding is completed there is no ride to guard, so the link is dropped.
+            if (isOnboarded()) navigator.open(it)
             onDeepLinkHandled()
         }
     }

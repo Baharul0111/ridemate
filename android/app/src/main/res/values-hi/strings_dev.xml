@@ -85,6 +85,20 @@
     <string name="dev_budget_ai_state">AI से पढ़ना</string>
     <string name="dev_budget_ai_on">चालू</string>
     <string name="dev_budget_ai_off">बंद</string>
+    <string name="dev_budget_ai_off_because">बंद: %1$s</string>
+    <string name="dev_budget_ai_off_code">बंद (सर्वर कोड %1$s)</string>
+    <string name="dev_reason_signed_out">साइन इन नहीं है</string>
+    <string name="dev_reason_anonymous">Google से साइन इन नहीं है</string>
+    <string name="dev_reason_kill_switch">मालिक ने बंद किया है</string>
+    <string name="dev_reason_budget">क्रेडिट बजट खत्म हो गया</string>
+    <string name="dev_reason_day_cap">आज की दैनिक सीमा पूरी हो गई</string>
+    <string name="dev_reason_tier_pause">नए और ज़्यादा उपयोग वाले खातों के लिए रुका हुआ</string>
+    <string name="dev_reason_quota">इस खाते का आज का उचित हिस्सा खत्म हो गया</string>
+    <string name="dev_reason_breaker">मॉडल एंडपॉइंट विफल हो रहा है (सर्किट ब्रेकर खुला)</string>
+    <string name="dev_reason_meter">खर्च मीटर पढ़ा नहीं जा सका (सुरक्षित रूप से बंद)</string>
+    <string name="dev_reason_model_missing">तय किया गया मॉडल उपलब्ध नहीं है</string>
+    <string name="dev_profile_normal">सामान्य</string>
+    <string name="dev_profile_judging">जजिंग सप्ताह</string>
 
     <string name="dev_owner_alerts">मालिक अलर्ट</string>
     <string name="dev_owner_alerts_switch">मालिक अलर्ट इस फ़ोन पर भेजें</string>
@@ -106,4 +120,5 @@
     <string name="dev_msg_golden_unavailable">स्क्रीन कैप्चर अभी इस संस्करण में उपलब्ध नहीं है।</string>
     <string name="dev_msg_golden_captured">मास्क किया हुआ कैप्चर सहेजा गया। नीचे उसके लेबल जोड़ें।</string>
     <string name="dev_msg_export_failed">एक्सपोर्ट नहीं लिखा जा सका। थोड़ी जगह खाली करें और फिर कोशिश करें।</string>
+    <string name="dev_msg_storage_failed">फ़ोन की स्टोरेज पढ़ी या लिखी नहीं जा सकी, इसलिए कुछ नहीं बदला। थोड़ी जगह खाली करें और फिर कोशिश करें।</string>
 </resources>

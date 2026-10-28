@@ -3,6 +3,7 @@ package app.ridemate.settings
 import android.app.LocaleManager
 import android.content.Context
 import android.content.res.Configuration
+import android.content.res.Resources
 import android.os.Build
 import android.os.LocaleList
 import androidx.annotation.RequiresApi
@@ -84,10 +85,22 @@ class DefaultLanguageController(private val backend: AppLocaleBackend, private v
 
 /** Android 10–12: applies the stored language to an activity's base context. */
 object LegacyLocale {
-    fun wrap(base: Context, sdkInt: Int = Build.VERSION.SDK_INT): Context {
+    /**
+     * [base] in the stored language. With nothing stored ("Phone's language") the process default locale follows the
+     * phone again, in case an earlier choice in this process changed it ([systemLocale]: the phone's own locale).
+     */
+    fun wrap(
+        base: Context,
+        sdkInt: Int = Build.VERSION.SDK_INT,
+        systemLocale: () -> Locale = { Resources.getSystem().configuration.locales[0] },
+    ): Context {
         if (sdkInt >= Build.VERSION_CODES.TIRAMISU) return base
         val tag = base.getSharedPreferences(SettingsStore.PREFS_NAME, Context.MODE_PRIVATE)
-            .getString(SettingsStore.K_LANGUAGE, null) ?: return base
+            .getString(SettingsStore.K_LANGUAGE, null)
+        if (tag == null) {
+            runCatching { systemLocale() }.getOrNull()?.let { if (it != Locale.getDefault()) Locale.setDefault(it) }
+            return base
+        }
         val locale = Locale.forLanguageTag(tag)
         Locale.setDefault(locale)
         val config = Configuration(base.resources.configuration)

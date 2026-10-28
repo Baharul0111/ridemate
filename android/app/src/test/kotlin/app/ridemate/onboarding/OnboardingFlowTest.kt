@@ -149,6 +149,15 @@ class OnboardingFlowTest {
         assertEquals(1, OnboardingFlow.position(OnboardingStep.AGE_GATE))
         assertEquals(OnboardingFlow.ORDER.size, OnboardingFlow.position(OnboardingStep.HEALTH_CHECK))
         assertEquals(null, OnboardingFlow.position(OnboardingStep.DONE))
+        // A Play-installed phone never sees the restricted-settings guidance, so it is not counted.
+        val play = DeviceProfile(sdkInt = 35, release = "15", manufacturer = "Google", sideloaded = false)
+        assertEquals(OnboardingFlow.ORDER.size - 1, OnboardingFlow.visibleOrder(play).size)
+        assertEquals(6, OnboardingFlow.position(OnboardingStep.OVERLAY, play))
+        assertEquals(7, OnboardingFlow.position(OnboardingStep.LOCATION, play))
+        assertEquals(null, OnboardingFlow.position(OnboardingStep.RESTRICTED_SETTINGS, play))
+        val sideloaded = play.copy(sideloaded = true)
+        assertEquals(8, OnboardingFlow.position(OnboardingStep.LOCATION, sideloaded))
+        assertEquals(OnboardingFlow.ORDER.size, OnboardingFlow.visibleOrder(sideloaded).size)
         assertFalse(OnboardingFlow.isFinished(OnboardingStep.UNDER_AGE_BLOCKED, OnboardingAnswers(), env()))
     }
 

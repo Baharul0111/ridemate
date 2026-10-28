@@ -16,10 +16,15 @@ import app.ridemate.testing.ShellFakeApi
 import app.ridemate.testing.TestData
 import app.ridemate.update.UpdateState
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -130,6 +135,52 @@ class HomeModelTest {
         home.continueAnyway { opened++ }
         assertEquals(2, opened)
         assertEquals(CompareCheck.Idle, home.state.value.compare)
+    }
+
+    @Test
+    fun `a pre-session check that fails or never answers blocks compare within its time limit`() = runTest {
+        val blind = CompareCheck.Blocked(PreSessionReport(listOf(PreSessionIssue.LISTENER_OFF), emptyList()))
+        var opened = 0
+        val hanging = model(backgroundScope, gate = PreSessionGate { awaitCancellation() })
+        hanging.compare { opened++ }
+        runCurrent()
+        assertEquals(CompareCheck.Checking, hanging.state.value.compare)
+        advanceTimeBy(HomeModel.PRE_SESSION_TIMEOUT_MS - 1)
+        runCurrent()
+        assertEquals("still within the limit", CompareCheck.Checking, hanging.state.value.compare)
+        advanceTimeBy(2)
+        runCurrent()
+        assertEquals(blind, hanging.state.value.compare)
+
+        val inner = model(backgroundScope, gate = PreSessionGate { withTimeout(10) { awaitCancellation() } })
+        inner.compare { opened++ }
+        advanceTimeBy(11)
+        runCurrent()
+        assertEquals("a time limit inside the gate counts as blind too", blind, inner.state.value.compare)
+
+        val failing = model(backgroundScope, gate = PreSessionGate { error("listener ping failed") })
+        failing.compare { opened++ }
+        runCurrent()
+        assertEquals(blind, failing.state.value.compare)
+        assertEquals("nothing starts without a clean check", 0, opened)
+    }
+
+    @Test
+    fun `fix-it cards are checked again on return, without starting a comparison`() = runTest(UnconfinedTestDispatcher()) {
+        var report = PreSessionReport(listOf(PreSessionIssue.OVERLAY_OFF), listOf(PreSessionIssue.BATTERY_OPTIMISED))
+        var opened = 0
+        val home = model(backgroundScope, gate = PreSessionGate { report })
+        assertNull("nothing showing, nothing to re-check", home.recheckIfShowing())
+
+        home.compare { opened++ }
+        assertEquals(CompareCheck.Blocked(report), home.state.value.compare)
+        report = PreSessionReport(emptyList(), listOf(PreSessionIssue.BATTERY_OPTIMISED))
+        home.recheckIfShowing()
+        assertEquals(CompareCheck.Warnings(report), home.state.value.compare)
+        report = PreSessionReport.READY
+        home.recheckIfShowing()
+        assertEquals(CompareCheck.Idle, home.state.value.compare)
+        assertEquals("the user starts the comparison, never the re-check", 0, opened)
     }
 
     @Test

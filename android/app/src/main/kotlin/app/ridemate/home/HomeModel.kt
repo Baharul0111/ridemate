@@ -11,6 +11,7 @@ import app.ridemate.update.UpdateState
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -23,6 +24,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 
 /** The active ride session shown on Home (tap → guardian). */
 data class ActiveSessionSummary(
@@ -127,20 +129,47 @@ class HomeModel(
     /** The Compare tap: runs the pre-session check, then [onReady] when nothing needs attention. */
     fun compare(onReady: () -> Unit): Job = scope.launch {
         compare.value = CompareCheck.Checking
-        val report = try {
-            gate().check()
+        val report = runCheck()
+        compare.value = report.toCheck()
+        if (report.clean) onReady()
+    }
+
+    /**
+     * Back on Home (e.g. from a settings screen a fix-it card opened): while fix-it cards are showing, the check runs
+     * again so they never describe a problem the user already fixed. It never starts a comparison by itself.
+     */
+    fun recheckIfShowing(): Job? {
+        if (compare.value !is CompareCheck.Blocked && compare.value !is CompareCheck.Warnings) return null
+        return scope.launch {
+            val report = runCheck()
+            // Only if the user didn't start, close or continue in the meantime.
+            if (compare.value is CompareCheck.Blocked || compare.value is CompareCheck.Warnings) compare.value = report.toCheck()
+        }
+    }
+
+    /**
+     * The gate with a time limit (goal 21: every step has one). A check that fails or doesn't answer in
+     * [PRE_SESSION_TIMEOUT_MS] means RideWatch could not be confirmed, which blocks Compare (architecture §4.2).
+     */
+    private suspend fun runCheck(): PreSessionReport {
+        val blind = PreSessionReport(blocking = listOf(PreSessionIssue.LISTENER_OFF), warnings = emptyList())
+        return try {
+            withTimeoutOrNull(PRE_SESSION_TIMEOUT_MS) { gate().check() } ?: blind
+        } catch (e: TimeoutCancellationException) {
+            // A time limit inside the gate itself ran out.
+            blind
         } catch (e: CancellationException) {
-            compare.value = CompareCheck.Idle
+            if (compare.value == CompareCheck.Checking) compare.value = CompareCheck.Idle
             throw e
         } catch (e: Exception) {
-            PreSessionReport(blocking = listOf(PreSessionIssue.LISTENER_OFF), warnings = emptyList())
+            blind
         }
-        compare.value = when {
-            report.clean -> CompareCheck.Idle
-            report.canStart -> CompareCheck.Warnings(report)
-            else -> CompareCheck.Blocked(report)
-        }
-        if (report.clean) onReady()
+    }
+
+    private fun PreSessionReport.toCheck(): CompareCheck = when {
+        clean -> CompareCheck.Idle
+        canStart -> CompareCheck.Warnings(this)
+        else -> CompareCheck.Blocked(this)
     }
 
     /** "Continue anyway" on warnings. */
@@ -153,5 +182,10 @@ class HomeModel(
 
     fun dismissCompareCheck() {
         compare.value = CompareCheck.Idle
+    }
+
+    companion object {
+        /** The pre-session check's ceiling (A2's check pings RideWatch; a healthy answer takes well under a second). */
+        const val PRE_SESSION_TIMEOUT_MS = 8_000L
     }
 }

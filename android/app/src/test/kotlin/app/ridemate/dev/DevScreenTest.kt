@@ -70,7 +70,7 @@ class DevScreenTest {
         rule.onNodeWithText("Run capture test").performScrollTo().performClick()
         rule.onNodeWithText("$2.00 of $80.00 (2%)").performScrollTo().assertIsDisplayed()
         rule.onNodeWithText("$1.50 of $3.00 (50%)").performScrollTo().assertIsDisplayed()
-        rule.onNodeWithText("judging").performScrollTo().assertIsDisplayed()
+        rule.onNodeWithText("Judging week").performScrollTo().assertIsDisplayed()
         rule.onNodeWithText("Turn off developer mode").performScrollTo().performClick()
         assertEquals(listOf("export", "capture", "off"), clicks)
     }

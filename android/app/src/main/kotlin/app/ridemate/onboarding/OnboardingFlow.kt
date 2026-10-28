@@ -96,6 +96,14 @@ object OnboardingFlow {
         OnboardingStep.DONE -> true
     }
 
-    /** 1-based position among the visible steps, for "Step 3 of 10"; null for the block and the end. */
-    fun position(step: OnboardingStep): Int? = ORDER.indexOf(step).takeIf { it >= 0 }?.plus(1)
+    /**
+     * The steps [device] can show: the "Allow restricted settings" guidance exists only on sideloaded Android 13+
+     * phones, so elsewhere it is not counted (no "Step 8 of 10" right after "Step 6 of 10").
+     */
+    fun visibleOrder(device: DeviceProfile?): List<OnboardingStep> =
+        if (device == null || device.restrictedSettingsPossible) ORDER else ORDER - OnboardingStep.RESTRICTED_SETTINGS
+
+    /** 1-based position among [device]'s visible steps, for "Step 3 of 10"; null for the block and the end. */
+    fun position(step: OnboardingStep, device: DeviceProfile? = null): Int? =
+        visibleOrder(device).indexOf(step).takeIf { it >= 0 }?.plus(1)
 }

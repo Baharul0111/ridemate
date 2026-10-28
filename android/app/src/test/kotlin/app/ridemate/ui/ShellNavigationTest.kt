@@ -2,12 +2,16 @@ package app.ridemate.ui
 
 import android.content.Context
 import android.content.Intent
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.navigation.NavHostController
+import androidx.navigation.compose.rememberNavController
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.ridemate.MainActivity
@@ -71,19 +75,69 @@ class ShellNavigationTest {
     }
 
     @Test
-    fun `fresh install starts at onboarding, and placeholders stand in for other areas`() {
+    fun `fresh install starts at onboarding and a notification link cannot skip it`() {
         val deepLinks = MutableStateFlow<DeepLink?>(null)
         rule.setContent { RideMateTheme { RideMateRoot(app.graph, deepLinks, onDeepLinkHandled = { deepLinks.value = null }) } }
         rule.onNodeWithText("Are you 18 or older?").assertIsDisplayed()
 
+        // MainActivity is exported: a link sent before onboarding is consumed but never opens anything.
+        deepLinks.value = DeepLink.Guardian("s1", "first_driver")
+        rule.waitForIdle()
+        assertNull("the deep link is consumed once", deepLinks.value)
+        rule.onNodeWithText("Are you 18 or older?").assertIsDisplayed()
+        rule.onAllNodesWithText("Ride guardian").assertCountEquals(0)
+    }
+
+    @Test
+    fun `under 18 stays blocked whatever a link or the navigator asks`() {
+        app.graph.appShell.onboardingStore.declareUnderAge()
+        val deepLinks = MutableStateFlow<DeepLink?>(null)
+        lateinit var nav: NavHostController
+        rule.setContent {
+            nav = rememberNavController()
+            RideMateTheme { RideMateRoot(app.graph, deepLinks, onDeepLinkHandled = { deepLinks.value = null }, navController = nav) }
+        }
+        rule.onNodeWithText("RideMate is for adults only").assertIsDisplayed()
+        deepLinks.value = DeepLink.Guardian("s1", null)
+        rule.waitForIdle()
+        rule.runOnIdle { NavFeatureNavigator(nav) { app.graph.appShell.onboardingStore.answers.value.completed }.home() }
+        rule.waitForIdle()
+        rule.onNodeWithText("RideMate is for adults only").assertIsDisplayed()
+        rule.onAllNodesWithText("Compare ride prices").assertCountEquals(0)
+        rule.runOnIdle { assertEquals(Routes.ONBOARDING, nav.currentDestination?.route) }
+    }
+
+    @Test
+    fun `after onboarding a notification opens the guardian, and home clears the back stack`() {
+        app.graph.appShell.onboardingStore.markCompleted()
+        val deepLinks = MutableStateFlow<DeepLink?>(null)
+        lateinit var nav: NavHostController
+        rule.setContent {
+            nav = rememberNavController()
+            RideMateTheme { RideMateRoot(app.graph, deepLinks, onDeepLinkHandled = { deepLinks.value = null }, navController = nav) }
+        }
+        rule.onNodeWithText("Compare ride prices").assertIsDisplayed()
+        rule.onNodeWithContentDescription("Settings").performClick()
+        rule.onNodeWithText("Privacy notice").assertIsDisplayed()
+
         // A notification tap opens the guardian (a placeholder until the integration binds A3's screen).
         deepLinks.value = DeepLink.Guardian("s1", "first_driver")
         rule.waitForIdle()
+        assertNull("the deep link is consumed once", deepLinks.value)
         rule.onNodeWithText("Ride guardian").assertIsDisplayed()
         rule.onNodeWithText("This part isn't in this build yet").assertIsDisplayed()
-        assertNull("the deep link is consumed once", deepLinks.value)
-        rule.onNodeWithContentDescription("Back").performClick()
-        rule.onNodeWithText("Are you 18 or older?").assertIsDisplayed()
+        rule.runOnIdle {
+            assertEquals(Routes.GUARDIAN, nav.currentDestination?.route)
+            assertEquals("s1", nav.currentBackStackEntry?.arguments?.getString(Routes.ARG_SESSION))
+            assertEquals("first_driver", nav.currentBackStackEntry?.arguments?.getString(Routes.ARG_SHEET))
+        }
+
+        rule.onNodeWithText("Go to the home screen").performScrollTo().performClick()
+        rule.onNodeWithText("Compare ride prices").assertIsDisplayed()
+        rule.runOnIdle {
+            assertEquals(Routes.HOME, nav.currentDestination?.route)
+            assertNull("Home is the only screen left, so Back leaves the app", nav.previousBackStackEntry)
+        }
     }
 
     @Test

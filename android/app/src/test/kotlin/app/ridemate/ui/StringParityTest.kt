@@ -79,4 +79,13 @@ class StringParityTest {
         assertEquals("AI processing happens on Modal\\'s servers in the USA.", en.getValue("onb_notice_usa_callout").text)
         assertTrue(en.getValue("onb_notice_where_body").text.startsWith("AI processing happens on Modal\\'s servers in the USA."))
     }
+
+    @Test
+    fun `the notice lists the K1 inventory additions`() {
+        // K1: destination text sent to Modal by place-pick, and addresses visible in uploaded screenshots.
+        val data = read(File(res, "values/strings_onboarding.xml")).getValue("onb_notice_data_body").text
+        assertTrue("destination text", "Your destination text is sent to Modal" in data)
+        assertTrue("addresses in screenshots", "Addresses visible in those screenshots: masked where detected" in data)
+        assertTrue("processed transiently", "processed only while it is read" in data)
+    }
 }
