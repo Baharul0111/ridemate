@@ -27,6 +27,7 @@
     <string name="platform_erase_waiting">Your data on this phone is erased. Your server data and account will be erased as soon as RideMate can reach its server.</string>
     <string name="platform_erase_reauth">Sign in with Google once more to finish deleting your account.</string>
     <string name="platform_erase_failed">We couldn\'t finish erasing your account. Email %1$s and we\'ll do it within 30 days.</string>
+    <string name="platform_erase_local_failed">RideMate couldn\'t erase the data on this phone. Free up some storage, then tap Erase again.</string>
 
     <!-- My data. -->
     <string name="platform_my_data_sessions">Ride comparisons</string>

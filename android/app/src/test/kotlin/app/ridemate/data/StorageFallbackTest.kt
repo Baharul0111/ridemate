@@ -71,6 +71,44 @@ class StorageFallbackTest {
         assertEquals(null, store.load("s1"))
     }
 
+    @Test
+    fun `one writer's success never hides another writer's memory-only data`() {
+        val health = StorageHealth()
+        health.onWriteFailed(SQLiteFullException(), StorageHealth.SOURCE_OUTBOX)
+        health.onWriteFailed(SQLiteDiskIOException(), StorageHealth.SOURCE_GUARDIAN_SNAPSHOTS)
+        assertEquals(StorageWarning.FULL, health.warning.value)
+
+        health.onWriteSucceeded(StorageHealth.SOURCE_GUARDIAN_SNAPSHOTS)
+        assertEquals(StorageWarning.FULL, health.warning.value)
+        health.onWriteFailed(SQLiteDiskIOException(), StorageHealth.SOURCE_OUTBOX)
+        assertEquals(StorageWarning.WRITE_FAILED, health.warning.value)
+        health.onWriteSucceeded(StorageHealth.SOURCE_OUTBOX)
+        assertEquals(StorageWarning.NONE, health.warning.value)
+    }
+
+    @Test
+    fun `guardian snapshots keep the warning while another session is memory-only`() = runBlocking {
+        db.sessionDao().insert(TestData.session("s1"))
+        db.sessionDao().insert(TestData.session("s2"))
+        val dao = FlakySnapshotDao(db.guardianSnapshotDao())
+        val health = StorageHealth()
+        val store = GuardianSnapshotStore(dao, FakeClock(), health)
+
+        dao.fail = true
+        store.save("s1", "{}")
+        store.save("s2", "{}")
+        dao.fail = false
+        assertTrue(store.save("s1", """{"v":2}"""))
+        assertEquals("s2 still lives only in memory", StorageWarning.FULL, health.warning.value)
+        assertTrue(store.save("s2", """{"v":2}"""))
+        assertEquals(StorageWarning.NONE, health.warning.value)
+
+        dao.fail = true
+        store.save("s1", "{}")
+        store.clearMemory()
+        assertEquals(StorageWarning.NONE, health.warning.value)
+    }
+
     @Test(expected = SQLiteConstraintException::class)
     fun `programming errors are not hidden by the fallback`() = runBlocking {
         // No session row: the foreign key rejects the snapshot, and that must surface.

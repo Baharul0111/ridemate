@@ -21,12 +21,12 @@ class GuardianSnapshotStore(
         return try {
             dao.upsert(row)
             memory.remove(sessionId)
-            storage.onWriteSucceeded()
+            if (memory.isEmpty()) storage.onWriteSucceeded(SOURCE)
             true
         } catch (e: Exception) {
             if (!StorageHealth.isStorageFailure(e)) throw e
             memory[sessionId] = row
-            storage.onWriteFailed(e)
+            storage.onWriteFailed(e, SOURCE)
             false
         }
     }
@@ -42,9 +42,17 @@ class GuardianSnapshotStore(
 
     suspend fun delete(sessionId: String) {
         memory.remove(sessionId)
+        if (memory.isEmpty()) storage.onWriteSucceeded(SOURCE)
         dao.delete(sessionId)
     }
 
     /** Drops the in-memory copies (erase). */
-    fun clearMemory() = memory.clear()
+    fun clearMemory() {
+        memory.clear()
+        storage.onWriteSucceeded(SOURCE)
+    }
+
+    private companion object {
+        const val SOURCE = StorageHealth.SOURCE_GUARDIAN_SNAPSHOTS
+    }
 }

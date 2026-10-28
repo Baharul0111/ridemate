@@ -43,8 +43,11 @@ interface SessionDao {
     @Query("UPDATE session SET kept_leg_id = :legId WHERE id = :id")
     suspend fun setKeptLeg(id: String, legId: String?)
 
-    /** Deletes CLOSED sessions closed before [cutoffUtc] (children cascade). */
-    @Query("DELETE FROM session WHERE status = 'CLOSED' AND closed_at_utc < :cutoffUtc")
+    /**
+     * Deletes CLOSED sessions closed before [cutoffUtc] (children cascade). A CLOSED row written without a close
+     * time (e.g. through [upsert]) counts from its creation, so it can never escape the 24 h purge.
+     */
+    @Query("DELETE FROM session WHERE status = 'CLOSED' AND COALESCE(closed_at_utc, created_at_utc) < :cutoffUtc")
     suspend fun deleteClosedBefore(cutoffUtc: Long): Int
 
     /** Deletes sessions left ACTIVE (e.g. the app was killed for good) that were created before [cutoffUtc]. */

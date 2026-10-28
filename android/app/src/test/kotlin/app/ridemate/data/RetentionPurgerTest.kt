@@ -61,6 +61,18 @@ class RetentionPurgerTest {
     }
 
     @Test
+    fun `a closed session written without a close time is purged 24 h after creation`() = runBlocking {
+        val now = clock.wall
+        db.sessionDao().upsert(TestData.session("no-close-old", createdAtUtc = now - 25 * hour, status = SessionStatus.CLOSED))
+        db.sessionDao().upsert(TestData.session("no-close-new", createdAtUtc = now - 23 * hour, status = SessionStatus.CLOSED))
+
+        assertEquals(1, RetentionPurger(db, clock).purge().closedSessions)
+
+        assertNull(db.sessionDao().get("no-close-old"))
+        assertNotNull(db.sessionDao().get("no-close-new"))
+    }
+
+    @Test
     fun `abandoned active sessions and stale unscoped rows are removed`() = runBlocking {
         val now = clock.wall
         seedSession("abandoned", closedAt = null, createdAt = now - 49 * hour)

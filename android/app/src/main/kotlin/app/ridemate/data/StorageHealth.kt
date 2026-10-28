@@ -21,21 +21,45 @@ enum class StorageWarning {
 
 /**
  * Tracks whether Room writes are failing (ActionOutbox requirement: "Room write failure → in-memory outbox +
- * storage full warning"). Writers call [onWriteFailed] / [onWriteSucceeded]; the UI collects [warning].
+ * storage full warning"). Writers report per [source] (their own name): [onWriteFailed] when a write fell back to
+ * memory, [onWriteSucceeded] once that writer holds nothing in memory any more. The UI collects [warning], which
+ * stays raised while **any** writer still holds data that only lives in memory, so one writer's success never
+ * hides another writer's unsaved reminders.
  */
 class StorageHealth {
     private val _warning = MutableStateFlow(StorageWarning.NONE)
     val warning: StateFlow<StorageWarning> = _warning.asStateFlow()
 
-    fun onWriteFailed(error: Throwable) {
-        _warning.value = if (error.isDiskFull()) StorageWarning.FULL else StorageWarning.WRITE_FAILED
+    private val failing = HashMap<String, StorageWarning>()
+
+    @Synchronized
+    fun onWriteFailed(error: Throwable, source: String = DEFAULT_SOURCE) {
+        failing[source] = if (error.isDiskFull()) StorageWarning.FULL else StorageWarning.WRITE_FAILED
+        publish()
     }
 
-    fun onWriteSucceeded() {
-        _warning.value = StorageWarning.NONE
+    @Synchronized
+    fun onWriteSucceeded(source: String = DEFAULT_SOURCE) {
+        if (failing.remove(source) != null) publish()
+    }
+
+    private fun publish() {
+        _warning.value = when {
+            failing.isEmpty() -> StorageWarning.NONE
+            StorageWarning.FULL in failing.values -> StorageWarning.FULL
+            else -> StorageWarning.WRITE_FAILED
+        }
     }
 
     companion object {
+        const val DEFAULT_SOURCE = "default"
+
+        /** [app.ridemate.outbox.OutboxRepository]. */
+        const val SOURCE_OUTBOX = "outbox"
+
+        /** [GuardianSnapshotStore]. */
+        const val SOURCE_GUARDIAN_SNAPSHOTS = "guardian_snapshots"
+
         /**
          * True for errors that mean "the database cannot take writes right now" (so the caller should fall back to
          * memory), false for programming errors and constraint violations, which must not be hidden.

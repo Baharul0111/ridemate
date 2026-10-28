@@ -1,6 +1,7 @@
 package app.ridemate
 
 import android.content.Context
+import android.content.pm.PackageManager
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.work.WorkInfo
@@ -43,6 +44,13 @@ class AppGraphTest {
         assertSame(graph.configRepository, graph.configRepository)
         assertSame(graph.outboxDriver, graph.outboxDriver)
         assertTrue(graph.localWipers.isNotEmpty())
+    }
+
+    @Test
+    fun `debug builds never auto-collect crash reports, even before start`() {
+        @Suppress("DEPRECATION")
+        val info = context.packageManager.getApplicationInfo(context.packageName, PackageManager.GET_META_DATA)
+        assertEquals(false, info.metaData.getBoolean("firebase_crashlytics_collection_enabled", true))
     }
 
     @Test

@@ -16,8 +16,9 @@ import kotlinx.coroutines.withContext
 import java.util.concurrent.TimeUnit
 
 /**
- * The outbox backstop when no session runs: fires due rows; [OutboxDriver.start] then reschedules it for the next
- * one. While a session is active it does nothing (the foreground service ticks the outbox itself).
+ * The outbox backstop when no session runs: fires due rows (and waits for background deliveries such as the queued
+ * server erase), then asks [OutboxDriver.onBackstopRun] to plan the next job. While a session is active it does
+ * nothing (the foreground service ticks the outbox itself).
  *
  * The tick runs non-cancellably: rescheduling (REPLACE) while this worker runs must not interrupt a delivery.
  */
@@ -29,7 +30,9 @@ class OutboxWorker(context: Context, params: WorkerParameters) : CoroutineWorker
             withContext(NonCancellable) {
                 graph.outboxRepository.rebaseAfterReboot()
                 graph.outboxDriver.tick()
+                graph.outboxDriver.awaitBackground()
             }
+            graph.outboxDriver.onBackstopRun()
             Result.success()
         } catch (e: Exception) {
             graph.crashReporter.recordNonFatal(e, CrashSite.OUTBOX)
@@ -75,6 +78,11 @@ class WorkManagerOutboxScheduler(
         if (last === CANCELLED) return
         workManager().cancelUniqueWork(OutboxWorker.UNIQUE_NAME)
         last = CANCELLED
+    }
+
+    @Synchronized
+    override fun invalidate() {
+        last = null
     }
 
     private companion object {

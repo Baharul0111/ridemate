@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Debug builds never send crash reports: Crashlytics collection is off from the first instant of the process,
+  before RideMateApp.onCreate also switches it off at run time. Release builds keep collection on (§4.18 B12
+  sanitizing still applies there).
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <meta-data
+            android:name="firebase_crashlytics_collection_enabled"
+            android:value="false" />
+    </application>
+</manifest>

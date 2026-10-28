@@ -7,12 +7,14 @@ import app.ridemate.data.OutboxKind
 import app.ridemate.data.OutboxStatus
 import app.ridemate.data.RideMateDb
 import app.ridemate.data.StorageHealth
+import app.ridemate.data.StorageWarning
 import app.ridemate.testing.FakeBootIds
 import app.ridemate.testing.FakeClock
 import app.ridemate.testing.FakeCrashBackend
 import app.ridemate.testing.TestData
 import app.ridemate.testing.TestSeams
 import app.ridemate.util.SessionActivity
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -28,6 +30,7 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.atomic.AtomicInteger
 
 @RunWith(AndroidJUnit4::class)
 class OutboxDriverTest {
@@ -126,6 +129,7 @@ class OutboxDriverTest {
     fun `the WorkManager backstop runs only while no session is active`() = runBlocking {
         val scheduler = RecordingScheduler()
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        driver.register(setOf(OutboxKind.REMINDER, OutboxKind.ERASE_SERVER), recordingHandler())
         try {
             driver.start(scope, scheduler)
             scheduler.await("cancel")
@@ -146,6 +150,99 @@ class OutboxDriverTest {
     }
 
     @Test
+    fun `the backstop plans only for handled kinds and re-plans after every run`() = runBlocking {
+        val scheduler = RecordingScheduler()
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        try {
+            // An overdue reminder nobody handles yet, and an erase retry in a minute that has a handler.
+            val reminder = repo.schedule(OutboxKind.REMINDER, "l1", 0)
+            val erase = repo.schedule(OutboxKind.ERASE_SERVER, null, 60_000)
+            driver.register(setOf(OutboxKind.ERASE_SERVER), recordingHandler())
+            driver.start(scope, scheduler)
+
+            // The unhandled reminder must not pin the backstop to "now" and hide the erase retry.
+            scheduler.await("at:${erase.dueElapsedMs}:true")
+            assertFalse(scheduler.events.contains("at:${reminder.dueElapsedMs}:false"))
+
+            // Once a reminder handler registers, the backstop is planned for the reminder.
+            val registration = driver.register(setOf(OutboxKind.REMINDER), recordingHandler())
+            scheduler.await("at:${reminder.dueElapsedMs}:false")
+            registration.close()
+            scheduler.await("at:${erase.dueElapsedMs}:true", occurrence = 2)
+
+            // A backstop run (even one that found nothing due) invalidates the old job and plans the next one.
+            val before = scheduler.events.count { it == "at:${erase.dueElapsedMs}:true" }
+            driver.onBackstopRun()
+            scheduler.await("invalidate")
+            scheduler.await("at:${erase.dueElapsedMs}:true", occurrence = before + 1)
+        } finally {
+            scope.cancel()
+        }
+    }
+
+    @Test
+    fun `a slow background handler never holds up a reminder due in the same tick`() = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val background = OutboxDriver(repo, clock, session, CrashReporter { crashBackend }, backgroundScope = scope)
+        val gate = CompletableDeferred<Unit>()
+        val eraseCalls = AtomicInteger()
+        try {
+            background.register(setOf(OutboxKind.ERASE_SERVER), OutboxDispatch.BACKGROUND) {
+                eraseCalls.incrementAndGet()
+                gate.await()
+                OutboxOutcome.Done
+            }
+            background.register(setOf(OutboxKind.REMINDER), recordingHandler())
+            val erase = repo.schedule(OutboxKind.ERASE_SERVER, null, 0)
+            val reminder = repo.schedule(OutboxKind.REMINDER, "l1", 0)
+            val later = repo.schedule(OutboxKind.REMINDER, "l1", 45_000)
+
+            val first = withTimeout(2_000) { background.tick() }
+            assertEquals(1, first.delivered)
+            assertEquals(1, first.inBackground)
+            assertEquals(listOf(reminder.id), delivered.map { it.id })
+            // The in-flight erase is not counted as the next due item.
+            assertEquals(later.dueElapsedMs, first.nextDueElapsedMs)
+
+            // While it is still running, the next tick does not start it a second time.
+            assertEquals(1, withTimeout(2_000) { background.tick() }.inBackground)
+            withTimeout(2_000) { while (eraseCalls.get() == 0) delay(5) }
+            assertEquals(1, eraseCalls.get())
+
+            gate.complete(Unit)
+            withTimeout(2_000) { background.awaitBackground() }
+            assertEquals(OutboxStatus.DONE, db.outboxDao().get(erase.id)!!.status)
+            assertEquals(0, background.tick().inBackground)
+        } finally {
+            scope.cancel()
+        }
+    }
+
+    @Test
+    fun `every tick retries rows the full disk refused`() = runBlocking {
+        val flaky = OutboxRepositoryTest.FlakyOutboxDao(db.outboxDao())
+        val health = StorageHealth()
+        val flakyRepo = OutboxRepository(flaky, clock, FakeBootIds(), health)
+        val flakyDriver = OutboxDriver(flakyRepo, clock, session)
+        flaky.failWrites = true
+        flakyRepo.schedule(OutboxKind.REMINDER, "l1", 60_000)
+        assertEquals(StorageWarning.FULL, health.warning.value)
+
+        // Another writer succeeding does not hide the reminder that only lives in memory.
+        health.onWriteSucceeded(StorageHealth.SOURCE_GUARDIAN_SNAPSHOTS)
+        assertEquals(StorageWarning.FULL, health.warning.value)
+
+        flakyDriver.tick()
+        assertTrue(flakyRepo.hasUnsavedChanges())
+
+        flaky.failWrites = false
+        flakyDriver.tick()
+        assertFalse(flakyRepo.hasUnsavedChanges())
+        assertEquals(1, db.outboxDao().count())
+        assertEquals(StorageWarning.NONE, health.warning.value)
+    }
+
+    @Test
     fun `backoff doubles from 30 s up to one hour`() {
         assertEquals(30_000L, OutboxDriver.backoffMs(0))
         assertEquals(60_000L, OutboxDriver.backoffMs(1))
@@ -163,6 +260,10 @@ class OutboxDriverTest {
 
         override fun cancel() {
             events += "cancel"
+        }
+
+        override fun invalidate() {
+            events += "invalidate"
         }
 
         suspend fun await(event: String, occurrence: Int = 1) = withTimeout(5_000) {
