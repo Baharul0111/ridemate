@@ -46,9 +46,14 @@ enum class Layer { REMOTE, LAST_GOOD, BUNDLED }
 
 data class Layered<T>(val value: T, val source: Layer, val raw: String)
 
-/** A per-app list of entries keyed by `min_version_code`: newest entry ≤ installed versionCode wins (§4.5.7). */
+/**
+ * A per-app list of entries keyed by `min_version_code`: the newest entry ≤ the installed versionCode wins (§4.5.7).
+ * `max_known_version_code` (optional) is the newest app version the entry was verified against; anything newer is
+ * still served by that entry but flagged as a fallback so it can be logged (`template=fallback`).
+ */
 interface VersionedEntry {
     val minVersionCode: Long
+    val maxKnownVersionCode: Long? get() = null
 }
 
 data class VersionPick<T>(val entry: T, val isFallback: Boolean)
@@ -57,8 +62,8 @@ fun <T : VersionedEntry> pickForVersion(entries: List<T>, installedVersionCode: 
     if (entries.isEmpty()) return null
     val sorted = entries.sortedByDescending { it.minVersionCode }
     if (installedVersionCode == null) return VersionPick(sorted.first(), isFallback = true)
-    val exact = sorted.firstOrNull { it.minVersionCode <= installedVersionCode } ?: return VersionPick(sorted.last(), true)
-    // An entry newer than everything we know about is still "fallback": the app updated past our templates.
-    val isFallback = sorted.first().minVersionCode < installedVersionCode && exact == sorted.first()
-    return VersionPick(exact, isFallback)
+    val match = sorted.firstOrNull { it.minVersionCode <= installedVersionCode }
+        ?: return VersionPick(sorted.last(), isFallback = true)
+    val beyondKnown = match.maxKnownVersionCode?.let { installedVersionCode > it } ?: false
+    return VersionPick(match, isFallback = beyondKnown)
 }
