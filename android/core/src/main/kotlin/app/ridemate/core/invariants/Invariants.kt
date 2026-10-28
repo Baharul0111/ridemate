@@ -17,6 +17,7 @@ import app.ridemate.core.state.isAdmissible
 import app.ridemate.core.watch.PostAuditEntry
 import app.ridemate.core.watch.PostKind
 import app.ridemate.core.watch.PostOutcome
+import app.ridemate.core.watch.RideWatchPipeline
 import java.lang.reflect.Modifier
 
 /** §4.9 invariants, checked over the guardian's and RideWatch's audit trails (tests and debug builds). */
@@ -55,9 +56,9 @@ fun InvariantReport.enforce(mode: InvariantMode, log: (Violation) -> Unit = {}) 
 }
 
 object Invariants {
-    /** I9 bounds: rule hits and redacted posts within 3 s; rule misses within 3 s plus the 6 s classifier deadline. */
+    /** I9 bounds: rule hits and redacted posts within 3 s; rule misses within 3 s plus the 10 s classifier deadline. */
     const val HIT_BOUND_MS = 3_000L
-    const val MISS_BOUND_MS = 3_000L + 6_000L
+    const val MISS_BOUND_MS = 3_000L + RideWatchPipeline.CLASSIFIER_DEADLINE_MS
 
     private val TAPPED_ACTIONS = setOf(
         ActionKind.BOOKED_HERE, ActionKind.CANCEL_CHAIN_START, ActionKind.CANCEL_GUIDE, ActionKind.SWITCH,
@@ -189,7 +190,7 @@ object Invariants {
 
     /**
      * I9: every allowlisted post on a booked, non-terminal leg produced a RideEvent (incl. a MAYBE prompt) or a logged
-     * exact-duplicate drop, within 3 s for rule hits and redacted posts and 3 s + 6 s for rule misses. A post covered by
+     * exact-duplicate drop, within 3 s for rule hits and redacted posts and 3 s + 10 s for rule misses. A post covered by
      * a newer one on the same key counts when that one resolved within this post's own bound.
      */
     fun checkI9(audit: List<PostAuditEntry>, nowElapsedMs: Long): List<Violation> {

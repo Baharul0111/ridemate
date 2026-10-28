@@ -64,6 +64,13 @@ data class FeeRule(
     @SerialName("free_within_s_after_accept") val freeWithinSAfterAccept: Int? = null,
     @SerialName("free_if_driver_late_min") val freeIfDriverLateMin: Int? = null,
 ) {
+    internal fun validate(where: String) {
+        require(pct == null || pct in 0..100) { "$where.pct must be 0–100" }
+        require(maxInr == null || maxInr >= 0) { "$where.max_inr must be ≥ 0" }
+        require(freeWithinSAfterAccept == null || freeWithinSAfterAccept >= 0) { "$where.free_within_s_after_accept must be ≥ 0" }
+        require(freeIfDriverLateMin == null || freeIfDriverLateMin >= 0) { "$where.free_if_driver_late_min must be ≥ 0" }
+    }
+
     fun overlay(over: FeeRule?): FeeRule = if (over == null) this else FeeRule(
         pct = over.pct ?: pct,
         maxInr = over.maxInr ?: maxInr,
@@ -85,10 +92,22 @@ data class FeeRules(
         default.overlay(apps[packageName]).overlay(stateCode?.let { states[it] })
 
     companion object {
+        private val STATE_CODE = Regex("^[A-Z]{2}$")
+
+        /** Parses and validates `fee_rules`; throws on a wrong schema major or an invalid rule (the one parser of it). */
         fun parse(raw: String): FeeRules {
             val obj = ConfigJson.parseToJsonElement(raw) as? JsonObject ?: throw IllegalArgumentException("not an object")
             require(schemaMajor(obj) == SupportedSchemas.MAJOR) { "unsupported schema" }
-            return ConfigJson.decodeFromJsonElement(serializer(), obj)
+            return ConfigJson.decodeFromJsonElement(serializer(), obj).also { it.validate() }
+        }
+    }
+
+    private fun validate() {
+        default.validate("default")
+        apps.forEach { (app, rule) -> rule.validate(app) }
+        states.forEach { (code, rule) ->
+            require(STATE_CODE.matches(code)) { "state code '$code' must be two capital letters" }
+            rule.validate(code)
         }
     }
 }

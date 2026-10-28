@@ -1,5 +1,6 @@
 package app.ridemate.core.config
 
+import app.ridemate.core.guardian.FeeRules
 import app.ridemate.core.model.Provider
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -22,7 +23,7 @@ class BundledConfigTest {
         "fare_parsers" to ::parseFareParsers,
         "sanity_bands" to ::parseSanityBands,
         "cancel_cards" to ::parseCancelCards,
-        "fee_rules" to ::parseFeeRules,
+        "fee_rules" to FeeRules::parse,
         "launch_templates" to ::parseLaunchTemplates,
     )
 

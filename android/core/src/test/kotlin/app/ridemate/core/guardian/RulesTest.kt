@@ -105,4 +105,23 @@ class RulesTest {
         val noFreeSearch = RuleBasedFeeEstimator(FeeRules(default = FeeRule(pct = 10, maxInr = 80, freeWhileSearching = false)))
         assertEquals(FeeNote(FeeNoteKind.MAY_APPLY, upToInr = 80), noFreeSearch.note(FeeQuery(Provider.UBER, RideState.SEARCHING, null, null, 0)))
     }
+
+    @Test
+    fun `invalid fee rules are rejected by the one fee_rules parser`() {
+        val json = """
+            {"schema": "1.0", "default": {"pct": 10, "max_inr": 100, "free_while_searching": true},
+             "apps": {"com.rapido.passenger": {"free_within_s_after_accept": 60, "max_inr": 50}},
+             "states": {"AS": {"max_inr": 100}}}
+        """.trimIndent()
+        assertEquals(50, FeeRules.parse(json).ruleFor("com.rapido.passenger", null).maxInr)
+        for (broken in listOf(
+            json.replace("\"pct\": 10", "\"pct\": 150"),
+            json.replace("\"max_inr\": 50", "\"max_inr\": -1"),
+            json.replace("\"AS\"", "\"Assam\""),
+            json.replace("\"free_within_s_after_accept\": 60", "\"free_within_s_after_accept\": -5"),
+            json.replace("\"schema\": \"1.0\"", "\"schema\": \"0.9\""),
+        )) {
+            assertThrows(broken, IllegalArgumentException::class.java) { FeeRules.parse(broken) }
+        }
+    }
 }

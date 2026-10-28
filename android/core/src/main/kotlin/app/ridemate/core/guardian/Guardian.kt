@@ -130,6 +130,27 @@ class Guardian(
         return true
     }
 
+    /**
+     * Ends a Try-the-demo session at once. Its bookings are fictional, so every leg still owed a cancel is dismissed,
+     * its checks and reminders are dropped, open sheets and prompts are withdrawn, and the session closes. Live
+     * sessions are never ended this way (I8): they close only through [closeSession].
+     */
+    fun endDemoSession(): List<GuardianEffect> = step {
+        val session = s.session ?: return@step
+        if (!session.demo || session.closed) return@step
+        activeLegs().filter { !it.leg.state.isTerminal }.forEach { it.dismissed = true }
+        s.prompts.toList().forEach { prompt ->
+            s.prompts.remove(prompt)
+            emit(GuardianEffect.PromptWithdrawn(prompt.promptId, prompt.legId, UiKey.PROMPT_ANSWERED))
+        }
+        s.sheets.toList().forEach { sheet -> closeSheet(sheet, UiKey.SHEET_CLOSED) }
+        s.timers.clear()
+        s.reminders = null
+        s.chain = null
+        session.closed = true
+        schedule.value++
+    }
+
     fun markOpened(legId: String): List<GuardianEffect> = step { leg(legId)?.let { apply(it, Lifecycle(LifecycleStep.OPENED)) } }
 
     fun markQuoted(legId: String): List<GuardianEffect> = step { leg(legId)?.let { apply(it, Lifecycle(LifecycleStep.QUOTED)) } }
@@ -1131,7 +1152,7 @@ class Guardian(
     private fun activeLegs(): Collection<LegRecord> = s.legs.values
 
     private fun addLeg(sessionId: String, provider: Provider, round: Int, now: Moment) {
-        val legId = if (round == 1) "$sessionId:${provider.wireId}" else "$sessionId:${provider.wireId}:r$round"
+        val legId = legIdOf(sessionId, provider, round)
         s.legs[legId] = LegRecord(
             LegState(legId = legId, provider = provider, enteredAtElapsedMs = now.elapsedMs, notBeforeWallMs = now.wallMs),
         )
@@ -1198,6 +1219,10 @@ class Guardian(
     }
 
     companion object {
+        /** The id of [provider]'s leg in session [sessionId] ([round] > 1 after "Compare again" re-adds it). */
+        fun legIdOf(sessionId: String, provider: Provider, round: Int = 1): String =
+            if (round == 1) "$sessionId:${provider.wireId}" else "$sessionId:${provider.wireId}:r$round"
+
         private const val MAX_FIRES_PER_TICK = 64
 
         /** Wall-clock corrections (NTP/NITZ) smaller than this are not taken for a reboot. */

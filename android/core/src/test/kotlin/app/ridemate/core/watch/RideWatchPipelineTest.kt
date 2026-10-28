@@ -272,7 +272,7 @@ class RideWatchPipelineTest {
         assertEquals(PostOutcome.EVENT, c.outcome)
         assertEquals(PostOutcome.COALESCED, b.outcome)
         assertEquals(c.seq, b.coveredBySeq)
-        assertTrue("b resolved within its own bound", b.resolvedAtElapsedMs!! - b.arrivedAtElapsedMs <= 9_000)
+        assertTrue("b resolved within its own bound", b.resolvedAtElapsedMs!! - b.arrivedAtElapsedMs <= 13_000)
         assertEquals(2, rig.legs.events.size)
     }
 
@@ -292,11 +292,11 @@ class RideWatchPipelineTest {
     }
 
     @Test
-    fun `classifier down, anonymous, or past the 6 s deadline falls back to UNKNOWN_UPDATE`() = runTest {
+    fun `classifier down, anonymous, or past the 10 s deadline falls back to UNKNOWN_UPDATE`() = runTest {
         for ((mode, reason, at) in listOf(
             Triple(FakeClassifier.Mode.DOWN, UnknownReason.CLASSIFIER_FAILED, 0L),
             Triple(FakeClassifier.Mode.ANONYMOUS, UnknownReason.CLASSIFIER_UNAVAILABLE, 0L),
-            Triple(FakeClassifier.Mode.HANG, UnknownReason.CLASSIFIER_TIMEOUT, 6_000L),
+            Triple(FakeClassifier.Mode.HANG, UnknownReason.CLASSIFIER_TIMEOUT, 10_000L),
         )) {
             val rig = Rig(this, FakeClassifier(mode))
             rig.leg(Fixtures.UBER)

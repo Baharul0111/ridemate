@@ -52,7 +52,7 @@ sealed interface ClassifierResult {
 /**
  * The rule-miss classifier. The app implements it over `/v1/parse-notification` (and returns [ClassifierResult.Unavailable]
  * without a network call when the user is anonymous or AI is paused). Failures may be thrown; RideWatch turns them,
- * and the 6 s deadline, into UNKNOWN_UPDATE.
+ * and the 10 s deadline, into UNKNOWN_UPDATE.
  */
 fun interface NotificationClassifier {
     suspend fun classify(request: ClassifyRequest): ClassifierResult

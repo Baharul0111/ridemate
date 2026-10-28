@@ -188,7 +188,7 @@ class InvariantsTest {
     fun `I9 - every covered post resolves in time, directly or through the post that covered it`() {
         val onTime = audit(1).apply { resolve(PostOutcome.EVENT, 2_000, EventType.SEARCHING, disposition = Disposition.TRANSITION) }
         val dup = audit(2, arrived = 5_000).apply { resolve(PostOutcome.DUPLICATE_DROPPED, 5_000) }
-        val missOnTime = audit(3, PostKind.RULE_MISS, arrived = 10_000).apply { resolve(PostOutcome.EVENT, 19_000) }
+        val missOnTime = audit(3, PostKind.RULE_MISS, arrived = 10_000).apply { resolve(PostOutcome.EVENT, 23_000) }
         val pendingYoung = audit(4, PostKind.RULE_MISS, arrived = 25_000)
         val notBooked = audit(5, booked = false, arrived = 0)
         val terminal = audit(6, state = RideState.SEARCH_EXPIRED)
@@ -198,7 +198,7 @@ class InvariantsTest {
         assertTrue(Invariants.checkI9(good, nowElapsedMs = 30_000).isEmpty())
 
         val late = audit(10, arrived = 0).apply { resolve(PostOutcome.EVENT, 3_001) }
-        val lateMiss = audit(11, PostKind.RULE_MISS, arrived = 0).apply { resolve(PostOutcome.EVENT, 9_001) }
+        val lateMiss = audit(11, PostKind.RULE_MISS, arrived = 0).apply { resolve(PostOutcome.EVENT, Invariants.MISS_BOUND_MS + 1) }
         val stuck = audit(12, PostKind.RULE_MISS, arrived = 0)
         val orphan = audit(13, PostKind.RULE_MISS, arrived = 0).apply { resolve(PostOutcome.COALESCED, 1_000, coveredBySeq = 99) }
         val dropped = audit(14, arrived = 0).apply { resolve(PostOutcome.NO_ACTIVE_LEG, 0) }

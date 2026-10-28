@@ -21,6 +21,10 @@ tasks.test {
     systemProperty("ridemate.repoRoot", repoRoot.absolutePath)
     // -PrequireFixtures=true turns a missing eval fixture into a failure instead of a skip (CI with fixtures).
     systemProperty("ridemate.requireFixtures", (findProperty("requireFixtures") as String?) ?: "false")
+    // AccuracyTest writes <suite>.json here for eval/harness/summarize.py (outcomes only, never fare values).
+    val accuracyDir = layout.buildDirectory.dir("accuracy").get().asFile
+    systemProperty("ridemate.accuracyDir", accuracyDir.absolutePath)
+    outputs.dir(accuracyDir).withPropertyName("accuracyResults")
     // Declared as inputs so changed fixtures or bundled configs re-run the suites instead of hitting the cache.
     inputs.files(fileTree(repoRoot.resolve("eval")) { include("**/*.json"); exclude("out/**", "private/**", "**/.*/**") })
         .withPropertyName("evalFixtures").withPathSensitivity(PathSensitivity.RELATIVE)

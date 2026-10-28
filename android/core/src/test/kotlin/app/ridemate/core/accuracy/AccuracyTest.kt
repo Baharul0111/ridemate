@@ -19,8 +19,13 @@ import app.ridemate.core.model.VehicleClass
 import app.ridemate.core.ocr.OcrFrame
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.intOrNull
@@ -32,6 +37,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
 import org.junit.Test
 import java.io.File
+import java.time.Instant
 
 /**
  * Runs Channel B + the gate over the labelled eval screens (contracts §6) against every recorded and synthetic
@@ -40,6 +46,9 @@ import java.io.File
  * UNREADABLE (an attacked row) must not be VERIFIED either. It prints only counts and rates, never fare values (L6).
  *
  * Without fixtures the test is skipped, unless `-PrequireFixtures=true` (system property ridemate.requireFixtures).
+ *
+ * Every suite's outcomes are written to `android/core/build/accuracy/<suite>.json` in the format of
+ * `eval/harness/README.md` (enum outcomes and booleans only, never a fare) for `eval/harness/summarize.py`.
  */
 class AccuracyTest {
     private val repoRoot = File(System.getProperty("ridemate.repoRoot") ?: ".")
@@ -55,6 +64,7 @@ class AccuracyTest {
         val rows: List<LabelRow>,
         val driverEta: Int?,
         val driverMeters: Int?,
+        val screenType: String?,
     )
 
     /** One fixture file and the label rows it says must not be VERIFIED (`expect.rows[i] == "UNREADABLE"`). */
@@ -104,10 +114,12 @@ class AccuracyTest {
         val honest = Tally()
         val attacked = Tally()
         val problems = mutableListOf<String>()
+        val results = linkedMapOf<String, MutableList<JsonObject>>()
 
         for (suite in suites) {
             val file = File(repoRoot, suite.labels)
             if (!file.isFile) continue
+            val entries = results.getOrPut(suite.name) { mutableListOf() }
             for (screen in loadScreens(file)) {
                 val parser = FareParser.forApp(parsers, screen.app, null)
                 if (parser == null) {
@@ -127,12 +139,14 @@ class AccuracyTest {
                         tally.verified += result.verifiedCount
                         val wrong = wrongShown(screen, result, read.mustNotVerify + frame.mustNotVerify)
                         tally.wrong += wrong
+                        entries += resultEntry(screen, result, read.mustNotVerify + frame.mustNotVerify)
                         if (wrong > 0) problems += "${frame.file.name} × ${read.file.name}: $wrong wrong-shown"
                     }
                 }
             }
         }
         requireOrSkip(honest.pairs + attacked.pairs > 0, "no OCR + Channel A fixture pairs under eval/")
+        writeResults(results)
         println(
             "AccuracyTest: %d honest pairs, VERIFIED rate %.1f%% (%d/%d rows); %d adversarial/injection pairs, %d rows verified; wrong-shown %d"
                 .format(
@@ -162,6 +176,60 @@ class AccuracyTest {
         if (result.driver.etaMin != null && result.driver.etaMin != screen.driverEta) wrong++
         if (result.driver.distanceMeters != null && result.driver.distanceMeters != screen.driverMeters) wrong++
         return wrong
+    }
+
+    /**
+     * One gate run in the result-file format: per label row VERIFIED (with `correct`) or UNREADABLE, plus a wrong row
+     * for every VERIFIED value no label row backs; the driver's ETA and distance when the screen is labelled with them.
+     */
+    private fun resultEntry(screen: Screen, result: GateResult, mustNotVerify: Set<Int>): JsonObject {
+        val verified = result.rows.filter { it.status == QuoteStatus.VERIFIED }
+        val used = mutableSetOf<GatedRow>()
+        val rows = buildJsonArray {
+            screen.rows.forEachIndexed { i, label ->
+                val shown = verified.firstOrNull { it !in used && belongsTo(label, it) }
+                if (shown == null) {
+                    add(outcome("UNREADABLE", null))
+                } else {
+                    used += shown
+                    val correct = i !in mustNotVerify && shown.price == label.price && (shown.eta == null || shown.eta == label.eta)
+                    add(outcome("VERIFIED", correct))
+                }
+            }
+            verified.filter { it !in used }.forEach { _ -> add(outcome("VERIFIED", false)) }
+        }
+        fun fact(label: Int?, shown: Int?): JsonElement = when {
+            label == null && shown == null -> JsonNull
+            shown == null -> outcome("SEE_IN_APP", null)
+            else -> outcome("VERIFIED", shown == label)
+        }
+        return buildJsonObject {
+            put("sha256", screen.sha)
+            put("app", screen.app.wireId)
+            put("screen_type", screen.screenType)
+            put("rows", rows)
+            put("driver_eta", fact(screen.driverEta, result.driver.etaMin))
+            put("driver_distance", fact(screen.driverMeters, result.driver.distanceMeters))
+        }
+    }
+
+    private fun outcome(outcome: String, correct: Boolean?): JsonObject = buildJsonObject {
+        put("outcome", outcome)
+        put("correct", correct)
+    }
+
+    /** `build/accuracy/<suite>.json` (the core module's build dir), read by `eval/harness/summarize.py`. */
+    private fun writeResults(results: Map<String, List<JsonObject>>) {
+        val dir = File(System.getProperty("ridemate.accuracyDir") ?: "build/accuracy").apply { mkdirs() }
+        for ((suite, screens) in results) {
+            val doc = buildJsonObject {
+                put("schema", "1.0")
+                put("suite", suite)
+                put("generated_at", Instant.ofEpochMilli(NOW).toString())
+                put("screens", JsonArray(screens))
+            }
+            File(dir, "$suite.json").writeText(doc.toString())
+        }
     }
 
     private fun belongsTo(label: LabelRow, row: GatedRow): Boolean {
@@ -196,6 +264,7 @@ class AccuracyTest {
                 },
                 driverEta = s.int("driver_eta_min"),
                 driverMeters = DistanceText.parseMeters(s.string("driver_distance_text")),
+                screenType = s.string("screen_type"),
             )
         }
     }

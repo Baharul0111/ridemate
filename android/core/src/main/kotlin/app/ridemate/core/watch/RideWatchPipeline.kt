@@ -21,7 +21,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 /**
  * RideWatch (§4.5). Every allowlisted post is masked and matched immediately (nothing on the local path is debounced);
  * template hits and redacted posts become RideEvents synchronously, rule misses go through the per-session cache and
- * then the classifier under a 6 s deadline with UNKNOWN_UPDATE as the fallback.
+ * then the classifier under a 10 s deadline with UNKNOWN_UPDATE as the fallback.
  *
  * Threading: all public methods and the classifier continuations must run on one confined dispatcher (the [scope]'s),
  * the same one the guardian is confined to.
@@ -371,7 +371,8 @@ class RideWatchPipeline(
     }
 
     companion object {
-        const val CLASSIFIER_DEADLINE_MS = 6_000L
+        /** Day-1 spike (docs/spikes.md): reasoning cannot be switched off, so a classification takes 5–8 s. */
+        const val CLASSIFIER_DEADLINE_MS = 10_000L
         const val MAX_LOG_ENTRIES = 5_000
         val DEMO_PACKAGES: Set<String> = Provider.DEMO_APPS.map { it.packageName }.toSet()
     }

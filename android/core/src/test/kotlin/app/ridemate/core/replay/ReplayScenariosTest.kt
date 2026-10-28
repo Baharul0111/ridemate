@@ -33,7 +33,7 @@ import org.junit.Test
 
 /**
  * The nine mandatory replay scenarios of §4.5.11, end to end through RideWatch, the statechart and the guardian on
- * virtual time, with the timing bounds of I9 (rule hits and redacted posts ≤ 3 s; misses ≤ 3 s + the 6 s deadline).
+ * virtual time, with the timing bounds of I9 (rule hits and redacted posts ≤ 3 s; misses ≤ 3 s + the 10 s deadline).
  */
 class ReplayScenariosTest {
 
@@ -186,7 +186,7 @@ class ReplayScenariosTest {
 
         val miss = h.post(RAPIDO, "r1", "Rapido", "Your captain is stuck in traffic")
         h.advance(1_500)
-        assertWithin(miss, 9_000)
+        assertWithin(miss, 3_000 + 10_000)
         assertEquals(RideState.MAYBE_CHANGED, h.state(Provider.RAPIDO))
         val prompt = h.effectsOf<GuardianEffect.MaybePrompt>().single()
         assertEquals(UiKey.PROMPT_MAYBE_CHANGED, prompt.key)
@@ -343,17 +343,17 @@ class ReplayScenariosTest {
     }
 
     @Test
-    fun `(i) a hanging backend prompts at the 6 s deadline, a working one proposes ASSIGNED with 'see in app'`() = runTest {
+    fun `(i) a hanging backend prompts at the 10 s deadline, a working one proposes ASSIGNED with 'see in app'`() = runTest {
         val hang = ReplayHarness(this, providers = listOf(Provider.UBER, Provider.RAPIDO), classifier = FakeClassifier(FakeClassifier.Mode.HANG))
         hang.book(Provider.UBER, Provider.RAPIDO)
         hang.post(UBER, "u1", Text.uberSearching)
         hang.post(RAPIDO, "r1", Text.rapidoSearching)
         val slow = hang.post(RAPIDO, "r1", "Rapido", "Great news! Your captain accepted and is heading over")
-        hang.advance(5_999)
+        hang.advance(9_999)
         assertEquals(RideState.SEARCHING, hang.state(Provider.RAPIDO))
         hang.advance(1)
         assertEquals(UnknownReason.CLASSIFIER_TIMEOUT, slow.unknownReason)
-        assertWithin(slow, 3_000 + 6_000)
+        assertWithin(slow, 3_000 + 10_000)
         assertEquals(RideState.MAYBE_ASSIGNED, hang.state(Provider.RAPIDO))
         assertClean(hang)
 
@@ -364,7 +364,7 @@ class ReplayScenariosTest {
         ok.post(RAPIDO, "r1", Text.rapidoSearching)
         val labelled = ok.post(RAPIDO, "r1", "Rapido", "Great news! Your captain accepted and is heading over")
         ok.advance(1_500)
-        assertWithin(labelled, 3_000 + 6_000)
+        assertWithin(labelled, 3_000 + 10_000)
         assertEquals(RideState.ASSIGNED, ok.state(Provider.RAPIDO))
         val sheet = ok.effectsOf<GuardianEffect.DriverSheet>().single()
         assertNull(sheet.drivers.single().etaMin)
