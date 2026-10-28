@@ -7,7 +7,12 @@ import androidx.lifecycle.LifecycleOwner
 import app.ridemate.auth.AuthGateway
 import app.ridemate.auth.AuthState
 import app.ridemate.auth.DefaultAuthGateway
+import app.ridemate.config.ConfigKeys
 import app.ridemate.config.ConfigRepository
+import app.ridemate.core.config.SanityBandsConfig
+import app.ridemate.core.config.parseCancelCards
+import app.ridemate.core.config.parseFareParsers
+import app.ridemate.core.config.parseSanityBands
 import app.ridemate.crash.CrashKey
 import app.ridemate.crash.CrashReporter
 import app.ridemate.crash.CrashSite
@@ -16,8 +21,18 @@ import app.ridemate.data.PurgeWorker
 import app.ridemate.data.RetentionPurger
 import app.ridemate.data.RideMateDb
 import app.ridemate.data.StorageHealth
+import app.ridemate.demo.AndroidDemoAssets
+import app.ridemate.demo.DemoController
+import app.ridemate.demo.DemoFareReader
+import app.ridemate.messaging.FirebaseFcmTokenSource
+import app.ridemate.messaging.OwnerAccess
+import app.ridemate.messaging.OwnerAlertNotifier
+import app.ridemate.messaging.OwnerMessaging
+import app.ridemate.messaging.OwnerTokenRegistrar
 import app.ridemate.net.ApiClient
 import app.ridemate.net.OkHttpApiClient
+import app.ridemate.ondc.FirestoreOndcTxnSource
+import app.ridemate.ondc.OndcClient
 import app.ridemate.outbox.OutboxDriver
 import app.ridemate.outbox.OutboxRepository
 import app.ridemate.outbox.OutboxWorkScheduler
@@ -142,6 +157,59 @@ class AppGraph(
             configEpoch = configRepository.epoch,
             sessionActive = sessionActivity.active,
             scope = appScope,
+        )
+    }
+
+    // ---- try the demo / ONDC / owner messaging (app.ridemate.demo, .ondc, .messaging) ----
+    /**
+     * Try the demo. Integration calls `demoController.bind(ocr, host)` with the capture area's OCR engine and the
+     * session area's guardian session API; until then `start` answers NOT_READY.
+     */
+    val demoController: DemoController by lazy {
+        val assets = AndroidDemoAssets(app.assets)
+        DemoController(
+            assets = assets,
+            reader = DemoFareReader(
+                assets = assets,
+                api = apiClient,
+                auth = authGateway,
+                clock = clock,
+                aiReaderEnabled = { configRepository.aiReaderEnabled.value },
+                fareParsers = { configRepository.resolve(ConfigKeys.FARE_PARSERS, ::parseFareParsers)?.value },
+                sanityBands = {
+                    configRepository.resolve(ConfigKeys.SANITY_BANDS, ::parseSanityBands)?.value
+                        ?: SanityBandsConfig.DEFAULT
+                },
+            ),
+            api = apiClient,
+            clock = clock,
+            scope = CoroutineScope(SupervisorJob() + dispatchers.main + CoroutineExceptionHandler { _, e -> crashReporter.recordNonFatal(e, CrashSite.OTHER) }),
+            demoEnabled = configRepository.demoEnabled,
+            cancelCards = { configRepository.resolve(ConfigKeys.CANCEL_CARDS, ::parseCancelCards)?.value },
+        )
+    }
+
+    /** The ONDC buyer flow. Integration calls `ondcClient.bind { legId, event -> guardian.onProtocolEvent(legId, event) }`. */
+    val ondcClient: OndcClient by lazy {
+        OndcClient(
+            api = apiClient,
+            txns = FirestoreOndcTxnSource(),
+            ondcEnabled = configRepository.ondcEnabled,
+            clock = clock,
+            scope = CoroutineScope(SupervisorJob() + dispatchers.main + CoroutineExceptionHandler { _, e -> crashReporter.recordNonFatal(e, CrashSite.OTHER) }),
+        )
+    }
+
+    /** Owner alert pushes and the owner's FCM token registration ([app.ridemate.messaging.OwnerMessagingService]). */
+    val ownerMessaging: OwnerMessaging by lazy {
+        val owner = OwnerAccess(
+            authState = { authGateway.state.value },
+            ownerEmailHashes = { OwnerAccess.parseHashes(configRepository.string(ConfigKeys.OWNER_EMAILS_SHA256)) },
+        )
+        OwnerMessaging(
+            registrar = OwnerTokenRegistrar(apiClient, owner, FirebaseFcmTokenSource),
+            owner = owner,
+            notify = OwnerAlertNotifier(app)::show,
         )
     }
 

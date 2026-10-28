@@ -1,0 +1,22 @@
+{
+  "image_sha256": "467d6211aa2f882c95aa994d01e19831187700ea5e2d0ffda3ba882c82f7c33b",
+  "model": "synthetic-perfect-reader",
+  "recorded_at": "2026-10-28T00:00:00Z",
+  "read": {
+    "app": "demo_pepper",
+    "screen_type": "cancel_flow",
+    "options": [],
+    "fee_text": "Cancellation fee up to ₹50 may apply",
+    "driver_eta_min": null,
+    "driver_distance_text": null
+  },
+  "usage": {
+    "input_tokens": 0,
+    "cached_input_tokens": 0,
+    "output_tokens": 0
+  },
+  "cost_usd": 0.0,
+  "expect": {
+    "rows": []
+  }
+}

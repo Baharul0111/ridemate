@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- खुला राइड नेटवर्क (ONDC, goal 17). Owned by app.ridemate.ondc. -->
+<resources>
+    <string name="ondc_name">खुला राइड नेटवर्क (ONDC)</string>
+    <string name="ondc_label_network_quote">नेटवर्क का भाव</string>
+    <string name="ondc_label_demo_seller">ONDC डेमो विक्रेता</string>
+    <string name="ondc_row_label">%1$s · %2$s</string>
+    <string name="ondc_row_description">%1$s, %2$s: %3$s। %4$s</string>
+    <string name="ondc_eta">%1$d मिनट</string>
+    <string name="ondc_eta_unknown">नेटवर्क ने पहुँचने का समय नहीं बताया</string>
+
+    <string name="ondc_unavailable">ONDC उपलब्ध नहीं</string>
+    <string name="ondc_unavailable_switched_off">खुला नेटवर्क अभी बंद है। इसके बजाय किसी राइड ऐप में बुक करें।</string>
+    <string name="ondc_unavailable_sign_in">खुले नेटवर्क पर बुकिंग के लिए Google साइन-इन चाहिए। साइन इन करें, या किसी राइड ऐप में बुक करें।</string>
+    <string name="ondc_unavailable_offline">आप ऑफ़लाइन हैं। कनेक्ट होकर फिर खोजें, या किसी राइड ऐप में बुक करें।</string>
+    <string name="ondc_unavailable_timeout">खुले नेटवर्क ने जवाब देने में बहुत देर लगाई। फिर खोजें, या किसी राइड ऐप में बुक करें।</string>
+    <string name="ondc_unavailable_server">खुला नेटवर्क अभी उपलब्ध नहीं है। बाद में कोशिश करें, या किसी राइड ऐप में बुक करें।</string>
+    <string name="ondc_unavailable_not_configured">RideMate का सर्वर अभी तैयार नहीं है, इसलिए खुले नेटवर्क पर खोज नहीं हो सकती। किसी राइड ऐप में बुक करें।</string>
+    <string name="ondc_unavailable_listener">RideMate अभी इस बुकिंग पर नज़र नहीं रख पा रहा। अपना कनेक्शन जाँचें, या किसी राइड ऐप में बुक करें।</string>
+    <string name="ondc_unavailable_quota">खुला नेटवर्क लगभग दोपहर 1:30 बजे (IST) तक रुका है। तब तक किसी राइड ऐप में बुक करें।</string>
+
+    <string name="ondc_searching">खुले नेटवर्क पर खोज जारी है…</string>
+    <string name="ondc_no_results">इस यात्रा के लिए खुले नेटवर्क पर कोई राइड नहीं। इसके बजाय किसी राइड ऐप में बुक करें।</string>
+    <string name="ondc_booking">खुले नेटवर्क पर बुकिंग हो रही है…</string>
+    <string name="ondc_booked">खुले नेटवर्क पर बुक हो गया।</string>
+    <string name="ondc_arriving">आपका ड्राइवर पहुँच रहा है।</string>
+    <string name="ondc_on_trip">यात्रा जारी है।</string>
+    <string name="ondc_ended">राइड पूरी हुई। विक्रेता के बताए तरीके से ड्राइवर को भुगतान करें।</string>
+    <string name="ondc_cancel_requested">नेटवर्क से पूछ रहे हैं कि अभी रद्द करने पर कितना लगेगा…</string>
+    <string name="ondc_cancel_fee">अभी रद्द करने पर ₹%1$s लगेंगे (नेटवर्क का शुल्क)। रद्द करने की पुष्टि करें, या राइड रखें।</string>
+    <string name="ondc_cancel_free">अभी रद्द करना मुफ़्त है। रद्द करने की पुष्टि करें, या राइड रखें।</string>
+    <string name="ondc_cancelling">खुले नेटवर्क पर रद्द किया जा रहा है…</string>
+    <string name="ondc_cancelled">रद्द हो गया। नेटवर्क ने इसकी पुष्टि की।</string>
+    <string name="ondc_failed">खुला नेटवर्क यह बुकिंग पूरी नहीं कर सका। इसके बजाय किसी राइड ऐप में बुक करें।</string>
+
+    <string name="ondc_action_book">बुक करें</string>
+    <string name="ondc_action_book_description">खुले नेटवर्क पर %2$s में %1$s बुक करें</string>
+    <string name="ondc_action_cancel">राइड रद्द करें</string>
+    <string name="ondc_action_cancel_description">कुछ भी रद्द होने से पहले खुले नेटवर्क से रद्द करने का शुल्क पूछें</string>
+    <string name="ondc_action_confirm_cancel">रद्द करने की पुष्टि करें</string>
+    <string name="ondc_action_confirm_cancel_description">खुले नेटवर्क की राइड रद्द करें और दिखाया गया शुल्क स्वीकार करें</string>
+    <string name="ondc_action_keep_ride">राइड रखें</string>
+    <string name="ondc_action_keep_ride_description">खुले नेटवर्क की राइड रखें; कुछ भी रद्द नहीं होता</string>
+</resources>

@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The open ride network (ONDC, goal 17). Owned by app.ridemate.ondc. -->
+<resources>
+    <string name="ondc_name">Open ride network (ONDC)</string>
+    <string name="ondc_label_network_quote">network quote</string>
+    <string name="ondc_label_demo_seller">ONDC demo seller</string>
+    <string name="ondc_row_label">%1$s · %2$s</string>
+    <string name="ondc_row_description">%1$s, %2$s: %3$s. %4$s</string>
+    <string name="ondc_eta">%1$d min</string>
+    <string name="ondc_eta_unknown">ETA not given by the network</string>
+
+    <!-- The "ONDC unavailable" row: why, and what to do next. -->
+    <string name="ondc_unavailable">ONDC unavailable</string>
+    <string name="ondc_unavailable_switched_off">The open network is switched off for now. Book in a ride app instead.</string>
+    <string name="ondc_unavailable_sign_in">Booking on the open network needs Google sign-in. Sign in, or book in a ride app.</string>
+    <string name="ondc_unavailable_offline">You\'re offline. Connect and search again, or book in a ride app.</string>
+    <string name="ondc_unavailable_timeout">The open network took too long to answer. Search again, or book in a ride app.</string>
+    <string name="ondc_unavailable_server">The open network isn\'t available right now. Try again later, or book in a ride app.</string>
+    <string name="ondc_unavailable_not_configured">RideMate\'s server isn\'t set up yet, so the open network can\'t be searched. Book in a ride app.</string>
+    <string name="ondc_unavailable_listener">RideMate can\'t follow this booking right now. Check your connection, or book in a ride app.</string>
+    <string name="ondc_unavailable_quota">The open network is paused until about 1:30 pm (IST). Book in a ride app meanwhile.</string>
+
+    <!-- Progress. -->
+    <string name="ondc_searching">Searching the open network…</string>
+    <string name="ondc_no_results">No rides on the open network for this trip. Book in a ride app instead.</string>
+    <string name="ondc_booking">Booking on the open network…</string>
+    <string name="ondc_booked">Booked on the open network.</string>
+    <string name="ondc_arriving">Your driver is arriving.</string>
+    <string name="ondc_on_trip">Trip under way.</string>
+    <string name="ondc_ended">Ride ended. Pay the driver as the seller asks.</string>
+    <string name="ondc_cancel_requested">Asking the network what cancelling costs now…</string>
+    <string name="ondc_cancel_fee">Cancelling now costs ₹%1$s (the network\'s fee). Confirm to cancel, or keep the ride.</string>
+    <string name="ondc_cancel_free">Cancelling now is free. Confirm to cancel, or keep the ride.</string>
+    <string name="ondc_cancelling">Cancelling on the open network…</string>
+    <string name="ondc_cancelled">Cancelled. The network confirmed it.</string>
+    <string name="ondc_failed">The open network couldn\'t complete this booking. Book in a ride app instead.</string>
+
+    <!-- Controls. -->
+    <string name="ondc_action_book">Book</string>
+    <string name="ondc_action_book_description">Book %1$s on the open network for %2$s</string>
+    <string name="ondc_action_cancel">Cancel ride</string>
+    <string name="ondc_action_cancel_description">Ask the open network what cancelling costs, before anything is cancelled</string>
+    <string name="ondc_action_confirm_cancel">Confirm cancel</string>
+    <string name="ondc_action_confirm_cancel_description">Cancel the open-network ride and accept the fee shown</string>
+    <string name="ondc_action_keep_ride">Keep ride</string>
+    <string name="ondc_action_keep_ride_description">Keep the open-network ride; nothing is cancelled</string>
+</resources>

@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Try the demo (goal 19). Owned by app.ridemate.demo. Every demo provider is fictional and labelled DEMO. -->
+<resources>
+    <string name="demo_title">Try the demo</string>
+    <string name="demo_badge">DEMO</string>
+    <string name="demo_badge_description">Demo mode: fictional ride companies, no real bookings and no money</string>
+    <string name="demo_intro">Sample screens from three made-up ride companies show how RideMate reads prices, spots your driver, guides you to cancel the other bookings with proof, and hands you back to pay. You need no ride app, no sign-in and no AI budget.</string>
+    <string name="demo_provider_label">%1$s · DEMO</string>
+
+    <!-- Choosing a walk-through. -->
+    <string name="demo_track_main_title">Book three, keep one</string>
+    <string name="demo_track_main_body">Book in all three demo apps. When the first driver is found, RideMate asks to cancel the others, guides each cancel, proves it and reminds you until every one is gone.</string>
+    <string name="demo_track_keep_searching_title">Keep searching</string>
+    <string name="demo_track_keep_searching_body">Keep looking after the first driver. A much closer driver brings a better-ride offer, and nothing changes unless you tap Yes. In real rides, dropping a driver may cost a fee and costs that driver a trip, so use this fairly.</string>
+    <string name="demo_track_rematch_title">Driver cancels</string>
+    <string name="demo_track_rematch_body">One booking: the driver cancels, the app finds a closer driver, and RideMate follows every change.</string>
+    <string name="demo_start">Start</string>
+    <string name="demo_start_description">Start the demo: %1$s</string>
+    <string name="demo_leave">Leave demo</string>
+    <string name="demo_leave_description">Leave the demo. Your real rides are not affected.</string>
+
+    <!-- Why the demo can't start; each says what to do next. -->
+    <string name="demo_unavailable_not_ready">The demo isn\'t available in this version of RideMate. Update the app, then try again.</string>
+    <string name="demo_unavailable_switched_off">The demo is switched off for now. Try again later.</string>
+    <string name="demo_unavailable_session_busy">Finish cancelling your current ride bookings first, then start the demo.</string>
+    <string name="demo_unavailable_assets_broken">The demo files are damaged. Reinstall RideMate to restore them.</string>
+
+    <!-- Where the user is. -->
+    <string name="demo_step_book">Step %1$d of %2$d: read the prices in %3$s, then tap Booked here.</string>
+    <string name="demo_step_watching">All booked. RideMate now watches each demo app\'s notifications, just as it does for Uber, Ola and Rapido. Wait for a driver.</string>
+    <string name="demo_step_finished">Demo complete. In a real ride you pay inside the ride app. RideMate never handles money.</string>
+    <string name="demo_app_cancel_hint">RideMate opened %1$s so you can cancel this extra booking. Tap Cancel ride, as you would in the real app.</string>
+    <string name="demo_app_pay_hint">This is where you would pay in %1$s. Demo: no money moves.</string>
+    <string name="demo_cancel_waiting">Cancel tapped. Waiting for %1$s to confirm it…</string>
+    <string name="demo_cancel_proven">Cancelled. %1$s\'s own notification proved it.</string>
+
+    <!-- Controls. -->
+    <string name="demo_action_read_fares">Read fares</string>
+    <string name="demo_action_read_fares_description">Read the prices on the %1$s demo screen with two independent readers</string>
+    <string name="demo_action_reading">Reading prices…</string>
+    <string name="demo_action_booked_here">Booked here</string>
+    <string name="demo_action_booked_here_description">I booked a ride in %1$s (demo)</string>
+    <string name="demo_action_cancel_ride">Cancel ride</string>
+    <string name="demo_action_cancel_ride_description">Tap Cancel ride in %1$s (demo), as you would in the real app</string>
+    <string name="demo_action_show_me">Show me</string>
+    <string name="demo_action_show_me_description">Show me where Cancel ride is in %1$s</string>
+    <string name="demo_action_pay">Pay in %1$s</string>
+    <string name="demo_action_pay_description">Open %1$s to pay (demo: no money moves)</string>
+    <string name="demo_action_open_app">Open %1$s</string>
+    <string name="demo_action_open_app_description">Open the %1$s demo app</string>
+    <string name="demo_action_back">Back to overview</string>
+    <string name="demo_action_back_description">Close the demo app and go back to the demo overview</string>
+    <string name="demo_action_ok">OK</string>
+
+    <!-- The bundled screens (read aloud by screen readers). -->
+    <string name="demo_screen_description">%1$s demo screen: %2$s</string>
+    <string name="demo_screen_fare_options">fare options</string>
+    <string name="demo_screen_searching">searching for a driver</string>
+    <string name="demo_screen_driver_assigned">driver assigned</string>
+    <string name="demo_screen_driver_assigned_better">a new, closer driver assigned</string>
+    <string name="demo_screen_cancel_flow">cancel your ride</string>
+    <string name="demo_screen_cancelled">ride cancelled</string>
+    <string name="demo_screen_other">app screen</string>
+    <string name="demo_pointer_description">Arrow pointing at the Cancel ride button</string>
+
+    <!-- Where a read came from (shown on every demo row). -->
+    <string name="demo_source_live">Read by Muse Spark Open</string>
+    <string name="demo_source_cache">Read by Muse Spark Open (cached)</string>
+    <string name="demo_source_recorded">recorded</string>
+    <string name="demo_source_recorded_long">Recorded Muse Spark Open read</string>
+    <string name="demo_source_none">No AI read</string>
+    <string name="demo_rows_label">%1$s · DEMO · %2$s</string>
+
+    <!-- Why a read has no AI read or no rows; each says what to do next. -->
+    <string name="demo_issue_ai_switched_off">AI reading is switched off, so the demo uses a recorded read.</string>
+    <string name="demo_issue_ai_unavailable">AI reading isn\'t available and no recorded read is bundled, so prices show as Couldn\'t read. Try again when you\'re online.</string>
+    <string name="demo_issue_not_a_fare_screen">This doesn\'t look like a fare screen, so nothing was sent. Open the fare screen and try again.</string>
+    <string name="demo_issue_ocr_failed">Your phone couldn\'t read the screen text. Tap Read fares again.</string>
+    <string name="demo_issue_no_parser">Reading rules for this demo app are missing. Update RideMate, then try again.</string>
+    <string name="demo_issue_recorded_fallback">RideMate\'s server couldn\'t be reached, so the demo used the recorded read bundled in the app.</string>
+
+    <!-- Rows of the demo price list. -->
+    <string name="demo_row_unreadable">Couldn\'t read · check in app</string>
+    <string name="demo_row_eta">%1$d min</string>
+    <string name="demo_row_eta_unknown">ETA: see in app</string>
+    <string name="demo_row_seen_at">seen in %1$s at %2$s</string>
+    <string name="demo_row_stale">old · tap Read fares to refresh</string>
+    <string name="demo_row_cheapest">cheapest</string>
+    <string name="demo_row_description">%1$s: %2$s</string>
+    <string name="demo_class_bike">Bike</string>
+    <string name="demo_class_auto">Auto</string>
+    <string name="demo_class_cab_economy">Cab</string>
+    <string name="demo_class_cab_premium">Premium cab</string>
+    <string name="demo_class_cab_xl">XL cab</string>
+    <string name="demo_class_other">Other</string>
+
+    <!-- Each demo app's status in the overview. -->
+    <string name="demo_status_not_booked">Not booked yet</string>
+    <string name="demo_status_searching">Searching for a driver</string>
+    <string name="demo_status_driver">Driver assigned</string>
+    <string name="demo_status_cancelling">Cancel tapped, waiting for proof</string>
+    <string name="demo_status_cancelled">Cancelled, proven</string>
+    <string name="demo_status_booked">Booked</string>
+
+    <!-- Progress checklist (state in words, never colour alone). -->
+    <string name="demo_progress_title">What the demo has shown</string>
+    <string name="demo_progress_prices">Prices read by two readers</string>
+    <string name="demo_progress_booked">Booked in %1$d of %2$d apps</string>
+    <string name="demo_progress_driver">Driver found</string>
+    <string name="demo_progress_cancel_guide">Cancel guide shown</string>
+    <string name="demo_progress_proof">Cancels proven: %1$d</string>
+    <string name="demo_progress_reminders">Reminders sent: %1$d</string>
+    <string name="demo_progress_better_ride">Better-ride offer</string>
+    <string name="demo_progress_pay">Handed back to pay</string>
+    <string name="demo_progress_done">Done</string>
+    <string name="demo_progress_not_yet">Not yet</string>
+    <string name="demo_progress_item">%1$s: %2$s</string>
+
+    <!-- One-off notices. -->
+    <string name="demo_notice_not_now">You chose Not now, so nothing more happens in this demo. Leave the demo and start again to see the cancel guide.</string>
+    <string name="demo_notice_show_me_unavailable">Show me needs Google sign-in and AI reading. Look for the large Cancel ride button instead.</string>
+    <string name="demo_notice_switched_off">The demo was switched off. Your real rides are not affected.</string>
+</resources>

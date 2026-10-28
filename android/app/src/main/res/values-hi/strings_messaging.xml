@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- मालिक के लिए अलर्ट (केवल मालिक). Owned by app.ridemate.messaging. -->
+<resources>
+    <string name="owner_alert_channel_name">मालिक के अलर्ट</string>
+    <string name="owner_alert_channel_description">ऐप मालिक के लिए RideMate सर्वर के अलर्ट: त्रुटियाँ, खर्च, पढ़ने की सटीकता।</string>
+    <string name="owner_alert_title_format">RideMate अलर्ट: %1$s</string>
+    <string name="owner_alert_with_value">%1$s मापा गया: %2$s।</string>
+    <string name="owner_alert_generic_title">सर्वर अलर्ट</string>
+    <string name="owner_alert_generic_body">विवरण के लिए अलर्ट ईमेल खोलें और उससे जुड़ी रनबुक का पालन करें।</string>
+
+    <string name="owner_alert_server_errors_title" formatted="false">सर्वर त्रुटियाँ 5% से ज़्यादा</string>
+    <string name="owner_alert_server_errors_body">Modal लॉग जाँचें, और अगर किसी डिप्लॉय से हुआ है तो रोलबैक रनबुक का पालन करें।</string>
+    <string name="owner_alert_slow_reads_title">कीमत पढ़ना धीमा</string>
+    <string name="owner_alert_slow_reads_body">read-screen का p95 15 सेकंड से ज़्यादा है। Modal-down रनबुक का पालन करें।</string>
+    <string name="owner_alert_reading_accuracy_title">पढ़ने की सटीकता गिरी</string>
+    <string name="owner_alert_reading_accuracy_body" formatted="false">सत्यापित पंक्तियाँ 70% से नीचे गईं। कोई राइड ऐप बदला हो सकता है: ride-app-update रनबुक का पालन करें।</string>
+    <string name="owner_alert_rule_miss_title">सूचना टेम्पलेट मेल नहीं खा रहे</string>
+    <string name="owner_alert_rule_miss_body" formatted="false">20% से ज़्यादा राइड-ऐप सूचनाएँ टेम्पलेट से मेल नहीं खातीं। ride-app-update रनबुक का पालन करें।</string>
+    <string name="owner_alert_misses_unclassified_title">AI के बिना सवाल</string>
+    <string name="owner_alert_misses_unclassified_body">क्लासिफ़ायर उपलब्ध न होने से उपयोगकर्ताओं से ज़्यादा सवाल पूछे जा रहे हैं। cap और Modal रनबुक देखें।</string>
+    <string name="owner_alert_spend_title">खर्च ज़्यादा</string>
+    <string name="owner_alert_spend_body" formatted="false">खर्च आज की सीमा के 70% या किसी बजट के 80% से ऊपर गया। cap-tripped रनबुक का पालन करें।</string>
+    <string name="owner_alert_billing_drift_title">बिलिंग में अंतर</string>
+    <string name="owner_alert_billing_drift_body" formatted="false">RideMate का मीटर और Modal की बिलिंग 10% से ज़्यादा अलग हैं। सीमाएँ कड़ी कर दी गईं; cap-tripped रनबुक का पालन करें।</string>
+    <string name="owner_alert_firestore_quota_title">Firestore कोटा ऊँचा</string>
+    <string name="owner_alert_firestore_quota_body" formatted="false">Firestore राइट मुफ़्त दैनिक कोटे के 70% से ऊपर गए। सबसे पहले ONDC पर असर होता है: ONDC रनबुक का पालन करें।</string>
+    <string name="owner_alert_probe_failure_title">दैनिक जाँच विफल</string>
+    <string name="owner_alert_probe_failure_body">सिंथेटिक गोल्डन-इमेज पठन विफल रहा। model-removed और Modal-down रनबुक का पालन करें।</string>
+    <string name="owner_alert_model_missing_title">मॉडल नहीं मिला</string>
+    <string name="owner_alert_model_missing_body">तय Muse Spark Open मॉडल id हट गया है, इसलिए AI बंद है। model-removed रनबुक का पालन करें।</string>
+    <string name="owner_alert_key_age_title">कुंजी 80 दिन से पुरानी</string>
+    <string name="owner_alert_key_age_body">एक सर्विस-अकाउंट कुंजी बदलनी है। key-rotation रनबुक का पालन करें।</string>
+    <string name="owner_alert_test_title">परीक्षण अलर्ट</string>
+    <string name="owner_alert_test_body">अलर्ट इस फ़ोन तक पहुँचते हैं। तारीख docs/slo-and-alerts.md में दर्ज करें।</string>
+</resources>
