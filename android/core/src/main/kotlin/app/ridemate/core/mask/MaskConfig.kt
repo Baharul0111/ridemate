@@ -6,6 +6,8 @@ data class MaskConfig(
     val statusBarFraction: Double = 0.045,
     /** Words after which a driver's name follows. Matched case-insensitively as whole words. */
     val nameAnchors: List<String> = DEFAULT_NAME_ANCHORS,
+    /** Phrases a driver's name comes right before ("Ramesh is on the way"). Matched like [nameAnchors]. */
+    val trailingNameAnchors: List<String> = DEFAULT_TRAILING_NAME_ANCHORS,
     /** Labels near which a 4–6 digit code is an OTP/PIN. Matched case-insensitively as whole words. */
     val otpAnchors: List<String> = DEFAULT_OTP_ANCHORS,
     /** Capitalised words that end a name (statuses, brands, vehicle and payment words), compared lower-cased. */
@@ -19,6 +21,11 @@ data class MaskConfig(
         val DEFAULT_NAME_ANCHORS: List<String> = listOf(
             "your captain", "your driver", "captain", "driver", "with",
             "आपके कैप्टन", "आपके ड्राइवर", "कैप्टन", "ड्राइवर", "चालक",
+        )
+
+        val DEFAULT_TRAILING_NAME_ANCHORS: List<String> = listOf(
+            "is your driver", "is your captain", "is on the way", "is on his way", "is on her way", "is arriving",
+            "has arrived", "is waiting", "will reach", "आ रहे हैं", "पहुंच गए", "पहुँच गए", "पहुंच रहे हैं",
         )
 
         val DEFAULT_OTP_ANCHORS: List<String> = listOf(

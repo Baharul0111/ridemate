@@ -298,6 +298,24 @@ class VerificationGateTest {
     }
 
     @Test
+    fun `a re-read sends at most twelve crops and ignores answers it did not ask for`() {
+        val many = fareScreen(List(14) { RowSpec("Auto", "₹${100 + it}") }, pitch = 140)
+        val offByOne = perfectRead(many).let { r ->
+            r.copy(options = r.options.map { it.copy(priceMin = it.priceMin!! + 1, priceMax = it.priceMax!! + 1) })
+        }
+        val first = verify(offByOne, many)
+        assertEquals(14, first.unreadableCount)
+        val plan = VerificationGate.planReread(first, NOW - 1_000, NOW, false)!!
+        assertEquals(VerificationGate.MAX_REREAD_CROPS, plan.crops.size)
+        assertEquals((0 until 12).map { "r$it" }, plan.crops.map { it.rowId })
+
+        val answers = listOf(RereadRow("r0", VehicleClass.AUTO, "Auto", 100, 100, 3), RereadRow("r13", VehicleClass.AUTO, "Auto", 113, 113, 3))
+        val reread = VerificationGate.applyReread(first, RereadResponse(answers))
+        assertEquals(listOf("r0"), reread.rows.filter { it.status == QuoteStatus.VERIFIED }.map { it.rowId })
+        assertEquals(QuoteStatus.UNREADABLE, reread.rows.single { it.rowId == "r13" }.status)
+    }
+
+    @Test
     fun `gated rows enforce I2`() {
         assertThrows(IllegalArgumentException::class.java) {
             GatedRow(APP, VehicleClass.AUTO, "Auto", true, 110..110, QuoteStatus.UNREADABLE, null, EtaSource.NONE, NOW)

@@ -18,16 +18,16 @@ data class PiiSpan(val start: Int, val end: Int, val kind: PiiKind, val plate: S
  * Prices are never reported: digits directly after ₹/Rs/INR are not an OTP, and phone numbers cannot follow ₹.
  */
 class PiiDetector(private val cfg: MaskConfig = MaskConfig.DEFAULT) {
-    private val otpAfter: Regex
-    private val otpBefore: Regex
-    private val nameAnchor: Regex
-
-    init {
-        val otp = alternation(cfg.otpAnchors)
-        otpAfter = Regex("$NOT_LETTER_BEHIND(?:$otp)$NOT_LETTER_AHEAD[^\\d]{0,30}?(\\d(?:[ -]?\\d){3,5})(?!\\d)", RegexOption.IGNORE_CASE)
-        otpBefore = Regex("(?<!\\d)(\\d(?:[ -]?\\d){3,5})(?!\\d)[^\\d]{0,25}?$NOT_LETTER_BEHIND(?:$otp)$NOT_LETTER_AHEAD", RegexOption.IGNORE_CASE)
-        nameAnchor = Regex("$NOT_LETTER_BEHIND(?:${alternation(cfg.nameAnchors)})$NOT_LETTER_AHEAD", RegexOption.IGNORE_CASE)
+    // Null for an empty anchor list: an empty alternation would match everywhere and turn every number into an OTP.
+    private val otpAnchors: String? = alternation(cfg.otpAnchors)
+    private val otpAfter: Regex? = otpAnchors?.let { otp ->
+        Regex("$NOT_LETTER_BEHIND(?:$otp)$NOT_LETTER_AHEAD[^\\d]{0,30}?(\\d(?:[ -]?\\d){3,5})(?!\\d)", RegexOption.IGNORE_CASE)
     }
+    private val otpBefore: Regex? = otpAnchors?.let { otp ->
+        Regex("(?<!\\d)(\\d(?:[ -]?\\d){3,5})(?!\\d)[^\\d]{0,25}?$NOT_LETTER_BEHIND(?:$otp)$NOT_LETTER_AHEAD", RegexOption.IGNORE_CASE)
+    }
+    private val nameAnchor: Regex? = anchorRegex(cfg.nameAnchors)
+    private val trailingNameAnchor: Regex? = anchorRegex(cfg.trailingNameAnchors)
 
     /** Every span found, sorted by start; spans may overlap (use [mergeSpans] before replacing text). */
     fun detect(text: String): List<PiiSpan> {
@@ -38,13 +38,14 @@ class PiiDetector(private val cfg: MaskConfig = MaskConfig.DEFAULT) {
         LANDLINE.findAll(s).filter { m -> m.value.count { it.isDigit() } == 11 }
             .forEach { spans += PiiSpan(it.range.first, it.range.last + 1, PiiKind.PHONE) }
         plates(s, spans)
-        for (regex in listOf(otpAfter, otpBefore)) {
+        for (regex in listOfNotNull(otpAfter, otpBefore)) {
             regex.findAll(s).forEach { m ->
                 val g = m.groups[1]!!.range
                 if (!followsCurrency(s, g.first)) spans += PiiSpan(g.first, g.last + 1, PiiKind.OTP)
             }
         }
         names(s, spans)
+        namesBefore(s, spans)
         return spans.sortedWith(compareBy({ it.start }, { it.end }))
     }
 
@@ -63,7 +64,7 @@ class PiiDetector(private val cfg: MaskConfig = MaskConfig.DEFAULT) {
     }
 
     private fun names(s: String, spans: MutableList<PiiSpan>) {
-        for (anchor in nameAnchor.findAll(s)) {
+        for (anchor in nameAnchor?.findAll(s).orEmpty()) {
             var i = anchor.range.last + 1
             var newlines = 0
             while (i < s.length && s[i] in SEPARATORS) {
@@ -83,6 +84,39 @@ class PiiDetector(private val cfg: MaskConfig = MaskConfig.DEFAULT) {
             }
             if (first >= 0) spans += PiiSpan(first, last, PiiKind.NAME)
         }
+    }
+
+    /** Up to [MAX_NAME_WORDS] name words directly before a trailing anchor ("Ramesh Kumar is on the way"). */
+    private fun namesBefore(s: String, spans: MutableList<PiiSpan>) {
+        for (anchor in trailingNameAnchor?.findAll(s).orEmpty()) {
+            var i = anchor.range.first
+            while (i > 0 && s[i - 1] in " ,") i--
+            var first = -1
+            var last = -1
+            var words = 0
+            while (i > 0 && words < MAX_NAME_WORDS) {
+                val start = wordStart(s, i)
+                if (start == i || s.substring(start, i).lowercase().trimEnd('.') in cfg.nameStopwords) break
+                if (last < 0) last = i
+                first = start
+                words++
+                if (start >= 2 && s[start - 1] == ' ' && wordStart(s, start - 1) < start - 1) i = start - 1 else break
+            }
+            if (first >= 0) spans += PiiSpan(first, last, PiiKind.NAME)
+        }
+    }
+
+    /** Start of a capitalised Latin word or a Devanagari word ending at [end]; [end] itself when there is none. */
+    private fun wordStart(s: String, end: Int): Int {
+        if (end == 0) return end
+        var j = end
+        if (isDevanagariLetter(s[end - 1])) {
+            while (j > 0 && isDevanagariLetter(s[j - 1])) j--
+            return j
+        }
+        while (j > 0 && (s[j - 1].isLetter() && s[j - 1].code < 0x0900 || s[j - 1] in "'’.")) j--
+        while (j < end && s[j] in "'’.") j++
+        return if (j < end && s[j] in 'A'..'Z') j else end
     }
 
     /** End of a capitalised Latin word or a Devanagari word starting at [i]; [i] itself when there is none. */
@@ -127,8 +161,14 @@ class PiiDetector(private val cfg: MaskConfig = MaskConfig.DEFAULT) {
         /** Bharat series: `22 BH 1234 AA`. */
         private val BH_PLATE = Regex("(?<![A-Za-z0-9])(\\d{2})[\\s.-]?BH[\\s.-]?(\\d{4})[\\s.-]?([A-HJ-NP-Z]{1,2})(?![A-Za-z0-9])")
 
-        private fun alternation(words: List<String>): String = words.sortedByDescending { it.length }
+        /** The phrases as one regex alternation (longest first, any whitespace between words); null when there are none. */
+        private fun alternation(words: List<String>): String? = words.filter { it.isNotBlank() }.sortedByDescending { it.length }
             .joinToString("|") { phrase -> phrase.trim().split(Regex("\\s+")).joinToString("\\s+") { Regex.escape(it) } }
+            .ifEmpty { null }
+
+        private fun anchorRegex(words: List<String>): Regex? = alternation(words)?.let {
+            Regex("$NOT_LETTER_BEHIND(?:$it)$NOT_LETTER_AHEAD", RegexOption.IGNORE_CASE)
+        }
     }
 }
 

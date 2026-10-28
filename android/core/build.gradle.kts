@@ -22,9 +22,11 @@ tasks.test {
     // -PrequireFixtures=true turns a missing eval fixture into a failure instead of a skip (CI with fixtures).
     systemProperty("ridemate.requireFixtures", (findProperty("requireFixtures") as String?) ?: "false")
     // Declared as inputs so changed fixtures or bundled configs re-run the suites instead of hitting the cache.
-    inputs.files(fileTree(repoRoot.resolve("eval")) { include("**/*.json"); exclude("out/**", "private/**") })
+    inputs.files(fileTree(repoRoot.resolve("eval")) { include("**/*.json"); exclude("out/**", "private/**", "**/.*/**") })
         .withPropertyName("evalFixtures").withPathSensitivity(PathSensitivity.RELATIVE)
-    inputs.files(fileTree(repoRoot.resolve("config/remote_config")) { include("*.json") })
-        .withPropertyName("bundledConfig").withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.files(
+        fileTree(repoRoot.resolve("config/remote_config")) { include("*.json") },
+        fileTree(repoRoot.resolve("android/app/src/main/assets/config")) { include("*.json") },
+    ).withPropertyName("bundledConfig").withPathSensitivity(PathSensitivity.RELATIVE)
     testLogging { events("failed"); exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL }
 }

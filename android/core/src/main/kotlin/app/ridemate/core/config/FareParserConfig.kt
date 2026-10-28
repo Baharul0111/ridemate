@@ -71,11 +71,15 @@ fun parseFareParsers(raw: String): FareParsersConfig {
 }
 
 /** Decodes a fare-side Remote Config payload after checking its `schema` major (contracts §2). */
-internal fun <T> decodeFareSidePayload(raw: String, serializer: KSerializer<T>): T {
+internal fun <T> decodeFareSidePayload(raw: String, serializer: KSerializer<T>): T =
+    ConfigJson.decodeFromJsonElement(serializer, fareSidePayload(raw))
+
+/** The payload as a JSON object whose `schema` major this build understands; throws otherwise. */
+internal fun fareSidePayload(raw: String): JsonObject {
     val obj = ConfigJson.parseToJsonElement(raw) as? JsonObject
         ?: throw IllegalArgumentException("payload must be a JSON object")
     require(schemaMajor(obj) == SupportedSchemas.MAJOR) { "unsupported schema ${obj["schema"]}" }
-    return ConfigJson.decodeFromJsonElement(serializer, obj)
+    return obj
 }
 
 private val SCREEN_BY_WIRE: Map<String, ScreenType> =

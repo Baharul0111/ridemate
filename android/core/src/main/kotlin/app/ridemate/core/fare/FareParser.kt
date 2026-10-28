@@ -224,7 +224,7 @@ class FareParser(val entry: FareParserEntry) {
 
         private fun keywordHits(): Map<ScreenType, Int> {
             val all = texts.joinToString("\n").lowercase()
-            return keywords.mapValues { (_, words) -> words.count { it in all } }
+            return keywords.mapValues { (_, words) -> words.count { containsWord(all, it) } }
         }
 
         private fun screenType(rows: List<FareRow>): ScreenType {
@@ -348,6 +348,29 @@ class FareParser(val entry: FareParserEntry) {
         }
 
         private val FIRST_INT = Regex("\\d+")
+
+        /**
+         * [word] occurs in [text] as a whole word: not glued to a letter or combining mark on either side, so `book`
+         * is not found in "Facebook" or "booking", nor `pin` in "shopping" (K3 must not upload those screens).
+         */
+        internal fun containsWord(text: String, word: String): Boolean {
+            if (word.isEmpty()) return false
+            var from = 0
+            while (true) {
+                val at = text.indexOf(word, from)
+                if (at < 0) return false
+                val end = at + word.length
+                val startOk = at == 0 || !isWordChar(word.first()) || !isWordChar(text[at - 1])
+                val endOk = end == text.length || !isWordChar(word.last()) || !isWordChar(text[end])
+                if (startOk && endOk) return true
+                from = at + 1
+            }
+        }
+
+        private fun isWordChar(c: Char): Boolean = c.isLetter() || when (Character.getType(c).toByte()) {
+            Character.NON_SPACING_MARK, Character.COMBINING_SPACING_MARK, Character.ENCLOSING_MARK -> true
+            else -> false
+        }
 
         private fun median(values: List<Double>): Double? {
             if (values.isEmpty()) return null

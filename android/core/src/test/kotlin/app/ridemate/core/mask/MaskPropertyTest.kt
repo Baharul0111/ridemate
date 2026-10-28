@@ -82,6 +82,22 @@ class MaskPropertyTest {
     }
 
     @Test
+    fun `driver names next to an anchor never survive`() {
+        val given = listOf("Ramesh", "Priya", "Mohd.", "Sunil", "Anjali", "Imran", "Kavya", "Arjun", "रमेश", "सुनील", "प्रिया")
+        val family = listOf("Kumar", "Das", "Sharma", "Irfan", "Baruah", "K.", "कुमार", "दास")
+        val before = listOf("Captain", "Your driver", "Driver:", "Ride with", "कैप्टन", "ड्राइवर")
+        val after = listOf("is on the way", "is arriving", "has arrived", "is your captain", "आ रहे हैं", "पहुंच गए")
+        repeat(1_500) {
+            val name = (listOf(given.random(random)) + List(random.nextInt(3)) { family.random(random) }).joinToString(" ")
+            val text = if (random.nextBoolean()) "${before.random(random)} $name" else "$name ${after.random(random)}"
+            val masked = maskText(sentence(text))
+            name.split(" ").forEach { part ->
+                assertFalse("$text → $masked", masked.split(Regex("[\\s·:]+")).contains(part))
+            }
+        }
+    }
+
+    @Test
     fun `prices are never masked`() {
         repeat(1_500) {
             val amount = 15 + random.nextInt(5_000)
