@@ -1,7 +1,9 @@
 package app.ridemate.watch
 
+import android.annotation.SuppressLint
 import android.app.Notification
 import android.content.pm.PackageManager
+import android.content.res.Resources
 import android.os.Bundle
 import android.service.notification.StatusBarNotification
 import androidx.core.content.pm.PackageInfoCompat
@@ -72,7 +74,10 @@ class PackageVersionCodes(
  * app provides one), channel, category, ongoing flag, id/tag/key, post time and the posting app's versionCode. The
  * text stays in memory: it is masked by RideWatch before normalisation and is never stored or logged.
  */
-class SbnPostReader(private val versionCodes: VersionCodeLookup) {
+class SbnPostReader(
+    private val versionCodes: VersionCodeLookup,
+    private val redaction: RedactionDetector = RedactionDetector(),
+) {
 
     fun read(sbn: StatusBarNotification): PostSnapshot {
         val notification: Notification? = sbn.notification
@@ -93,7 +98,7 @@ class SbnPostReader(private val versionCodes: VersionCodeLookup) {
             text = text,
             postTimeMs = sbn.postTime,
             versionCode = versionCodes.versionCode(sbn.packageName),
-            platformRedacted = RedactionDetector.isRedacted(title, text),
+            platformRedacted = redaction.isRedacted(title, text),
         )
     }
 
@@ -109,21 +114,47 @@ class SbnPostReader(private val versionCodes: VersionCodeLookup) {
 
 /**
  * Android 15 hides one-time codes from notification listeners by replacing the content with a placeholder
- * ("Sensitive notification content hidden"). Such a post has nothing a text template could match, so it is treated
- * like an empty post (§4.5.4): structural templates or a MAYBE prompt, never silence.
+ * ("Sensitive notification content hidden", in the phone's language). Such a post has nothing a text template could
+ * match, so it is treated like an empty post (§4.5.4): structural templates or a MAYBE prompt, never silence, and a
+ * structural fingerprint, so a second redacted assignment is never mistaken for the first (§4.5.9).
+ *
+ * [extraPlaceholders] adds the platform's own wording in the phone's language ([systemPlaceholders]); the English
+ * forms are always recognised.
  */
-object RedactionDetector {
-    private val PLACEHOLDERS = listOf(
-        "sensitive notification content hidden",
-        "notification content hidden",
-        "sensitive content hidden",
-        "contents hidden",
-        "content hidden",
-    )
+class RedactionDetector(extraPlaceholders: Collection<String> = emptyList()) {
+    private val placeholders: Set<String> = (ENGLISH + extraPlaceholders.map(::normalise)).filter { it.isNotEmpty() }.toSet()
 
     fun isRedacted(title: String?, text: String?): Boolean {
         if (title.isNullOrBlank() && text.isNullOrBlank()) return true
-        val body = text?.trim()?.trimEnd('.', '…')?.lowercase() ?: return false
-        return body in PLACEHOLDERS
+        val body = text?.let(::normalise) ?: return false
+        return body in placeholders
+    }
+
+    companion object {
+        private val ENGLISH = listOf(
+            "sensitive notification content hidden",
+            "notification content hidden",
+            "sensitive content hidden",
+            "contents hidden",
+            "content hidden",
+        )
+
+        /** The framework strings Android puts in place of redacted content (absent before Android 15). */
+        private val SYSTEM_STRING_NAMES = listOf("redacted_notification_message", "redacted_otp_notification_message")
+
+        private fun normalise(text: String): String = text.trim().trimEnd('.', '…', '।').trim().lowercase()
+
+        /**
+         * The redaction placeholders of this phone's framework, in its current language. A resource lookup by name
+         * (no reflection); missing names are skipped, so older Android versions simply add nothing.
+         */
+        @SuppressLint("DiscouragedApi")
+        fun systemPlaceholders(resources: Resources = Resources.getSystem()): List<String> = SYSTEM_STRING_NAMES.mapNotNull { name ->
+            try {
+                resources.getIdentifier(name, "string", "android").takeIf { it != 0 }?.let(resources::getString)
+            } catch (_: Resources.NotFoundException) {
+                null
+            }
+        }
     }
 }

@@ -55,6 +55,7 @@ import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.Executor
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.atomic.AtomicInteger
 
 /** The bundled Remote Config defaults (assets/config), as the guardian sees them before any remote value. */
@@ -73,6 +74,54 @@ class AssetGuardianConfig(private val appContext: Context) : GuardianConfigSourc
         /** The bundled payloads keyed by Remote Config key, for [app.ridemate.testing.TestSeams.bundled]. */
         fun bundled(context: Context): Map<String, String> = listOf("notification_templates", "fee_rules", "cancel_cards")
             .associateWith { key -> context.assets.open("config/$key.json").bufferedReader().use { it.readText() } }
+    }
+}
+
+/**
+ * An executor the test drives by hand ([runQueued], [awaitQueued]) until [runFreely] hands it a thread of its own, so a
+ * test can place a call exactly between two steps of the guardian's own work.
+ */
+class SteppedExecutor : Executor, AutoCloseable {
+    private val queue = LinkedBlockingQueue<Runnable>()
+
+    @Volatile
+    private var worker: Thread? = null
+
+    override fun execute(command: Runnable) {
+        queue.put(command)
+    }
+
+    /** Runs exactly the tasks queued now (not those they queue in turn). */
+    fun runQueued() = repeat(queue.size) { queue.poll()?.run() }
+
+    /** Waits until some other thread queues a task (a continuation coming back from storage). */
+    fun awaitQueued(timeoutMs: Long = 10_000) {
+        val deadline = System.currentTimeMillis() + timeoutMs
+        while (queue.isEmpty()) {
+            check(System.currentTimeMillis() < deadline) { "nothing was queued" }
+            Thread.sleep(2)
+        }
+    }
+
+    fun runFreely() {
+        worker = Thread {
+            while (!Thread.currentThread().isInterrupted) {
+                val task = try {
+                    queue.take()
+                } catch (_: InterruptedException) {
+                    break
+                }
+                task.run()
+            }
+        }.apply {
+            isDaemon = true
+            name = "stepped-guardian"
+            start()
+        }
+    }
+
+    override fun close() {
+        worker?.interrupt()
     }
 }
 
@@ -127,6 +176,8 @@ class GuardianTestRig(
     val clock: FakeClock = FakeClock(),
     val bootIds: FakeBootIds = FakeBootIds(),
     classifier: NotificationClassifier? = null,
+    /** The guardian's thread. Tests that need to interleave calls with the restore pass a [SteppedExecutor]. */
+    private val executor: Executor = Executors.newSingleThreadExecutor { Thread(it, "test-guardian").apply { isDaemon = true } },
 ) {
     val storage = StorageHealth()
     val crashBackend = FakeCrashBackend()
@@ -147,7 +198,6 @@ class GuardianTestRig(
     val journal = UiJournalStore(context)
     val keepSearching = KeepSearchingPreference.inMemory()
 
-    private val executor: ExecutorService = Executors.newSingleThreadExecutor { Thread(it, "test-guardian").apply { isDaemon = true } }
     val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     fun presenter(): GuardianPresenter = GuardianPresenter(GuardianText(context), CancelStepsSource { config.cancelSteps(it) })
@@ -201,7 +251,10 @@ class GuardianTestRig(
     /** The process dies: nothing of this runtime runs any more. Room (the "disk") stays. */
     fun kill() {
         scope.cancel()
-        executor.shutdownNow()
+        when (executor) {
+            is ExecutorService -> executor.shutdownNow()
+            is AutoCloseable -> executor.close()
+        }
     }
 
     fun startSession(vararg providers: Provider, keepSearching: Boolean = false, demo: Boolean = false, id: String = SESSION): String {

@@ -250,6 +250,31 @@ class GuardianPresenterTest {
 
         val riding = en.ongoing(chain.copy(legs = listOf(chain.legs[0])))
         assertEquals(listOf("Done", "Stop"), riding.labels())
+        assertTrue(riding.lines.toString(), "Your ride: Uber" in riding.lines)
+
+        // I10: once the kept driver cancels, the ongoing notification says what is happening, not "Your ride".
+        val lost = en.ongoing(chain.copy(legs = listOf(chain.legs[0].copy(provider = Provider.RAPIDO, state = RideState.DRIVER_CANCELLED))))
+        assertTrue(lost.lines.toString(), lost.lines.none { it.startsWith("Your ride") })
+        assertEquals("Rapido: " + en.text.state(RideState.DRIVER_CANCELLED, Provider.RAPIDO), lost.lines.first())
+        val onTrip = en.ongoing(chain.copy(legs = listOf(chain.legs[0].copy(state = RideState.ON_TRIP))))
+        assertTrue(onTrip.lines.toString(), onTrip.lines.none { it.startsWith("Your ride") })
+    }
+
+    @Test
+    fun `a capture card has the button whose tap Android's capture prompt must follow (I6)`() {
+        val proof = cards(GuardianEffect.RequestCapture("s:ola", Provider.OLA, CaptureReason.CANCEL_PROOF)).single()
+        assertEquals("Show Ola's cancelled screen", proof.title)
+        assertEquals(listOf("Check screen"), proof.labels())
+        assertEquals(GuardianTap(TapScope.LEG, "s:ola", UiAction.CHECK_SCREEN), proof.actions.single().target)
+        assertEquals("Check screen, Ola", proof.actions.single().description)
+
+        val check = cards(GuardianEffect.RequestCapture("s:rapido", Provider.RAPIDO, CaptureReason.CHECK_SCREEN)).single()
+        assertEquals(GuardianTap(TapScope.LEG, "s:rapido", UiAction.CHECK_SCREEN), check.actions.single().target)
+
+        val showMe = cards(GuardianEffect.RequestCapture("s:ola", Provider.OLA, CaptureReason.SHOW_ME)).single()
+        assertEquals(listOf("Show me"), showMe.labels())
+        assertEquals(GuardianTap(TapScope.LEG, "s:ola", UiAction.SHOW_ME), showMe.actions.single().target)
+        assertEquals(listOf("स्क्रीन जाँचें"), cards(GuardianEffect.RequestCapture("s:ola", Provider.OLA, CaptureReason.CANCEL_PROOF), hi).single().labels())
     }
 
     @Test

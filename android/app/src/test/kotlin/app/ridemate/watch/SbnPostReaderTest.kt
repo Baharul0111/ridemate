@@ -20,7 +20,7 @@ import org.robolectric.Shadows.shadowOf
 @RunWith(AndroidJUnit4::class)
 class SbnPostReaderTest {
     private val context: Context = ApplicationProvider.getApplicationContext()
-    private val reader = SbnPostReader { pkg -> if (pkg == RAPIDO) 4_242L else null }
+    private val reader = SbnPostReader(VersionCodeLookup { pkg -> if (pkg == RAPIDO) 4_242L else null })
 
     private fun sbn(notification: Notification, pkg: String = RAPIDO, id: Int = 7, tag: String? = "ride", postTime: Long = 1_793_000_000_000L) =
         StatusBarNotification(pkg, pkg, id, tag, Process.myUid(), 0, 0, notification, Process.myUserHandle(), postTime)
@@ -78,8 +78,27 @@ class SbnPostReaderTest {
         assertTrue(hidden.platformRedacted)
         assertTrue(hidden.isRedacted)
 
-        assertFalse(RedactionDetector.isRedacted("Rapido", "Your captain is on the way"))
-        assertTrue(RedactionDetector.isRedacted(null, "  "))
+        val detector = RedactionDetector()
+        assertFalse(detector.isRedacted("Rapido", "Your captain is on the way"))
+        assertTrue(detector.isRedacted(null, "  "))
+    }
+
+    @Test
+    fun `the phone's own placeholder wording counts as redacted in any language`() {
+        // What Android puts in place of the content on a phone set to Hindi (the framework string, not ours).
+        val hindiPlaceholder = "संवेदनशील सूचना की सामग्री छिपाई गई है।"
+        val localized = SbnPostReader(VersionCodeLookup { 4_242L }, RedactionDetector(listOf(hindiPlaceholder)))
+
+        val hidden = localized.read(sbn(builder().setContentTitle("Rapido").setContentText(hindiPlaceholder).build()))
+        assertTrue(hidden.platformRedacted)
+        // Without that wording the same post would be read as text (a rule miss), so a second redacted assignment
+        // could be fingerprinted like the first.
+        assertFalse(reader.read(sbn(builder().setContentTitle("Rapido").setContentText(hindiPlaceholder).build())).platformRedacted)
+        // English placeholders are always recognised; a real ride update never is.
+        assertTrue(localized.read(sbn(builder().setContentTitle("Uber").setContentText("Contents hidden").build())).platformRedacted)
+        assertFalse(localized.read(sbn(builder().setContentTitle("Rapido").setContentText("Captain assigned").build())).platformRedacted)
+        // Looking the framework strings up never fails, whatever this Android version has.
+        RedactionDetector.systemPlaceholders(context.resources).forEach { assertTrue(it.isNotBlank()) }
     }
 
     @Test

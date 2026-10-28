@@ -47,14 +47,20 @@ class RideWatchAdapter(
         if (removal.packageName in Provider.RIDE_APP_PACKAGES) sink.onRideAppRemoval(removal) else dropped.incrementAndGet()
     }
 
-    /** The listener (re)connected: re-read the shade, allowlisted posts only. */
-    fun onConnected(active: List<ListenerPost>, rereadActive: () -> Unit) {
+    /**
+     * The listener (re)connected: re-read the shade, allowlisted posts only. [active] is null when the shade could not
+     * be read: the guardian is then not told the shade is empty, so a +60 s check keeps assuming the ride may still be
+     * live (a loud alert rather than a silent pass) until a later read succeeds.
+     */
+    fun onConnected(active: List<ListenerPost>?, rereadActive: () -> Unit) {
         status.onConnected(rereadActive)
-        sink.onListenerConnected(filterActive(active))
+        active?.let { sink.onListenerConnected(filterActive(it)) }
     }
 
-    /** A re-read of the shade requested after a guardian restore (the listener stayed connected). */
-    fun onReread(active: List<ListenerPost>) = sink.onListenerConnected(filterActive(active))
+    /** A re-read of the shade requested after a guardian restore or an erase (the listener stayed connected). */
+    fun onReread(active: List<ListenerPost>?) {
+        active?.let { sink.onListenerConnected(filterActive(it)) }
+    }
 
     fun onDisconnected() {
         status.onDisconnected()

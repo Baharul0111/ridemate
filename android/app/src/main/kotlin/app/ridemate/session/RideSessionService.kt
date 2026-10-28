@@ -10,6 +10,7 @@ import androidx.lifecycle.LifecycleService
 import androidx.lifecycle.lifecycleScope
 import app.ridemate.RideMateApp
 import app.ridemate.crash.CrashSite
+import app.ridemate.notify.GuardianCard
 import app.ridemate.notify.GuardianUiState
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
@@ -38,6 +39,18 @@ class RideSessionService : LifecycleService() {
     private var capturing = false
     private var stopping = false
 
+    /**
+     * onStartCommand() has run, so startForeground() was called. A service started with startForegroundService() must
+     * not stop before that, or Android crashes the app ("did not then call Service.startForeground()").
+     */
+    private var commanded = false
+
+    /** The newest start request: stopping uses it, so a start that arrives while stopping keeps the service. */
+    private var lastStartId = 0
+
+    /** The ongoing notification as last posted. */
+    private var lastOngoing: GuardianCard? = null
+
     override fun onCreate() {
         super.onCreate()
         running = this
@@ -56,12 +69,20 @@ class RideSessionService : LifecycleService() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         super.onStartCommand(intent, flags, startId)
+        lastStartId = startId
+        stopping = false
         when (intent?.action) {
             ACTION_CAPTURE_BEGIN -> capturing = true
             ACTION_CAPTURE_END -> capturing = false
         }
+        // Always promote first, then decide whether to stay (see [commanded]).
         promote()
-        startTicking()
+        commanded = true
+        if (!needed(module.runtime.status.value)) {
+            stopNow()
+        } else {
+            startTicking()
+        }
         return START_STICKY
     }
 
@@ -89,6 +110,9 @@ class RideSessionService : LifecycleService() {
         return ok
     }
 
+    /** M7: a session or I8 needs the service, or a capture (fare reading, or a developer capture hold) runs. */
+    private fun needed(status: GuardianStatus): Boolean = status.shouldRunService || capturing || captureHolds.get() > 0
+
     /** Stops the service when nothing needs it any more (after a capture or a capture hold ended). */
     private fun recheck() {
         if (stopping) return
@@ -96,7 +120,9 @@ class RideSessionService : LifecycleService() {
     }
 
     private fun promote(): Boolean {
-        val notification = module.notifier.ongoing(module.presenter().ongoing(module.runtime.uiState.value))
+        val card = module.presenter().ongoing(module.runtime.uiState.value)
+        lastOngoing = card
+        val notification = module.notifier.ongoing(card)
         return try {
             ServiceCompat.startForeground(this, ONGOING_NOTIFICATION_ID, notification, foregroundType(capturing))
             true
@@ -125,11 +151,20 @@ class RideSessionService : LifecycleService() {
     }
 
     private fun onGuardian(status: GuardianStatus, ui: GuardianUiState) {
-        if (!status.shouldRunService && !capturing && captureHolds.get() == 0) {
+        // Before the first onStartCommand the service is not in the foreground yet; that call decides.
+        if (!commanded) return
+        if (!needed(status)) {
             stopNow()
             return
         }
-        module.notifier.updateOngoing(ONGOING_NOTIFICATION_ID, module.presenter().ongoing(ui))
+        // A stopping service must not re-post its notification: it would outlive the service.
+        if (stopping) return
+        // Re-post only what changed: Android drops a package's notification updates above its enqueue rate, and the
+        // reminders are updates too.
+        val card = module.presenter().ongoing(ui)
+        if (card == lastOngoing) return
+        lastOngoing = card
+        module.notifier.updateOngoing(ONGOING_NOTIFICATION_ID, card)
     }
 
     private fun stopNow() {
@@ -137,7 +172,8 @@ class RideSessionService : LifecycleService() {
         stopping = true
         tickJob?.cancel()
         ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
-        stopSelf()
+        // Only when no newer start arrived meanwhile (that start's onStartCommand decides again).
+        stopSelfResult(lastStartId)
     }
 
     companion object {

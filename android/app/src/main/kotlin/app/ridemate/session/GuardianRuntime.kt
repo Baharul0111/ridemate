@@ -15,6 +15,7 @@ import app.ridemate.core.model.EtaSource
 import app.ridemate.core.model.EvidenceRung
 import app.ridemate.core.model.Provider
 import app.ridemate.core.model.RideState
+import app.ridemate.core.state.Answer
 import app.ridemate.core.state.Protocol
 import app.ridemate.core.state.RideEvent
 import app.ridemate.core.state.TapId
@@ -64,6 +65,8 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -129,6 +132,10 @@ class GuardianRuntime(
     private lateinit var pipeline: RideWatchPipeline
     private var ui = GuardianUiState.EMPTY
     private var publishedUi = GuardianUiState.EMPTY
+
+    /** Calls in the order they were made; held until the restore finishes, then applied in that order. */
+    private val calls = ArrayDeque<() -> Unit>()
+    private var runningCalls = false
     private val pendingEffects = ArrayDeque<GuardianEffect>()
     private var draining = false
     private var drainScheduled = false
@@ -142,6 +149,7 @@ class GuardianRuntime(
     private val pendingOpens = mutableListOf<OpenRequest>()
     private var version = 0L
     private var lastServiceStartAttempt: Long? = null
+    private var resumePosted = false
 
     // ---- readable from any thread ----
     private val starting = AtomicInteger(0)
@@ -177,6 +185,20 @@ class GuardianRuntime(
         outboxRegistration = outboxDriver.register(GUARDIAN_OUTBOX_KINDS, GuardianOutboxHandler(this, watchStatus))
         scope.launch(ioDispatcher) { persistLoop() }
         scope.launch { restore() }
+        scope.launch {
+            restoredSignal.await()
+            // M7: if the service went away while the guardian still needs it (it stopped just as a new session
+            // started, or Android stopped it), bring it back at once rather than at the next guardian step.
+            sessionActivity.active.drop(1).collect { active ->
+                if (active) {
+                    // Running again: "Tap to resume" is answered (also one an earlier process posted).
+                    withdrawResume(force = true)
+                } else {
+                    lastServiceStartAttempt = null
+                    maybeStartService()
+                }
+            }
+        }
     }
 
     /** Suspends until the guardian of an earlier process has been restored (or found absent). */
@@ -223,7 +245,8 @@ class GuardianRuntime(
             is SessionOp -> when (target.op) {
                 SessionOpKind.READ_FARES -> onMain { bindings.fareReader?.readFares() ?: notifier.openRideMate(GuardianIntents.DESTINATION_GUARDIAN) }
                 SessionOpKind.BOOKED_HERE -> enqueue {
-                    val legId = target.ref ?: lastOpenedLegId ?: firstUnbookedLeg()
+                    if (guardian.state.session?.closed != false) return@enqueue
+                    val legId = target.ref ?: lastOpenedLegId?.takeIf { it in guardian.state.legs } ?: firstUnbookedLeg()
                     if (legId != null) applyUserAction(UserAction.BookedHere(legId, newTap()))
                 }
                 SessionOpKind.DONE, SessionOpKind.STOP -> requestStop()
@@ -357,7 +380,11 @@ class GuardianRuntime(
                 OpenPurpose.PAY, OpenPurpose.VIEW -> true
             }
         }
-        if (wanted) appOpener.open(request.legId, request.provider, request.purpose)
+        if (wanted) {
+            appOpener.open(request.legId, request.provider, request.purpose)
+            // The leg may have settled while the card was being posted.
+            withContext(guardianDispatcher) { appOpener.withdrawSettled(::stillGuided) }
+        }
         return OutboxOutcome.Done
     }
 
@@ -372,10 +399,14 @@ class GuardianRuntime(
             _ui.value = ui
             stopRequested = false
             sessionRow = null
+            lastOpenedLegId = null
             pendingOpens.clear()
             captureTaps.clear()
             keepSearchingPreference.clear()
             publishStatus()
+            // The new pipeline starts blind: re-read the shade so it knows which ride posts are still there (a +60 s
+            // check would otherwise always assume the ride is live until the listener reconnects).
+            watchStatus.requestReread()
         }
     }
 
@@ -432,9 +463,14 @@ class GuardianRuntime(
     }
 
     private fun applyUserAction(action: UserAction) {
+        // I6: a capture is accepted only within 2 s of the tap that asked for it, so remember that tap for the
+        // capture area (Check screen on a leg, on a MAYBE prompt, and Show me).
         when (action) {
             is UserAction.CheckScreen -> captureTaps[action.legId] = action.tapId
             is UserAction.ShowMe -> captureTaps[action.legId] = action.tapId
+            is UserAction.AnswerPrompt -> if (action.answer == Answer.CHECK_SCREEN) {
+                guardian.state.prompts.firstOrNull { it.promptId == action.promptId }?.let { captureTaps[it.legId] = action.tapId }
+            }
             // The user kept the ONDC ride after seeing the fee: the soft cancel lapses on the network side too.
             is UserAction.OndcKeepRide -> bindings.ondc?.let { sink -> onMain { sink.keepRide(action.legId) } }
             else -> Unit
@@ -443,22 +479,19 @@ class GuardianRuntime(
         guardian.onUserAction(action)
     }
 
-    private fun toggleKeepSearching() {
-        val value = !keepSearchingPreference.enabled
+    /**
+     * "Keep searching" (off by default). The tap flips what the user sees: the open session's setting, or the saved
+     * preference when there is none. It applies to the open session only while nothing is booked there yet (no
+     * driver sheet can depend on it); otherwise it is saved for the next comparison.
+     */
+    private fun toggleKeepSearching() = enqueue {
+        val g = guardian
+        val session = g.state.session?.takeIf { !it.closed }
+        val value = !(session?.keepSearching ?: keepSearchingPreference.enabled)
         keepSearchingPreference.enabled = value
-        enqueue {
-            val g = guardian
-            val session = g.state.session ?: return@enqueue
-            // Applies to the running session only while nothing is booked yet; otherwise to the next one.
-            if (session.closed || session.keepSearching == value || g.state.legs.values.any { it.leg.isBooked }) return@enqueue
-            val legs = g.state.legs.values.map { it.provider to it.leg.state }
-            g.startSession(session.sessionId, legs.map { it.first }, value, session.demo)
-            legs.forEach { (provider, state) ->
-                val legId = legOf(provider) ?: return@forEach
-                if (state != RideState.SELECTED) g.markOpened(legId)
-                if (state == RideState.QUOTED) g.markQuoted(legId)
-            }
-        }
+        if (session == null || g.state.legs.values.any { it.leg.isBooked }) return@enqueue
+        // Same session, same legs (ids, states and the user's earlier taps stay as they are).
+        g.state.session = session.copy(keepSearching = value)
     }
 
     private suspend fun restore() {
@@ -506,6 +539,8 @@ class GuardianRuntime(
         restoredSignal.complete(Unit)
         dirty = true
         drain()
+        // Calls made while restoring, in the order they were made.
+        runCalls()
         // I9: re-read the shade so posts that arrived while the process was dead are processed.
         if (restored != null) watchStatus.requestReread()
     }
@@ -533,19 +568,37 @@ class GuardianRuntime(
         p.demoSessionActive = g.state.session?.let { it.demo && !it.closed } == true
     }
 
+    /**
+     * Applies [block] on the guardian thread, after the restore and in call order. The block joins [calls] as soon as
+     * its coroutine runs (launches on the single guardian thread run in launch order), so a call made before the
+     * restore finished can never be overtaken by one made after it.
+     */
     private fun enqueue(block: () -> Unit) {
         start()
         scope.launch {
-            restoredSignal.await()
-            try {
-                block()
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                report(e)
+            calls.addLast(block)
+            runCalls()
+        }
+    }
+
+    private fun runCalls() {
+        if (runningCalls || !restoredSignal.isCompleted) return
+        runningCalls = true
+        try {
+            while (true) {
+                val block = calls.removeFirstOrNull() ?: break
+                try {
+                    block()
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    report(e)
+                }
+                dirty = true
+                drain()
             }
-            dirty = true
-            drain()
+        } finally {
+            runningCalls = false
         }
     }
 
@@ -629,6 +682,7 @@ class GuardianRuntime(
         captureTapsByProvider = captureTaps.mapNotNull { (legId, tap) -> g.state.legs[legId]?.let { it.provider to tap } }.toMap()
         publishStatus()
         maybeStartService()
+        appOpener.withdrawSettled(::stillGuided)
         requestPersist()
     }
 
@@ -650,7 +704,10 @@ class GuardianRuntime(
 
     private fun maybeStartService() {
         val status = _status.value
-        if (!status.shouldRunService || status.sessionId == null || !status.sessionOpen && !status.needsForegroundService) return
+        if (!status.shouldRunService || status.sessionId == null || !status.sessionOpen && !status.needsForegroundService) {
+            withdrawResume()
+            return
+        }
         if (sessionActivity.active.value) return
         val now = clock.elapsedRealtimeMs()
         val last = lastServiceStartAttempt
@@ -663,8 +720,21 @@ class GuardianRuntime(
             false
         }
         // Android refused a start from the background: the user's tap brings the guardian back.
-        if (!ok) notifier.post(presenter().resume())
+        if (!ok) {
+            notifier.post(presenter().resume())
+            resumePosted = true
+        }
     }
+
+    private fun withdrawResume(force: Boolean = false) {
+        if (!resumePosted && !force) return
+        resumePosted = false
+        notifier.cancel(GuardianPresenter.RESUME_ID)
+    }
+
+    /** An "Open <App> to cancel" card is wanted only while that leg is the one being cancelled. */
+    private fun stillGuided(legId: String): Boolean =
+        guardian.state.legs[legId]?.let { it.leg.state == RideState.CANCEL_GUIDED && !it.dismissed } == true
 
     private fun requestPersist() {
         val g = guardian
@@ -789,10 +859,19 @@ class GuardianRuntime(
     private fun keptLegPaid(state: GuardianState): Boolean =
         state.session?.keptLegId?.let { state.legs[it]?.leg?.state == RideState.PAY_HANDOFF } == true
 
-    private fun legOf(provider: Provider): String? = guardian.state.legs.values.firstOrNull { it.provider == provider }?.legId
+    /**
+     * The open session's leg for [provider]. Bubble commands never touch a closed session: RideWatch no longer watches
+     * its legs, so a "Booked here" there would be a booking nobody guards.
+     */
+    private fun legOf(provider: Provider): String? {
+        if (guardian.state.session?.closed != false) return null
+        return guardian.state.legs.values.firstOrNull { it.provider == provider }?.legId
+    }
 
-    private fun firstUnbookedLeg(): String? =
-        guardian.state.legs.values.firstOrNull { !it.leg.isBooked && !it.leg.state.isTerminal && !it.leg.isNetwork }?.legId
+    private fun firstUnbookedLeg(): String? {
+        if (guardian.state.session?.closed != false) return null
+        return guardian.state.legs.values.firstOrNull { !it.leg.isBooked && !it.leg.state.isTerminal && !it.leg.isNetwork }?.legId
+    }
 
     private fun onMain(block: () -> Unit) = mainExecutor.execute {
         try {

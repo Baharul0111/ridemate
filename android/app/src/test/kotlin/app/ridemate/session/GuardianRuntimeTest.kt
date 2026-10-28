@@ -177,6 +177,22 @@ class GuardianRuntimeTest {
     }
 
     @Test
+    fun `a late bubble tap on a closed session books nothing that RideWatch would no longer watch`() = runBlocking {
+        val r = rig()
+        r.startSession(Provider.UBER, Provider.RAPIDO)
+        r.runtime.appOpened(Provider.RAPIDO)
+        r.runtime.requestStop()
+        r.idle()
+        assertFalse(r.status.sessionOpen)
+
+        r.runtime.bookedHere(Provider.UBER)
+        r.runtime.perform(SessionOp(SessionOpKind.BOOKED_HERE))
+        r.idle()
+        assertEquals(0, r.status.bookedLegs)
+        assertFalse(r.status.shouldRunService)
+    }
+
+    @Test
     fun `a dismissed extra leg stops reminders and lets the service stop (logged dismissal)`() = runBlocking {
         val r = rig()
         r.firstDriverChain()
@@ -375,6 +391,210 @@ class GuardianRuntimeTest {
         assertFalse(r.status.sessionOpen)
         assertTrue(r.ui.items.isEmpty())
         assertTrue(r.notifications().isEmpty())
+    }
+
+    @Test
+    fun `calls made while the guardian is restoring are applied in the order they were made`() = runBlocking {
+        val stepped = SteppedExecutor()
+        val r = GuardianTestRig(executor = stepped).also { rigs += it }
+        r.runtime.start()
+        r.runtime.startSession(SessionSpec(GuardianTestRig.PICKUP, GuardianTestRig.DROP, listOf(Provider.UBER, Provider.RAPIDO), emptyList()))
+        // The restore starts and goes to storage; the session start waits for it.
+        stepped.runQueued()
+        // Storage answered: the restore's continuation is queued. A tap made now lands behind it.
+        stepped.awaitQueued()
+        r.runtime.bookedHere(Provider.UBER)
+        stepped.runFreely()
+        r.idle()
+
+        // The start (made first) was applied first, so "Booked here" found its leg.
+        assertEquals(RideState.BOOK_REQUESTED, r.ui.leg(r.legId(Provider.UBER))!!.state)
+        assertEquals(RideState.SELECTED, r.ui.leg(r.legId(Provider.RAPIDO))!!.state)
+    }
+
+    @Test
+    fun `a service that stops while the guardian still needs it is started again (M7)`() = runBlocking {
+        val r = rig()
+        r.firstDriverChain()
+        assertEquals(1, r.serviceStarts.get())
+
+        // The service ran, then went away (it stopped as a new step arrived, or Android stopped it).
+        r.sessionActivity.setActive(true)
+        r.idle()
+        r.sessionActivity.setActive(false)
+        r.idle()
+        assertEquals(2, r.serviceStarts.get())
+
+        // Once nothing needs it, its going away is final.
+        r.sessionActivity.setActive(true)
+        r.post(Provider.UBER, "u2", UBER_CANCELLED.first, UBER_CANCELLED.second, ongoing = false)
+        r.runtime.requestStop()
+        r.idle()
+        assertFalse(r.status.shouldRunService)
+        r.sessionActivity.setActive(false)
+        r.idle()
+        assertEquals(2, r.serviceStarts.get())
+    }
+
+    @Test
+    fun `Check screen on a MAYBE prompt gives the capture its tap, so the verified reading is accepted (I6)`() = runBlocking {
+        val r = rig()
+        val requests = java.util.concurrent.CopyOnWriteArrayList<Pair<app.ridemate.core.guardian.CaptureReason, app.ridemate.core.state.TapId?>>()
+        r.bindings.capture = CaptureRequester { _, _, reason, tap -> requests += reason to tap }
+        r.startSession(Provider.UBER, Provider.RAPIDO)
+        r.book(Provider.UBER, Provider.RAPIDO)
+        r.post(Provider.RAPIDO, "r1", RAPIDO_SEARCHING.first, RAPIDO_SEARCHING.second)
+        r.post(Provider.RAPIDO, "r1", "Rapido", "Ravi will reach you soon")
+        val prompt = r.ui.items.filterIsInstance<PromptItem>().single()
+
+        r.runtime.perform(GuardianTap(TapScope.PROMPT, prompt.id, UiAction.CHECK_SCREEN))
+        r.idle()
+        val (reason, tap) = requests.single()
+        assertEquals(app.ridemate.core.guardian.CaptureReason.CHECK_SCREEN, reason)
+        assertNotNull(tap)
+        assertEquals(tap, r.runtime.captureTap(Provider.RAPIDO))
+
+        // The capture area reads the driver through the gate within 2 s of that tap.
+        r.runtime.verifiedDriverReading(Provider.RAPIDO, 6, 1_500, tap!!, r.clock.elapsed + 400)
+        r.idle()
+        val rapido = r.ui.leg(r.legId(Provider.RAPIDO))!!
+        assertEquals(RideState.ASSIGNED, rapido.state)
+        assertEquals(6, rapido.driver!!.etaMin)
+        assertEquals(app.ridemate.core.model.EtaSource.VERIFIED, rapido.driver!!.etaSource)
+    }
+
+    @Test
+    fun `a capture RideMate asks for by itself waits for the user's tap, then proves the cancel (rung 3)`() = runBlocking {
+        val r = rig()
+        val requests = java.util.concurrent.CopyOnWriteArrayList<app.ridemate.core.state.TapId?>()
+        r.bindings.capture = CaptureRequester { _, _, _, tap -> requests += tap }
+        r.firstDriverChain()
+        val uber = r.legId(Provider.UBER)
+
+        // Uber's searching notification goes away by the app's own cancel: half of rung 3, RideMate asks to look.
+        r.remove(Provider.UBER, "u1")
+        val capture = r.ui.items.filterIsInstance<app.ridemate.notify.CaptureItem>().single()
+        assertEquals(app.ridemate.core.guardian.CaptureReason.CANCEL_PROOF, capture.reason)
+        assertNull(requests.single())
+        assertEquals(listOf("Check screen"), r.actionTitles(capture.id))
+
+        // A frame without a fresh user tap is never evidence.
+        r.runtime.captureVerdict(Provider.UBER, true, app.ridemate.core.state.TapId("no-tap"), r.clock.elapsed)
+        r.idle()
+        assertEquals(RideState.CANCEL_GUIDED, r.ui.leg(uber)!!.state)
+
+        // The card's button is the tap the capture follows.
+        val button = r.presenter().present(capture).actions.single().target
+        r.runtime.perform(button)
+        r.idle()
+        val tap = requests.last()
+        assertNotNull(tap)
+        r.runtime.captureVerdict(Provider.UBER, true, tap!!, r.clock.elapsed + 300)
+        r.idle()
+        assertEquals(RideState.CANCEL_CONFIRMED, r.ui.leg(uber)!!.state)
+        assertEquals(EvidenceRung.REMOVAL_PLUS_CAPTURE, r.ui.leg(uber)!!.evidence)
+        assertTrue(r.db.evidenceDao().forLeg(uber).any { it.source == EvidenceSource.REMOVAL_CAPTURE })
+    }
+
+    @Test
+    fun `keep searching flips what the session shows and keeps its legs`() = runBlocking {
+        val r = rig()
+        r.startSession(Provider.UBER, Provider.RAPIDO, keepSearching = true)
+        val uber = r.legId(Provider.UBER)
+        assertTrue(r.ui.keepSearching)
+        assertFalse(r.keepSearching.enabled)
+
+        r.runtime.perform(SessionOp(SessionOpKind.TOGGLE_KEEP_SEARCHING))
+        r.idle()
+        assertFalse(r.ui.keepSearching)
+        assertFalse(r.keepSearching.enabled)
+        assertEquals(uber, r.legId(Provider.UBER))
+
+        // Once something is booked the session keeps its setting; the preference is for the next comparison.
+        r.book(Provider.UBER)
+        r.runtime.perform(SessionOp(SessionOpKind.TOGGLE_KEEP_SEARCHING))
+        r.idle()
+        assertFalse(r.ui.keepSearching)
+        assertTrue(r.keepSearching.enabled)
+    }
+
+    @Test
+    fun `after an erase the guardian still knows which ride posts are in the shade`() = runBlocking {
+        val r = rig()
+        // A connected listener; a re-read finds the shade empty.
+        r.watchStatus.onConnected { r.runtime.onListenerConnected(emptyList()) }
+        r.connectListener()
+        r.runtime.wipe()
+        r.idle()
+
+        // A new session, without the listener reconnecting.
+        r.startSession(Provider.UBER, Provider.RAPIDO)
+        r.book(Provider.UBER, Provider.RAPIDO)
+        r.post(Provider.UBER, "u1", UBER_SEARCHING.first, UBER_SEARCHING.second)
+        r.post(Provider.RAPIDO, "r1", RAPIDO_SEARCHING.first, RAPIDO_SEARCHING.second)
+        r.post(Provider.RAPIDO, "r1", RAPIDO_ASSIGNED.first, RAPIDO_ASSIGNED.second)
+        val sheet = r.ui.items.filterIsInstance<DriverSheetItem>().single()
+        r.runtime.perform(GuardianTap(TapScope.SHEET, sheet.id, UiAction.YES_CANCEL_OTHERS))
+        r.idle()
+        val uber = r.legId(Provider.UBER)
+        r.runtime.perform(GuardianTap(TapScope.LEG, uber, UiAction.I_CANCELLED_IT))
+        r.idle()
+        r.remove(Provider.UBER, "u1", app.ridemate.core.watch.RemovalReason.REASON_CANCEL)
+
+        r.advance(60_000)
+        r.serviceTick()
+        // Uber's ride notification is gone, so the +60 s check passes quietly (no false "still active" alarm).
+        assertNull(r.notification("alert:$uber:${UiKey.ALERT_STILL_LIVE.name}"))
+        assertEquals(RideState.USER_SAYS_CANCELLED, r.ui.leg(uber)!!.state)
+    }
+
+    @Test
+    fun `Open the app to cancel is withdrawn once that cancel is settled`() = runBlocking {
+        val r = rig()
+        r.installApp(Provider.UBER)
+        r.firstDriverChain()
+        val uber = r.legId(Provider.UBER)
+        assertNotNull(r.notification("open:$uber"))
+
+        // Proven by Uber's own cancelled notification: the shade must not keep asking for it.
+        r.post(Provider.UBER, "u2", UBER_CANCELLED.first, UBER_CANCELLED.second, ongoing = false)
+        assertEquals(RideState.CANCEL_CONFIRMED, r.ui.leg(uber)!!.state)
+        assertNull(r.notification("open:$uber"))
+    }
+
+    @Test
+    fun `Open the app to cancel is withdrawn when the user says they cancelled it`() = runBlocking {
+        val r = rig()
+        r.installApp(Provider.UBER)
+        r.firstDriverChain()
+        val uber = r.legId(Provider.UBER)
+        assertNotNull(r.notification("open:$uber"))
+
+        r.runtime.perform(GuardianTap(TapScope.LEG, uber, UiAction.I_CANCELLED_IT))
+        r.idle()
+        assertNull(r.notification("open:$uber"))
+    }
+
+    @Test
+    fun `Tap to resume goes away once the service runs, or once nothing needs it`() = runBlocking {
+        val r = GuardianTestRig().also { rigs += it }
+        r.serviceStartResult = false
+        r.start()
+        r.startSession(Provider.UBER)
+        assertNotNull(r.notification(app.ridemate.notify.GuardianPresenter.RESUME_ID))
+
+        r.sessionActivity.setActive(true)
+        r.idle()
+        assertNull(r.notification(app.ridemate.notify.GuardianPresenter.RESUME_ID))
+
+        // Refused again after the service went away; then the user stops the session.
+        r.sessionActivity.setActive(false)
+        r.idle()
+        assertNotNull(r.notification(app.ridemate.notify.GuardianPresenter.RESUME_ID))
+        r.runtime.requestStop()
+        r.idle()
+        assertFalse(r.status.shouldRunService)
+        assertNull(r.notification(app.ridemate.notify.GuardianPresenter.RESUME_ID))
     }
 
     @Test

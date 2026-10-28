@@ -8,6 +8,7 @@ import app.ridemate.core.guardian.OpenPurpose
 import app.ridemate.core.model.Provider
 import app.ridemate.notify.GuardianNotifier
 import app.ridemate.notify.GuardianPresenter
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * The pieces other areas plug into the guardian at integration time (bubble, launcher, capture, ONDC, compare). Each
@@ -64,12 +65,15 @@ class GuardianAppOpener(
     private val presenter: () -> GuardianPresenter,
     private val appInForeground: () -> Boolean,
 ) {
+    /** "Open <App> to cancel" notifications posted and not yet withdrawn, by leg. */
+    private val cancelCards: MutableSet<String> = ConcurrentHashMap.newKeySet()
+
     fun open(legId: String, provider: Provider, purpose: OpenPurpose): OpenOutcome {
         val intent = bindings.opener.intentFor(provider, purpose)
         if (intent != null && (appInForeground() || bindings.bubble.isVisible)) {
             try {
                 context.startActivity(Intent(intent).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-                notifier.cancel(openCardId(legId))
+                withdraw(legId)
                 return OpenOutcome.OPENED
             } catch (_: ActivityNotFoundException) {
                 // Uninstalled since the session started: fall through to the notification, which says so.
@@ -78,7 +82,22 @@ class GuardianAppOpener(
             }
         }
         notifier.post(presenter().openApp(legId, provider, purpose, hasApp = intent != null))
+        if (purpose == OpenPurpose.CANCEL) cancelCards += legId
         return OpenOutcome.NOTIFIED
+    }
+
+    /**
+     * Withdraws "Open <App> to cancel" for every leg that no longer needs cancelling there ([stillGuided] is false: the
+     * cancel was proven, the app ended the ride, the user said "I cancelled it" or dismissed the leg), so the shade
+     * never asks for a cancel that is already done. "Open <App> to pay" stays until the user taps it.
+     */
+    fun withdrawSettled(stillGuided: (legId: String) -> Boolean) {
+        cancelCards.filterNot(stillGuided).forEach(::withdraw)
+    }
+
+    private fun withdraw(legId: String) {
+        cancelCards -= legId
+        notifier.cancel(openCardId(legId))
     }
 
     private fun openCardId(legId: String) = "open:$legId"

@@ -21,7 +21,9 @@ import app.ridemate.dev.RecordedPost
 class RideWatchService : NotificationListenerService() {
 
     private val graph by lazy { RideMateApp.graph(this) }
-    private val reader by lazy { SbnPostReader(PackageVersionCodes(packageManager, graph.clock)) }
+    private val reader by lazy {
+        SbnPostReader(PackageVersionCodes(packageManager, graph.clock), RedactionDetector(RedactionDetector.systemPlaceholders()))
+    }
     private val adapter by lazy { RideWatchAdapter(packageName, graph.guardianRuntime, graph.rideWatchStatus) }
 
     override fun onListenerConnected() {
@@ -69,15 +71,18 @@ class RideWatchService : NotificationListenerService() {
         }
     }
 
-    /** The current shade. Only the package name of each entry is read before the allowlist check. */
-    private fun activePosts(): List<ListenerPost> = try {
+    /**
+     * The current shade, or null when it cannot be read (the listener is being unbound). Only the package name of each
+     * entry is read before the allowlist check.
+     */
+    private fun activePosts(): List<ListenerPost>? = try {
         activeNotifications.orEmpty().filterNotNull().map { SbnListenerPost(it, reader) }
     } catch (e: SecurityException) {
         graph.crashReporter.recordNonFatal(e, CrashSite.WATCH)
-        emptyList()
+        null
     } catch (e: RuntimeException) {
         graph.crashReporter.recordNonFatal(e, CrashSite.WATCH)
-        emptyList()
+        null
     }
 }
 

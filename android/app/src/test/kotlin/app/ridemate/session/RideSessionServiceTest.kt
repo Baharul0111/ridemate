@@ -183,6 +183,32 @@ class RideSessionServiceTest {
     }
 
     @Test
+    fun `a service started after the session ended still enters the foreground before it stops`() {
+        runtime.start()
+        idle()
+        // Started with startForegroundService() while a session was open; the session closed before it came up.
+        val controller = Robolectric.buildService(RideSessionService::class.java).create().also { services += it }
+        shadowOf(Looper.getMainLooper()).idle()
+        val service = controller.get()
+        // Stopping before startForeground() makes Android crash the app, so onCreate never stops it.
+        assertFalse(shadowOf(service).isStoppedBySelf)
+
+        controller.startCommand(0, 1)
+        assertEquals(RideSessionService.ONGOING_NOTIFICATION_ID, shadowOf(service).lastForegroundNotificationId)
+        assertTrue(shadowOf(service).isForegroundStopped)
+        assertTrue(shadowOf(service).isStoppedBySelf)
+        // A new session while it stops: the stopping instance does not put its notification back by itself…
+        runtime.startSession(spec(Provider.OLA))
+        idle()
+        assertEquals(null, shadowOf(notificationManager).getNotification(RideSessionService.ONGOING_NOTIFICATION_ID))
+        // …and the start that session asks for keeps the service in the foreground.
+        controller.startCommand(0, 2)
+        idle()
+        assertFalse(shadowOf(service).isForegroundStopped)
+        assertNotNull(shadowOf(notificationManager).getNotification(RideSessionService.ONGOING_NOTIFICATION_ID))
+    }
+
+    @Test
     fun `fare capture adds the mediaProjection type only while it runs`() {
         runtime.start()
         runtime.startSession(spec(Provider.OLA))
