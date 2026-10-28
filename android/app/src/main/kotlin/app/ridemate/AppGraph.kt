@@ -26,12 +26,16 @@ import app.ridemate.privacy.EraseUseCase
 import app.ridemate.privacy.LocalDataWiper
 import app.ridemate.privacy.MyDataProvider
 import app.ridemate.privacy.SignInKind
+import app.ridemate.session.GuardianModule
+import app.ridemate.session.GuardianRuntime
+import app.ridemate.session.SessionBindings
 import app.ridemate.update.UpdateChecker
 import app.ridemate.util.BuildInfo
 import app.ridemate.util.Clock
 import app.ridemate.util.DefaultDispatcherProvider
 import app.ridemate.util.DispatcherProvider
 import app.ridemate.util.SessionActivity
+import app.ridemate.watch.RideWatchStatus
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
@@ -145,6 +149,15 @@ class AppGraph(
         )
     }
 
+    // ---- ride guardian: RideWatch, session service, notifications (packages watch / session / notify) ----
+    /** Where the bubble, launcher, capture, ONDC and compare areas plug into the guardian. */
+    val guardianBindings: SessionBindings by lazy { SessionBindings(app) }
+    val rideWatchStatus: RideWatchStatus by lazy { RideWatchStatus(app, clock) }
+    val guardian: GuardianModule by lazy { GuardianModule(this) }
+
+    /** The active session's guardian ([GuardianSessionApi] for demo/ONDC/UI, [SessionCommands] for the bubble). */
+    val guardianRuntime: GuardianRuntime get() = guardian.runtime
+
     @Volatile
     private var started = false
 
@@ -170,6 +183,7 @@ class AppGraph(
         })
 
         eraseUseCase // registers the ERASE_SERVER outbox handler
+        guardian.start() // registers the guardian's outbox handlers and restores an active ride session
 
         appScope.launch {
             authGateway.state.collect { state ->

@@ -1,0 +1,260 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Ride guardian (packages app.ridemate.watch / session / notify). I5: every word the guardian shows comes from here;
+  placeholders take only app names, numbers from admissible sources, amounts and IST times.
+  Rapido calls its drivers "captains", so a few strings have a _captain variant.
+-->
+<resources>
+    <!-- Apps. Demo providers are fictional and always labelled DEMO. -->
+    <string name="guardian_provider_uber">Uber</string>
+    <string name="guardian_provider_ola">Ola</string>
+    <string name="guardian_provider_rapido">Rapido</string>
+    <string name="guardian_provider_ondc">Open network (ONDC)</string>
+    <string name="guardian_provider_demo_kestrel">Kestrel Go (DEMO)</string>
+    <string name="guardian_provider_demo_pepper">Pepper Rides (DEMO)</string>
+    <string name="guardian_provider_demo_tamarind">Tamarind Cabs (DEMO)</string>
+    <string name="guardian_list_separator">", "</string>
+    <string name="guardian_list_last">%1$s and %2$s</string>
+    <string name="guardian_line">%1$s: %2$s</string>
+
+    <!-- Driver values: shown only when verified, read from the app's own notification, network data or typed by you. -->
+    <string name="guardian_eta_min">%1$d min away</string>
+    <string name="guardian_distance">%1$s away</string>
+    <string name="guardian_see_in_app">ETA and distance: see in %1$s</string>
+    <string name="guardian_eta_see_in_app">ETA: see in %1$s</string>
+    <string name="guardian_distance_see_in_app">distance: see in %1$s</string>
+    <string name="guardian_source_template">from %1$s notification</string>
+    <string name="guardian_source_verified">checked on screen</string>
+    <string name="guardian_source_network">from the open network</string>
+    <string name="guardian_source_user">entered by you</string>
+
+    <!-- Cancellation fees. -->
+    <string name="guardian_fee_free_searching">Usually free to cancel: no driver yet</string>
+    <string name="guardian_fee_free_window_s">Free to cancel for about %1$d more seconds</string>
+    <string name="guardian_fee_free_window_min">Free to cancel for about %1$d more minutes</string>
+    <string name="guardian_fee_free_driver_late">Free to cancel: the driver is running late</string>
+    <string name="guardian_fee_may_apply">A cancellation fee may apply, up to %1$s</string>
+    <string name="guardian_fee_may_apply_unknown">A cancellation fee may apply</string>
+    <string name="guardian_fee_shown_before_confirm">The open network shows any fee before you confirm</string>
+    <string name="guardian_fee_network">Cancellation fee: %1$s (from the open network)</string>
+
+    <!-- Booking states. -->
+    <string name="guardian_state_not_booked">Not booked yet</string>
+    <string name="guardian_state_book_requested">Booked here, waiting for %1$s</string>
+    <string name="guardian_state_searching">Searching for a driver</string>
+    <string name="guardian_state_searching_captain">Searching for a captain</string>
+    <string name="guardian_state_network_preparing">Preparing the booking on the open network</string>
+    <string name="guardian_state_question">Waiting for your answer</string>
+    <string name="guardian_state_assigned">Driver on the way</string>
+    <string name="guardian_state_assigned_captain">Captain on the way</string>
+    <string name="guardian_state_arriving">Driver arriving</string>
+    <string name="guardian_state_arriving_captain">Captain arriving</string>
+    <string name="guardian_state_driver_cancelled">Driver cancelled: %1$s is finding another</string>
+    <string name="guardian_state_driver_cancelled_captain">Captain cancelled: %1$s is finding another</string>
+    <string name="guardian_state_on_trip">On the trip</string>
+    <string name="guardian_state_ended">Ride ended: pay in %1$s</string>
+    <string name="guardian_state_pay_handoff">Opened %1$s to pay</string>
+    <string name="guardian_state_search_expired">Ended by %1$s. No cancel needed</string>
+    <string name="guardian_state_provider_cancelled">Cancelled by %1$s. No cancel needed</string>
+    <string name="guardian_state_cancel_requested">To cancel: waiting for its turn</string>
+    <string name="guardian_state_cancel_guided">Cancel it in %1$s now</string>
+    <string name="guardian_state_user_says_cancelled">You said you cancelled it. Checking again in a minute</string>
+    <string name="guardian_state_cancel_unconfirmed">Cancel not proven yet: check %1$s</string>
+    <string name="guardian_state_cancel_confirmed">Cancelled and proven</string>
+    <string name="guardian_state_network_confirmed">Booked on the open network</string>
+    <string name="guardian_state_soft_cancel">Fee shown: cancel or keep the ride</string>
+    <string name="guardian_state_confirm_cancel">Cancelling on the open network</string>
+
+    <!-- Roles and proof. -->
+    <string name="guardian_role_kept">Your ride</string>
+    <string name="guardian_role_extra">Extra booking: cancel it</string>
+    <string name="guardian_role_candidate">Still searching (Keep searching is on)</string>
+    <string name="guardian_role_dismissed">You stopped the reminders for this booking</string>
+    <string name="guardian_evidence_ondc">Proof: the open network confirmed the cancel</string>
+    <string name="guardian_evidence_template">Proof: %1$s\'s own cancelled notification</string>
+    <string name="guardian_evidence_removal_capture">Proof: %1$s\'s ride notification went away and its screen showed cancelled</string>
+    <string name="guardian_evidence_user">Not proven yet: you said you cancelled it</string>
+
+    <!-- Sheets. -->
+    <string name="guardian_sheet_cancel_others">Cancel the others?</string>
+    <string name="guardian_sheet_cancel_others_intro">%1$s found a driver.</string>
+    <string name="guardian_sheet_cancel_others_intro_captain">%1$s found a captain.</string>
+    <string name="guardian_sheet_others_header">Your other bookings:</string>
+    <string name="guardian_sheet_two_drivers">Two drivers found. Pick one</string>
+    <string name="guardian_sheet_two_drivers_intro">RideMate never picks for you. Keep one, and it will help you cancel the other.</string>
+    <string name="guardian_sheet_same_driver">Same driver on both. Keep one.</string>
+    <string name="guardian_sheet_same_driver_intro">The same driver accepted on %1$s.</string>
+    <string name="guardian_sheet_better_ride">A closer driver is available</string>
+    <string name="guardian_sheet_second_driver">Another driver accepted</string>
+    <string name="guardian_sheet_better_ride_intro">Nothing changes unless you tap Yes.</string>
+    <string name="guardian_sheet_current">Now: %1$s</string>
+    <string name="guardian_sheet_candidate">New: %1$s</string>
+    <string name="guardian_sheet_fee_if_switch">If you switch, cancelling %1$s: %2$s</string>
+    <string name="guardian_sheet_fee_if_keep">If you keep yours, cancelling %1$s: %2$s</string>
+    <string name="guardian_sheet_withdrawn_driver_cancelled">%1$s\'s driver cancelled. Keep the other searches?</string>
+    <string name="guardian_sheet_withdrawn_driver_cancelled_captain">%1$s\'s captain cancelled. Keep the other searches?</string>
+    <string name="guardian_sheet_withdrawn_searching_again">%1$s is searching again, so that question was closed.</string>
+    <string name="guardian_sheet_withdrawn_update_pending">%1$s sent an update RideMate couldn\'t read. Answer that question first.</string>
+    <string name="guardian_sheet_withdrawn_provider_cancelled">%1$s cancelled the ride, so that question was closed.</string>
+    <string name="guardian_sheet_withdrawn_search_expired">%1$s ended its search, so that question was closed.</string>
+    <string name="guardian_sheet_withdrawn_trip_underway">Your trip is underway, so that question was closed.</string>
+    <string name="guardian_sheet_withdrawn_new_driver">%1$s assigned a new driver. Check the new details.</string>
+    <string name="guardian_sheet_withdrawn_current_driver_close">Your driver is almost there, so RideMate stopped looking for a better ride.</string>
+    <string name="guardian_sheet_replaced">Updated with newer details.</string>
+    <string name="guardian_sheet_closed">That question was closed.</string>
+
+    <!-- Questions when an update could not be read (§4.5.6). -->
+    <string name="guardian_prompt_maybe_assigned">%1$s has an update. Got a driver?</string>
+    <string name="guardian_prompt_maybe_changed">%1$s has an update. Is your driver still coming?</string>
+    <string name="guardian_prompt_maybe_changed_captain">%1$s has an update. Is your captain still coming?</string>
+    <string name="guardian_prompt_maybe_new_driver">%1$s has an update. Is a new driver coming?</string>
+    <string name="guardian_prompt_maybe_new_driver_captain">%1$s has an update. Is a new captain coming?</string>
+    <string name="guardian_prompt_repeat_hint">Asking again: RideMate still needs your answer.</string>
+    <string name="guardian_prompt_check_screen">RideMate couldn\'t read %1$s\'s latest update</string>
+    <string name="guardian_prompt_check_screen_body">Check the screen to confirm the booking is cancelled.</string>
+    <string name="guardian_prompt_withdrawn_searching_again">%1$s is searching again, so the question was closed.</string>
+    <string name="guardian_prompt_withdrawn_driver_assigned">%1$s confirmed a driver, so the question was closed.</string>
+    <string name="guardian_prompt_withdrawn_driver_arriving">%1$s says the driver is arriving, so the question was closed.</string>
+    <string name="guardian_prompt_withdrawn_driver_cancelled">%1$s says the driver cancelled, so the question was closed.</string>
+    <string name="guardian_prompt_withdrawn_search_expired">%1$s ended the search, so the question was closed.</string>
+    <string name="guardian_prompt_withdrawn_provider_cancelled">%1$s cancelled the booking, so the question was closed.</string>
+    <string name="guardian_prompt_withdrawn_ride_ended">%1$s says the ride ended, so the question was closed.</string>
+    <string name="guardian_prompt_withdrawn_trip_started">%1$s says the trip started, so the question was closed.</string>
+    <string name="guardian_prompt_withdrawn_same_driver">%1$s confirmed the same driver is still coming.</string>
+    <string name="guardian_prompt_withdrawn_cancelling">You\'re cancelling %1$s, so the question was closed.</string>
+    <string name="guardian_prompt_answered">Thanks, noted.</string>
+
+    <!-- Opening apps. RideMate only opens them; you tap everything inside. -->
+    <string name="guardian_open_cancel">Open %1$s to cancel</string>
+    <string name="guardian_open_cancel_body">Tap to open %1$s, then tap Cancel there yourself.</string>
+    <string name="guardian_open_pay">Open %1$s to pay</string>
+    <string name="guardian_open_pay_body">Your ride ended. Pay in %1$s. RideMate never handles money.</string>
+    <string name="guardian_open_view">Open %1$s</string>
+    <string name="guardian_open_view_body">Tap to open %1$s.</string>
+    <string name="guardian_open_no_app">Open %1$s on your phone to continue.</string>
+
+    <!-- Guided cancel. -->
+    <string name="guardian_cancel_card_title">Cancel %1$s (%2$d of %3$d)</string>
+    <string name="guardian_cancel_card_short">Cancel %1$s</string>
+    <string name="guardian_cancel_card_no_steps">Open %1$s and tap Cancel on the ride screen.</string>
+    <string name="guardian_cancel_card_status">Status in %1$s: %2$s</string>
+
+    <!-- Screen checks (each one asks Android for permission again). -->
+    <string name="guardian_capture_check_screen">Check %1$s\'s screen</string>
+    <string name="guardian_capture_check_screen_body">RideMate will look at %1$s\'s screen once. Android will ask again.</string>
+    <string name="guardian_capture_cancel_proof">Show %1$s\'s cancelled screen</string>
+    <string name="guardian_capture_cancel_proof_body">Open the cancelled screen in %1$s so RideMate can confirm it. Android will ask again.</string>
+    <string name="guardian_capture_show_me">Finding the Cancel button</string>
+    <string name="guardian_capture_show_me_body">RideMate will look at %1$s\'s screen once to point at Cancel. Android will ask again.</string>
+    <string name="guardian_capture_share_fallback">If that doesn\'t work, take a screenshot and share it to RideMate.</string>
+
+    <!-- Reminders and alerts. -->
+    <string name="guardian_reminder_title">Still booked: %1$s</string>
+    <string name="guardian_reminder_body">Cancel the extra booking so you don\'t pay a fee. Reminder %1$d.</string>
+    <string name="guardian_alert_kept_leg_lost">Your %1$s driver cancelled. Compare again?</string>
+    <string name="guardian_alert_kept_leg_lost_captain">Your %1$s captain cancelled. Compare again?</string>
+    <string name="guardian_alert_kept_leg_lost_body">Compare again for the same trip, or open %1$s to see what happened.</string>
+    <string name="guardian_alert_still_live">%1$s still looks active</string>
+    <string name="guardian_alert_still_live_body">Its ride notification is still there. Open %1$s and make sure the booking is cancelled.</string>
+    <string name="guardian_alert_check_screen">Check %1$s now</string>
+    <string name="guardian_alert_check_screen_body">%1$s sent an update RideMate couldn\'t read. Open it and check the booking is cancelled.</string>
+
+    <!-- Updates. -->
+    <string name="guardian_banner_your_ride">Your ride: %1$s</string>
+    <string name="guardian_banner_finding_another">%1$s is finding another driver</string>
+    <string name="guardian_banner_finding_another_captain">%1$s is finding another captain</string>
+    <string name="guardian_banner_ended_by_app">Ended by %1$s. No cancel needed</string>
+    <string name="guardian_banner_cancel_confirmed">%1$s booking cancelled</string>
+    <string name="guardian_banner_proof_hint">See Bookings for the proof RideMate saw.</string>
+    <string name="guardian_banner_user_says_cancelled">Noted. RideMate will check %1$s again in a minute.</string>
+    <string name="guardian_banner_same_driver">Same driver on both. Keep one.</string>
+    <string name="guardian_banner_leg_dismissed">RideMate stopped reminding you about %1$s.</string>
+    <string name="guardian_banner_all_cancels_done">All extra bookings are cancelled.</string>
+    <string name="guardian_pay_offer">Ride ended. Open %1$s to pay</string>
+    <string name="guardian_pay_offer_body">RideMate never handles money. Pay in %1$s.</string>
+    <string name="guardian_compare_again">Comparing again for the same trip</string>
+    <string name="guardian_answer_rejected">That question had already changed. Check the latest update.</string>
+
+    <!-- Open network (ONDC). -->
+    <string name="guardian_ondc_book">Booking on the open network…</string>
+    <string name="guardian_ondc_soft_cancel">Checking the cancellation fee on the open network…</string>
+    <string name="guardian_ondc_confirm_cancel">Cancelling on the open network…</string>
+    <string name="guardian_ondc_fee_title">Cancel the open network ride?</string>
+    <string name="guardian_ondc_fee">Cancellation fee: %1$s. Cancel anyway?</string>
+    <string name="guardian_ondc_fee_free">No cancellation fee.</string>
+
+    <!-- Buttons. -->
+    <string name="guardian_action_yes_cancel_others">Yes, cancel the others</string>
+    <string name="guardian_action_keep_searching">Keep searching</string>
+    <string name="guardian_action_not_now">Not now</string>
+    <string name="guardian_action_pick">Pick %1$s</string>
+    <string name="guardian_action_switch">Yes, switch</string>
+    <string name="guardian_action_keep_current">No, keep current</string>
+    <string name="guardian_action_yes">Yes</string>
+    <string name="guardian_action_not_yet">Not yet</string>
+    <string name="guardian_action_driver_cancelled">Driver cancelled</string>
+    <string name="guardian_action_no_it_ended">No, it ended</string>
+    <string name="guardian_action_check_screen">Check screen</string>
+    <string name="guardian_action_i_cancelled_it">I cancelled it</string>
+    <string name="guardian_action_show_me">Show me</string>
+    <string name="guardian_action_open_app">Open %1$s</string>
+    <string name="guardian_action_dismiss">Dismiss</string>
+    <string name="guardian_action_dismiss_desc">Stop reminding about %1$s</string>
+    <string name="guardian_action_desc_with_app">%1$s, %2$s</string>
+    <string name="guardian_action_compare_again">Compare again (same trip)</string>
+    <string name="guardian_action_pay">Open %1$s to pay</string>
+    <string name="guardian_action_ondc_confirm_cancel">Cancel ride</string>
+    <string name="guardian_action_ondc_keep_ride">Keep ride</string>
+    <string name="guardian_action_read_fares">Read fares</string>
+    <string name="guardian_action_booked_here">Booked here</string>
+    <string name="guardian_action_done">Done</string>
+    <string name="guardian_action_stop">Stop</string>
+    <string name="guardian_action_keep_searching_on">Keep searching: on</string>
+    <string name="guardian_action_keep_searching_off">Keep searching: off</string>
+    <string name="guardian_keep_searching_warning">Keeps your other bookings searching after a driver accepts. Drivers may lose time, and a cancellation fee may apply. Off by default.</string>
+
+    <!-- Ongoing notification and service. -->
+    <string name="guardian_ongoing_title">RideMate is guarding your bookings</string>
+    <string name="guardian_ongoing_demo_title">RideMate demo (fictional providers)</string>
+    <string name="guardian_ongoing_booking_phase">Book in the apps yourself, then tap Booked here.</string>
+    <string name="guardian_ongoing_summary">%1$d booked · %2$d to cancel</string>
+    <string name="guardian_ongoing_cancel_now">Cancel %1$s now</string>
+    <string name="guardian_ongoing_your_ride">Your ride: %1$s</string>
+    <string name="guardian_fgs_start">RideMate is guarding your bookings</string>
+    <string name="guardian_fgs_stop">RideMate stopped guarding your bookings</string>
+    <string name="guardian_stop_blocked">RideMate can\'t stop yet: %1$s is still booked. Cancel it there, or tap Dismiss to stop the reminders.</string>
+    <string name="guardian_resume_title">Tap to resume RideMate\'s ride guardian</string>
+    <string name="guardian_resume_body">RideMate needs to run to keep reminding you about extra bookings.</string>
+    <string name="guardian_start_blocked">Finish cancelling your previous bookings before starting a new comparison.</string>
+
+    <!-- Onboarding self-test. -->
+    <string name="guardian_selftest_title">RideMate self-test</string>
+    <string name="guardian_selftest_body">Checking that RideMate can see ride notifications. This goes away by itself.</string>
+
+    <!-- Notification channels. -->
+    <string name="guardian_channel_guardian">Ride guardian status</string>
+    <string name="guardian_channel_guardian_desc">The ongoing notification while RideMate watches your bookings, and quiet updates.</string>
+    <string name="guardian_channel_prompts">Questions about your bookings</string>
+    <string name="guardian_channel_prompts_desc">Cancel the others, pick a driver, and other questions RideMate needs you to answer.</string>
+    <string name="guardian_channel_alerts">Urgent ride alerts</string>
+    <string name="guardian_channel_alerts_desc">Loud alerts when your ride is lost or a booking still looks active.</string>
+    <string name="guardian_channel_reminders">Cancel reminders</string>
+    <string name="guardian_channel_reminders_desc">Reminders until every extra booking is proven cancelled.</string>
+    <string name="guardian_channel_owner">Owner alerts</string>
+    <string name="guardian_channel_owner_desc">Service alerts for the RideMate owner (developer mode only).</string>
+    <string name="guardian_channel_selftest">Self-test</string>
+    <string name="guardian_channel_selftest_desc">A short test post that checks RideMate can see notifications.</string>
+
+    <!-- Guardian screen. -->
+    <string name="guardian_screen_title">Ride guardian</string>
+    <string name="guardian_screen_empty">No ride session right now. Start a comparison and RideMate will watch the bookings you make.</string>
+    <string name="guardian_screen_demo_badge">DEMO: fictional providers</string>
+    <string name="guardian_screen_needs_you">Needs your answer</string>
+    <string name="guardian_screen_bookings">Bookings</string>
+    <string name="guardian_screen_updates">Updates</string>
+    <string name="guardian_screen_reminders">Reminders sent: %1$d. Next at %2$s (IST).</string>
+    <string name="guardian_screen_reminders_none">No reminders pending.</string>
+    <string name="guardian_screen_next_reminder">Next reminder at %1$s (IST)</string>
+    <string name="guardian_screen_generation">Driver changes: %1$d</string>
+    <string name="guardian_screen_dismiss_notice">Dismiss update</string>
+</resources>
