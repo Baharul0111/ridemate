@@ -373,7 +373,9 @@ object GuardianUiReducer {
             closed = session?.closed == true,
             legs = legs,
             items = items,
-            notices = state.notices.filter { nowWallMs - it.atWallMs < NOTICE_TTL_MS }.take(MAX_NOTICES),
+            notices = state.notices
+                .filter { nowWallMs - it.atWallMs < NOTICE_TTL_MS && (it.key != UiKey.BANNER_YOUR_RIDE || stillYourRide(it, byId)) }
+                .take(MAX_NOTICES),
             remindersSent = guardian.reminders?.sent ?: 0,
             nextReminderAtWallMs = nextReminderAtWallMs,
             stopBlocked = stopBlocked,
@@ -382,6 +384,16 @@ object GuardianUiReducer {
 
     fun dismissNotice(state: GuardianUiState, noticeId: String): GuardianUiState =
         state.copy(notices = state.notices.filterNot { it.id == noticeId })
+
+    /**
+     * I10: a "Your ride" announcement stays only while that leg's current generation is still ASSIGNED or ARRIVING
+     * (it goes as soon as the driver cancels, the app searches again or a new driver takes over).
+     */
+    private fun stillYourRide(notice: NoticeItem, legs: Map<String, LegRecord>): Boolean {
+        val leg = notice.legId?.let { legs[it] }?.leg ?: return false
+        val generation = notice.driver?.generation ?: return false
+        return leg.state in GuardianPresenter.RIDE_STATES && leg.generation == generation
+    }
 
     private val CARD_STATES = setOf(RideState.CANCEL_REQUESTED, RideState.CANCEL_GUIDED)
 

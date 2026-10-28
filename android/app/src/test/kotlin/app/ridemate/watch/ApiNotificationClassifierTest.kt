@@ -20,7 +20,7 @@ import org.junit.Test
 /** `/v1/parse-notification` with canned results; records what was sent. */
 private class ParseApi(private val base: ApiClient = FakeApiClient()) : ApiClient by base {
     val sent = mutableListOf<Pair<ParseNotificationRequest, String?>>()
-    var result: ApiResult<ParseNotificationResponse> = ApiResult.Ok(ParseNotificationResponse("assigned", "captain is on the way", "r1"))
+    var result: ApiResult<ParseNotificationResponse> = ApiResult.Ok(ParseNotificationResponse("assigned", "will reach soon", "r1"))
 
     override suspend fun parseNotification(request: ParseNotificationRequest, sessionId: String?): ApiResult<ParseNotificationResponse> {
         sent += request to sessionId
@@ -91,6 +91,27 @@ class ApiNotificationClassifierTest {
         assertTrue(runCatching { classifier.classify(request()) }.exceptionOrNull() is ClassifierCallFailed)
         api.result = ApiResult.Http(500)
         assertTrue(runCatching { classifier.classify(request()) }.exceptionOrNull() is ClassifierCallFailed)
+    }
+
+    @Test
+    fun `a label counts only with evidence found in the masked text that was sent`() = runBlocking {
+        // The evidence is in the text: the label stands (case and surrounding spaces do not matter).
+        api.result = ApiResult.Ok(ParseNotificationResponse("assigned", "  Will Reach Soon ", "r1"))
+        assertEquals(ClassifierResult.Labelled(ClassifierLabel.ASSIGNED), classifier.classify(request()))
+        // Evidence the post never contained (an injected or made-up span): only a MAYBE prompt.
+        api.result = ApiResult.Ok(ParseNotificationResponse("assigned", "captain is on the way", "r1"))
+        assertEquals(ClassifierResult.Labelled(ClassifierLabel.UNKNOWN), classifier.classify(request()))
+        // A masked span is never evidence: the phone number was replaced before upload.
+        api.result = ApiResult.Ok(ParseNotificationResponse("searching", "9876543210", "r1"))
+        assertEquals(ClassifierResult.Labelled(ClassifierLabel.UNKNOWN), classifier.classify(request()))
+        // No evidence at all.
+        api.result = ApiResult.Ok(ParseNotificationResponse("searching", null, "r1"))
+        assertEquals(ClassifierResult.Labelled(ClassifierLabel.UNKNOWN), classifier.classify(request()))
+        api.result = ApiResult.Ok(ParseNotificationResponse("searching", " ", "r1"))
+        assertEquals(ClassifierResult.Labelled(ClassifierLabel.UNKNOWN), classifier.classify(request()))
+        // Evidence from the title counts too.
+        api.result = ApiResult.Ok(ParseNotificationResponse("searching", "rapido", "r1"))
+        assertEquals(ClassifierResult.Labelled(ClassifierLabel.SEARCHING), classifier.classify(request()))
     }
 
     @Test

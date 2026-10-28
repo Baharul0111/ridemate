@@ -61,7 +61,9 @@ class ApiNotificationClassifier(
             legState = request.legState,
         )
         return when (val result = api.parseNotification(call, sessionId)) {
-            is ApiResult.Ok -> ClassifierResult.Labelled(ClassifierLabel.fromWire(result.body.label))
+            is ApiResult.Ok -> ClassifierResult.Labelled(
+                label(result.body.label, result.body.evidenceSpan, "${call.titleMasked.orEmpty()}\n${call.textMasked.orEmpty()}"),
+            )
             is ApiResult.AiPaused -> ClassifierResult.Unavailable(
                 when (result.code) {
                     "quota_exhausted" -> UnavailableReason.QUOTA
@@ -76,5 +78,16 @@ class ApiNotificationClassifier(
             ApiResult.Timeout -> throw ClassifierCallFailed("timeout")
             is ApiResult.Http -> throw ClassifierCallFailed("http ${result.code}")
         }
+    }
+
+    /**
+     * §4.10: `evidence_span` must be a substring of what was sent. The server already forces "unknown" otherwise; the
+     * phone checks again, so a label without its evidence can only ever raise a MAYBE prompt.
+     */
+    private fun label(wire: String, evidence: String?, sent: String): ClassifierLabel {
+        val label = ClassifierLabel.fromWire(wire)
+        if (label == ClassifierLabel.UNKNOWN) return label
+        val span = evidence?.trim()?.takeIf { it.isNotEmpty() } ?: return ClassifierLabel.UNKNOWN
+        return if (sent.contains(span, ignoreCase = true)) label else ClassifierLabel.UNKNOWN
     }
 }

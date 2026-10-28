@@ -158,6 +158,25 @@ class RideWatchAdapterTest {
     }
 
     @Test
+    fun `a shade that cannot be read is never reported as an empty one`() {
+        // The listener connected but reading the shade failed: the guardian is not told "nothing is there", so a
+        // +60 s check keeps treating the ride as possibly live.
+        var rereads = 0
+        adapter.onConnected(null) { rereads++ }
+        assertTrue(status.connected.value)
+        assertTrue(sink.connections.isEmpty())
+
+        adapter.onReread(null)
+        assertTrue(sink.connections.isEmpty())
+
+        // A later successful re-read (after a restore or an erase) does reach the guardian.
+        assertTrue(status.requestReread())
+        assertEquals(1, rereads)
+        adapter.onReread(listOf(CountingPost("com.olacabs.customer")))
+        assertEquals(1, sink.connections.single().size)
+    }
+
+    @Test
     fun `the self-test passes when the listener sees RideMate's own test post`() = runBlocking {
         shadowOf(context as Application).grantPermissions(Manifest.permission.POST_NOTIFICATIONS)
         Settings.Secure.putString(
@@ -166,7 +185,7 @@ class RideWatchAdapterTest {
         )
         assertTrue(status.isAccessGranted())
         val manager = context.getSystemService(NotificationManager::class.java)
-        val reader = SbnPostReader { null }
+        val reader = SbnPostReader(VersionCodeLookup { null })
 
         val result = async(Dispatchers.Default) { status.selfTest(timeoutMs = 5_000) }
         val posted: StatusBarNotification = withTimeout(5_000) {

@@ -75,7 +75,9 @@ class GuardianPresenter(val text: GuardianText, private val cancelSteps: CancelS
             channel = GuardianChannels.PROMPTS,
             title = text.title(captureKey(item.reason), listOf(item.provider)),
             lines = listOf(text.captureBody(item.reason, item.provider), text.string(R.string.guardian_capture_share_fallback)),
-            actions = emptyList(),
+            // I6: a frame counts only within 2 s of a user tap. A capture RideMate asked for by itself (the ride
+            // notification went away during a cancel) needs this tap before Android's screen-capture prompt.
+            actions = listOf(legAction(item.legId, item.provider, captureAction(item.reason))),
             style = CardStyle.QUIET,
             timeoutMs = GuardianUiReducer.CAPTURE_TTL_MS,
         )
@@ -143,7 +145,10 @@ class GuardianPresenter(val text: GuardianText, private val cancelSteps: CancelS
         val lines = buildList {
             when {
                 guided != null -> add(text.string(R.string.guardian_ongoing_cancel_now, text.provider(guided.provider)))
-                kept != null -> add(text.string(R.string.guardian_ongoing_your_ride, text.provider(kept.provider)))
+                // I10: "Your ride" only while the kept leg's current generation has a driver; otherwise its state
+                // ("Rapido: finding another captain").
+                kept != null && kept.state in RIDE_STATES -> add(text.string(R.string.guardian_ongoing_your_ride, text.provider(kept.provider)))
+                kept != null -> add(text.string(R.string.guardian_line, text.provider(kept.provider), text.state(kept.state, kept.provider)))
                 else -> add(text.string(R.string.guardian_ongoing_booking_phase))
             }
             if (booked > 0) add(text.string(R.string.guardian_ongoing_summary, booked, toCancel))
@@ -336,7 +341,16 @@ class GuardianPresenter(val text: GuardianText, private val cancelSteps: CancelS
         CaptureReason.SHOW_ME -> UiKey.CAPTURE_SHOW_ME
     }
 
+    /** The tap that backs a capture: Show me for the pointer, Check screen for a status or cancel-proof read. */
+    private fun captureAction(reason: CaptureReason): UiAction = when (reason) {
+        CaptureReason.SHOW_ME -> UiAction.SHOW_ME
+        CaptureReason.CHECK_SCREEN, CaptureReason.CANCEL_PROOF -> UiAction.CHECK_SCREEN
+    }
+
     companion object {
+        /** I10: the states in which a leg is "your ride" (its current generation has a driver). */
+        val RIDE_STATES: Set<RideState> = setOf(RideState.ASSIGNED, RideState.ARRIVING)
+
         const val ONGOING_ID = "ongoing"
         const val RESUME_ID = "resume"
         const val START_BLOCKED_ID = "start-blocked"

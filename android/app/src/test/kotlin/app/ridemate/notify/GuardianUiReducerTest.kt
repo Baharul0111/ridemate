@@ -81,6 +81,30 @@ class GuardianUiReducerTest {
     }
 
     @Test
+    fun `a your-ride notice stays only while that driver is assigned or arriving (I10)`() {
+        book(Provider.UBER, Provider.RAPIDO)
+        update(Provider.RAPIDO, NotificationEvent.ASSIGNED, "r1", eta = 6)
+        val sheet = ui.items.filterIsInstance<DriverSheetItem>().single()
+        guardian.onUserAction(UserAction.AnswerSheet(sheet.id, app.ridemate.core.guardian.SheetChoice.YES_CANCEL_OTHERS, TapId("yes")))
+        reconcile()
+        val yourRide = ui.notices.single { it.key == UiKey.BANNER_YOUR_RIDE }
+        assertEquals(leg(Provider.RAPIDO), yourRide.legId)
+
+        update(Provider.RAPIDO, NotificationEvent.ARRIVING, "r1", eta = 2)
+        assertTrue(ui.notices.any { it.id == yourRide.id })
+
+        // The captain cancels: that generation is no longer anyone's ride, so its announcement goes at once.
+        update(Provider.RAPIDO, NotificationEvent.DRIVER_CANCELLED, "r1")
+        assertTrue(ui.notices.none { it.key == UiKey.BANNER_YOUR_RIDE })
+        assertTrue(ui.notices.any { it.key == UiKey.BANNER_FINDING_ANOTHER_CAPTAIN })
+
+        // A new captain is a new generation with its own announcement.
+        update(Provider.RAPIDO, NotificationEvent.ASSIGNED, "r1", eta = 3)
+        val again = ui.notices.single { it.key == UiKey.BANNER_YOUR_RIDE }
+        assertEquals(1, again.driver!!.generation)
+    }
+
+    @Test
     fun `a MAYBE prompt is replaced by a withdrawal notice when evidence answers it`() {
         book(Provider.UBER, Provider.RAPIDO)
         update(Provider.RAPIDO, NotificationEvent.SEARCHING, "r1")
