@@ -1,0 +1,68 @@
+{
+  "images": {
+    "0a40b32865dc7992183409979a8372bf57955e56ea2d8c4885e3e0f017419bfc": {
+      "app": "demo_kestrel",
+      "screen": "driver_assigned"
+    },
+    "23ef930b5cc30c8100fe637c3e8136959da8b3b3a75488539d773b8ba2d1efcd": {
+      "app": "demo_kestrel",
+      "screen": "fare_options"
+    },
+    "23efe5ca9ebd8a10a6d4bebe4afcdcfdad183eb6ce097879f3e6c1c96a09ce4e": {
+      "app": "demo_pepper",
+      "screen": "driver_assigned_better"
+    },
+    "3117f35244bfb2bafb4a131c3eebf045595762e5afa37d3c98af0980355d9b6b": {
+      "app": "demo_tamarind",
+      "screen": "cancel_flow"
+    },
+    "467d6211aa2f882c95aa994d01e19831187700ea5e2d0ffda3ba882c82f7c33b": {
+      "app": "demo_pepper",
+      "screen": "cancel_flow"
+    },
+    "63d3306c5057dc99706c96dde86c7e939f05a4deb1564f98c1381c9c284c854a": {
+      "app": "demo_tamarind",
+      "screen": "fare_options"
+    },
+    "69443ff9bdb8fb24d8bbc449592f57c059a257b609b658dd36d189d180e551c7": {
+      "app": "demo_pepper",
+      "screen": "fare_options"
+    },
+    "7c8430d05cb4cd4151a262623bb18be75eb53b2f5b656a4d14d01ecbf1ec99b2": {
+      "app": "demo_tamarind",
+      "screen": "searching"
+    },
+    "831792e72f9c166c82283d927a3ad9ac7f3e7c7020b511c4dd974d0b90f78ef5": {
+      "app": "demo_tamarind",
+      "screen": "cancelled"
+    },
+    "871c0c4f75853cc0f828d723016f52f8ef45e60e37b3afeb87ff22e08a3a7501": {
+      "app": "demo_pepper",
+      "screen": "cancelled"
+    },
+    "8edc0a8f619698f39056733d6e6facf2aa07528ced949f212907b5baa3283add": {
+      "app": "demo_kestrel",
+      "screen": "cancel_flow"
+    },
+    "aebe95d8df30f936666733b4ae737b44ee4931e91aeacda641eae2f90faa8594": {
+      "app": "demo_kestrel",
+      "screen": "searching"
+    },
+    "b8986903b724187070bf8f2c6e1845a7e185a50023fb16082ec850bd16027ef4": {
+      "app": "demo_pepper",
+      "screen": "searching"
+    },
+    "d4b13df48fdf47360c3e208e6681e0e62c4900d04cfa7c7310e93d0116ebdef4": {
+      "app": "demo_kestrel",
+      "screen": "cancelled"
+    },
+    "d578cac024f027f07ba27e83ab44926d89f70a85b9c31997aa97afece9ff8c8c": {
+      "app": "demo_tamarind",
+      "screen": "driver_assigned"
+    },
+    "e51eaf82d40c9fd6b6554505b54ecf0950a5d515254538dc21347dec6f16b963": {
+      "app": "demo_pepper",
+      "screen": "driver_assigned"
+    }
+  }
+}

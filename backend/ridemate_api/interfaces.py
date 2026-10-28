@@ -44,6 +44,8 @@ class Principal:
     is_judge: bool = False
     raw_token: str = field(default="", repr=False)
     sub_hmac_previous: str | None = None  # same sub under the previous HMAC key, for the 30-day dual read
+    # Token `iat`, compared with the account's validSince on revocation checks.
+    issued_at: datetime | None = None
 
     @property
     def is_google(self) -> bool:
@@ -76,6 +78,10 @@ class Reservation:
     shard: str
     request_id: str
     settled: bool = False
+    # Filled by spend.SpendMeter: the exact amount in nano-USD, the budgets it counts against, and its IST day.
+    reserved_nusd: int = 0
+    budgets: tuple[str, ...] = ()
+    day: str = ""
 
 
 @dataclass(frozen=True)
@@ -83,6 +89,7 @@ class AiStatus:
     enabled: bool
     reason: str | None = None  # see contracts §1.3 config-check
     resume_at: datetime | None = None
+    compute_over_budget: bool = False  # reported, never a pause: compute overruns eat the margin first
 
 
 class Auth(Protocol):

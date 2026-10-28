@@ -1,0 +1,39 @@
+{
+  "indexes": [],
+  "fieldOverrides": [
+    {
+      "collectionGroup": "events",
+      "fieldPath": "created_at",
+      "indexes": [{ "order": "ASCENDING", "queryScope": "COLLECTION" }]
+    },
+    {
+      "collectionGroup": "audit",
+      "fieldPath": "created_at",
+      "indexes": [{ "order": "ASCENDING", "queryScope": "COLLECTION" }]
+    },
+    {
+      "collectionGroup": "ondc_txn",
+      "fieldPath": "created_at",
+      "indexes": [{ "order": "ASCENDING", "queryScope": "COLLECTION" }]
+    },
+    {
+      "collectionGroup": "ondc_event",
+      "fieldPath": "received_at",
+      "indexes": [{ "order": "ASCENDING", "queryScope": "COLLECTION" }]
+    },
+    {
+      "collectionGroup": "usage_snapshot",
+      "fieldPath": "erased_at",
+      "indexes": [{ "order": "ASCENDING", "queryScope": "COLLECTION" }]
+    },
+    { "collectionGroup": "shards", "fieldPath": "counters", "indexes": [] },
+    { "collectionGroup": "shards", "fieldPath": "latency", "indexes": [] },
+    { "collectionGroup": "spend_shards", "fieldPath": "charged_nusd", "indexes": [] },
+    { "collectionGroup": "spend_shards", "fieldPath": "reserved_nusd", "indexes": [] },
+    { "collectionGroup": "spend_shards", "fieldPath": "usd", "indexes": [] },
+    { "collectionGroup": "spend_shards", "fieldPath": "totals_nusd", "indexes": [] },
+    { "collectionGroup": "ondc_txn", "fieldPath": "quotes", "indexes": [] },
+    { "collectionGroup": "ondc_txn", "fieldPath": "driver", "indexes": [] },
+    { "collectionGroup": "blocked_uids", "fieldPath": "uids", "indexes": [] }
+  ]
+}

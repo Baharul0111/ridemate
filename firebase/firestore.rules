@@ -1,0 +1,28 @@
+rules_version = '2';
+
+// RideMate Firestore rules (architecture §4.18 A2, §5).
+// Only the server writes, with service-account keys that these rules don't apply to. A signed-in phone may read
+// its own ONDC transaction and that transaction's callback records, which it listens to; nothing else is
+// readable, and no client may write anywhere.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function ownedByCaller() {
+      return request.auth != null && resource.data.uid == request.auth.uid;
+    }
+
+    match /ondc_txn/{txnId} {
+      allow get, list: if ownedByCaller();
+      allow create, update, delete: if false;
+    }
+
+    match /ondc_event/{eventId} {
+      allow get, list: if ownedByCaller();
+      allow create, update, delete: if false;
+    }
+
+    // Deny by default: every other collection and every subcollection.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
