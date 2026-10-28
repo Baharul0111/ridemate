@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Owner alert pushes (owner only). Owned by app.ridemate.messaging. Each body names the runbook to open next. -->
+<resources>
+    <string name="owner_alert_channel_name">Owner alerts</string>
+    <string name="owner_alert_channel_description">Alerts from RideMate\'s server for the app owner: errors, spending, reading accuracy.</string>
+    <string name="owner_alert_title_format">RideMate alert: %1$s</string>
+    <string name="owner_alert_with_value">%1$s Measured: %2$s.</string>
+    <string name="owner_alert_generic_title">server alert</string>
+    <string name="owner_alert_generic_body">Open the alert email for details and follow the matching runbook.</string>
+
+    <string name="owner_alert_server_errors_title" formatted="false">server errors above 5%</string>
+    <string name="owner_alert_server_errors_body">Check the Modal logs, then follow the rollback runbook if a deploy caused it.</string>
+    <string name="owner_alert_slow_reads_title">slow price reading</string>
+    <string name="owner_alert_slow_reads_body">Read-screen p95 is above 15 s. Follow the Modal-down runbook.</string>
+    <string name="owner_alert_reading_accuracy_title">reading accuracy dropped</string>
+    <string name="owner_alert_reading_accuracy_body" formatted="false">Verified rows fell below 70%. A ride app may have changed: follow the ride-app-update runbook.</string>
+    <string name="owner_alert_rule_miss_title">notification templates missing</string>
+    <string name="owner_alert_rule_miss_body" formatted="false">Over 20% of ride-app notifications miss their templates. Follow the ride-app-update runbook.</string>
+    <string name="owner_alert_misses_unclassified_title">questions without AI</string>
+    <string name="owner_alert_misses_unclassified_body">Users are getting extra questions because the classifier is unavailable. Check the cap and Modal runbooks.</string>
+    <string name="owner_alert_spend_title">spending high</string>
+    <string name="owner_alert_spend_body" formatted="false">Spend passed 70% of today\'s cap or 80% of a budget. Follow the cap-tripped runbook.</string>
+    <string name="owner_alert_billing_drift_title">billing drift</string>
+    <string name="owner_alert_billing_drift_body" formatted="false">RideMate\'s meter and Modal\'s billing differ by over 10%. Caps were tightened; follow the cap-tripped runbook.</string>
+    <string name="owner_alert_firestore_quota_title">Firestore quota high</string>
+    <string name="owner_alert_firestore_quota_body" formatted="false">Firestore writes passed 70% of the free daily quota. ONDC is affected first: follow the ONDC runbook.</string>
+    <string name="owner_alert_probe_failure_title">daily probe failed</string>
+    <string name="owner_alert_probe_failure_body">The synthetic golden-image read failed. Follow the model-removed and Modal-down runbooks.</string>
+    <string name="owner_alert_model_missing_title">model missing</string>
+    <string name="owner_alert_model_missing_body">The pinned Muse Spark Open model id is gone, so AI is off. Follow the model-removed runbook.</string>
+    <string name="owner_alert_key_age_title">key older than 80 days</string>
+    <string name="owner_alert_key_age_body">A service-account key needs rotating. Follow the key-rotation runbook.</string>
+    <string name="owner_alert_test_title">test alert</string>
+    <string name="owner_alert_test_body">Alert pushes reach this phone. Record the date in docs/slo-and-alerts.md.</string>
+</resources>

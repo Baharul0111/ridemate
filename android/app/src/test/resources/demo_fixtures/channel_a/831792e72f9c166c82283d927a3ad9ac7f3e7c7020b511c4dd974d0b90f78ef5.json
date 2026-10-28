@@ -1,0 +1,22 @@
+{
+  "image_sha256": "831792e72f9c166c82283d927a3ad9ac7f3e7c7020b511c4dd974d0b90f78ef5",
+  "model": "synthetic-perfect-reader",
+  "recorded_at": "2026-10-28T00:00:00Z",
+  "read": {
+    "app": "demo_tamarind",
+    "screen_type": "cancelled",
+    "options": [],
+    "fee_text": null,
+    "driver_eta_min": null,
+    "driver_distance_text": null
+  },
+  "usage": {
+    "input_tokens": 0,
+    "cached_input_tokens": 0,
+    "output_tokens": 0
+  },
+  "cost_usd": 0.0,
+  "expect": {
+    "rows": []
+  }
+}

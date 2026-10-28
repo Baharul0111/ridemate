@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- डेमो आज़माएँ (goal 19). Owned by app.ridemate.demo. -->
+<resources>
+    <string name="demo_title">डेमो आज़माएँ</string>
+    <string name="demo_badge">डेमो</string>
+    <string name="demo_badge_description">डेमो मोड: काल्पनिक राइड कंपनियाँ, कोई असली बुकिंग नहीं और कोई पैसा नहीं</string>
+    <string name="demo_intro">तीन काल्पनिक राइड कंपनियों की नमूना स्क्रीनें दिखाती हैं कि RideMate कैसे कीमतें पढ़ता है, आपका ड्राइवर पहचानता है, बाकी बुकिंग सबूत के साथ रद्द करने में मदद करता है और भुगतान के लिए आपको वापस ऐप पर भेजता है। इसके लिए न राइड ऐप चाहिए, न साइन-इन और न AI बजट।</string>
+    <string name="demo_provider_label">%1$s · डेमो</string>
+
+    <string name="demo_track_main_title">तीन बुक करें, एक रखें</string>
+    <string name="demo_track_main_body">तीनों डेमो ऐप में बुक करें। पहला ड्राइवर मिलते ही RideMate बाकी बुकिंग रद्द करने को पूछता है, हर रद्दीकरण में मदद करता है, उसे साबित करता है और सब रद्द होने तक याद दिलाता रहता है।</string>
+    <string name="demo_track_keep_searching_title">खोज जारी रखें</string>
+    <string name="demo_track_keep_searching_body">पहले ड्राइवर के बाद भी खोजते रहें। बहुत पास का ड्राइवर मिलने पर बेहतर राइड का प्रस्ताव आता है, और आपके हाँ दबाए बिना कुछ नहीं बदलता। असली राइड में ड्राइवर छोड़ने पर शुल्क लग सकता है और उस ड्राइवर की एक सवारी जाती है, इसलिए इसका उचित इस्तेमाल करें।</string>
+    <string name="demo_track_rematch_title">ड्राइवर ने रद्द किया</string>
+    <string name="demo_track_rematch_body">एक बुकिंग: ड्राइवर रद्द करता है, ऐप पास का नया ड्राइवर ढूँढता है, और RideMate हर बदलाव पर नज़र रखता है।</string>
+    <string name="demo_start">शुरू करें</string>
+    <string name="demo_start_description">डेमो शुरू करें: %1$s</string>
+    <string name="demo_leave">डेमो से बाहर निकलें</string>
+    <string name="demo_leave_description">डेमो से बाहर निकलें। आपकी असली राइड पर कोई असर नहीं पड़ता।</string>
+
+    <string name="demo_unavailable_not_ready">RideMate के इस संस्करण में डेमो उपलब्ध नहीं है। ऐप अपडेट करें, फिर दोबारा कोशिश करें।</string>
+    <string name="demo_unavailable_switched_off">डेमो अभी बंद है। बाद में दोबारा कोशिश करें।</string>
+    <string name="demo_unavailable_session_busy">पहले अपनी चल रही राइड बुकिंग रद्द करना पूरा करें, फिर डेमो शुरू करें।</string>
+    <string name="demo_unavailable_assets_broken">डेमो की फ़ाइलें खराब हैं। उन्हें वापस लाने के लिए RideMate दोबारा इंस्टॉल करें।</string>
+
+    <string name="demo_step_book">चरण %2$d में से %1$d: %3$s में कीमतें पढ़ें, फिर \"यहाँ बुक किया\" दबाएँ।</string>
+    <string name="demo_step_watching">सब बुक हो गया। RideMate अब हर डेमो ऐप की सूचनाओं पर नज़र रखता है, ठीक वैसे ही जैसे Uber, Ola और Rapido के लिए। ड्राइवर का इंतज़ार करें।</string>
+    <string name="demo_step_finished">डेमो पूरा हुआ। असली राइड में आप राइड ऐप के अंदर ही भुगतान करते हैं। RideMate कभी पैसे नहीं संभालता।</string>
+    <string name="demo_app_cancel_hint">RideMate ने %1$s खोला है ताकि आप यह अतिरिक्त बुकिंग रद्द कर सकें। असली ऐप की तरह \"राइड रद्द करें\" दबाएँ।</string>
+    <string name="demo_app_pay_hint">यहाँ आप %1$s में भुगतान करते। डेमो: कोई पैसा नहीं कटता।</string>
+    <string name="demo_cancel_waiting">रद्द करना दबाया गया। %1$s की पुष्टि का इंतज़ार है…</string>
+    <string name="demo_cancel_proven">रद्द हो गया। %1$s की अपनी सूचना ने इसे साबित किया।</string>
+
+    <string name="demo_action_read_fares">किराया पढ़ें</string>
+    <string name="demo_action_read_fares_description">%1$s की डेमो स्क्रीन पर कीमतें दो अलग-अलग तरीकों से पढ़ें</string>
+    <string name="demo_action_reading">कीमतें पढ़ी जा रही हैं…</string>
+    <string name="demo_action_booked_here">यहाँ बुक किया</string>
+    <string name="demo_action_booked_here_description">मैंने %1$s में राइड बुक की (डेमो)</string>
+    <string name="demo_action_cancel_ride">राइड रद्द करें</string>
+    <string name="demo_action_cancel_ride_description">%1$s (डेमो) में \"राइड रद्द करें\" दबाएँ, जैसे असली ऐप में करते हैं</string>
+    <string name="demo_action_show_me">मुझे दिखाएँ</string>
+    <string name="demo_action_show_me_description">दिखाएँ कि %1$s में \"राइड रद्द करें\" कहाँ है</string>
+    <string name="demo_action_pay">%1$s में भुगतान करें</string>
+    <string name="demo_action_pay_description">भुगतान के लिए %1$s खोलें (डेमो: कोई पैसा नहीं कटता)</string>
+    <string name="demo_action_open_app">%1$s खोलें</string>
+    <string name="demo_action_open_app_description">%1$s डेमो ऐप खोलें</string>
+    <string name="demo_action_back">सारांश पर वापस</string>
+    <string name="demo_action_back_description">डेमो ऐप बंद करके डेमो सारांश पर वापस जाएँ</string>
+    <string name="demo_action_ok">ठीक है</string>
+
+    <string name="demo_screen_description">%1$s डेमो स्क्रीन: %2$s</string>
+    <string name="demo_screen_fare_options">किराये के विकल्प</string>
+    <string name="demo_screen_searching">ड्राइवर की खोज</string>
+    <string name="demo_screen_driver_assigned">ड्राइवर मिल गया</string>
+    <string name="demo_screen_driver_assigned_better">नया, पास का ड्राइवर मिला</string>
+    <string name="demo_screen_cancel_flow">अपनी राइड रद्द करें</string>
+    <string name="demo_screen_cancelled">राइड रद्द</string>
+    <string name="demo_screen_other">ऐप स्क्रीन</string>
+    <string name="demo_pointer_description">\"राइड रद्द करें\" बटन की ओर इशारा करता तीर</string>
+
+    <string name="demo_source_live">Muse Spark Open ने पढ़ा</string>
+    <string name="demo_source_cache">Muse Spark Open ने पढ़ा (कैश)</string>
+    <string name="demo_source_recorded">रिकॉर्ड किया गया</string>
+    <string name="demo_source_recorded_long">Muse Spark Open का रिकॉर्ड किया गया पठन</string>
+    <string name="demo_source_none">AI पठन नहीं</string>
+    <string name="demo_rows_label">%1$s · डेमो · %2$s</string>
+
+    <string name="demo_issue_ai_switched_off">AI पठन बंद है, इसलिए डेमो रिकॉर्ड किया गया पठन इस्तेमाल करता है।</string>
+    <string name="demo_issue_ai_unavailable">AI पठन उपलब्ध नहीं है और कोई रिकॉर्ड किया गया पठन साथ नहीं है, इसलिए कीमतें \"पढ़ नहीं सके\" दिखती हैं। ऑनलाइन होने पर दोबारा कोशिश करें।</string>
+    <string name="demo_issue_not_a_fare_screen">यह किराये की स्क्रीन नहीं लगती, इसलिए कुछ नहीं भेजा गया। किराये की स्क्रीन खोलकर दोबारा कोशिश करें।</string>
+    <string name="demo_issue_ocr_failed">आपका फ़ोन स्क्रीन का टेक्स्ट नहीं पढ़ सका। \"किराया पढ़ें\" फिर से दबाएँ।</string>
+    <string name="demo_issue_no_parser">इस डेमो ऐप के पढ़ने के नियम नहीं मिले। RideMate अपडेट करें, फिर दोबारा कोशिश करें।</string>
+    <string name="demo_issue_recorded_fallback">RideMate के सर्वर तक नहीं पहुँच सके, इसलिए डेमो ने ऐप में रखा रिकॉर्ड किया गया पठन इस्तेमाल किया।</string>
+
+    <string name="demo_row_unreadable">पढ़ नहीं सके · ऐप में देखें</string>
+    <string name="demo_row_eta">%1$d मिनट</string>
+    <string name="demo_row_eta_unknown">पहुँचने का समय: ऐप में देखें</string>
+    <string name="demo_row_seen_at">%1$s में %2$s पर देखा</string>
+    <string name="demo_row_stale">पुराना · ताज़ा करने के लिए \"किराया पढ़ें\" दबाएँ</string>
+    <string name="demo_row_cheapest">सबसे सस्ता</string>
+    <string name="demo_row_description">%1$s: %2$s</string>
+    <string name="demo_class_bike">बाइक</string>
+    <string name="demo_class_auto">ऑटो</string>
+    <string name="demo_class_cab_economy">कैब</string>
+    <string name="demo_class_cab_premium">प्रीमियम कैब</string>
+    <string name="demo_class_cab_xl">XL कैब</string>
+    <string name="demo_class_other">अन्य</string>
+
+    <string name="demo_status_not_booked">अभी बुक नहीं</string>
+    <string name="demo_status_searching">ड्राइवर की खोज जारी</string>
+    <string name="demo_status_driver">ड्राइवर मिल गया</string>
+    <string name="demo_status_cancelling">रद्द करना दबाया, सबूत का इंतज़ार</string>
+    <string name="demo_status_cancelled">रद्द, साबित</string>
+    <string name="demo_status_booked">बुक हुआ</string>
+
+    <string name="demo_progress_title">डेमो ने अब तक क्या दिखाया</string>
+    <string name="demo_progress_prices">दो तरीकों से पढ़ी गई कीमतें</string>
+    <string name="demo_progress_booked">%2$d में से %1$d ऐप में बुक किया</string>
+    <string name="demo_progress_driver">ड्राइवर मिला</string>
+    <string name="demo_progress_cancel_guide">रद्द करने की गाइड दिखाई गई</string>
+    <string name="demo_progress_proof">साबित रद्दीकरण: %1$d</string>
+    <string name="demo_progress_reminders">भेजे गए रिमाइंडर: %1$d</string>
+    <string name="demo_progress_better_ride">बेहतर राइड का प्रस्ताव</string>
+    <string name="demo_progress_pay">भुगतान के लिए वापस भेजा</string>
+    <string name="demo_progress_done">हो गया</string>
+    <string name="demo_progress_not_yet">अभी नहीं</string>
+    <string name="demo_progress_item">%1$s: %2$s</string>
+
+    <string name="demo_notice_not_now">आपने \"अभी नहीं\" चुना, इसलिए इस डेमो में आगे कुछ नहीं होगा। रद्द करने की गाइड देखने के लिए डेमो से निकलकर फिर शुरू करें।</string>
+    <string name="demo_notice_show_me_unavailable">\"मुझे दिखाएँ\" के लिए Google साइन-इन और AI पठन चाहिए। इसके बजाय बड़ा \"राइड रद्द करें\" बटन ढूँढें।</string>
+    <string name="demo_notice_switched_off">डेमो बंद कर दिया गया। आपकी असली राइड पर कोई असर नहीं पड़ता।</string>
+</resources>

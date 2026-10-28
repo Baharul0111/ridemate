@@ -1,0 +1,22 @@
+{
+  "image_sha256": "aebe95d8df30f936666733b4ae737b44ee4931e91aeacda641eae2f90faa8594",
+  "model": "synthetic-perfect-reader",
+  "recorded_at": "2026-10-28T00:00:00Z",
+  "read": {
+    "app": "demo_kestrel",
+    "screen_type": "searching",
+    "options": [],
+    "fee_text": null,
+    "driver_eta_min": null,
+    "driver_distance_text": null
+  },
+  "usage": {
+    "input_tokens": 0,
+    "cached_input_tokens": 0,
+    "output_tokens": 0
+  },
+  "cost_usd": 0.0,
+  "expect": {
+    "rows": []
+  }
+}
