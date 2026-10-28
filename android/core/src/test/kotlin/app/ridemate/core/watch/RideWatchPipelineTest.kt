@@ -14,6 +14,7 @@ import app.ridemate.core.state.NotificationRemoved
 import app.ridemate.core.state.ProviderUpdate
 import app.ridemate.core.state.RideEvent
 import app.ridemate.core.state.SignalSource
+import app.ridemate.core.state.Statechart
 import app.ridemate.core.state.UnknownReason
 import app.ridemate.core.state.UnknownUpdate
 import kotlinx.coroutines.test.TestScope
@@ -195,10 +196,42 @@ class RideWatchPipelineTest {
     fun `labels other than searching or assigned only raise a prompt`() = runTest {
         val rig = Rig(this)
         rig.classifier!!.rules += "gone" to ClassifierLabel.CANCELLED
-        rig.leg(Fixtures.RAPIDO, RideState.ASSIGNED)
+        rig.leg(Fixtures.RAPIDO, RideState.SEARCHING)
         rig.post(Fixtures.RAPIDO, "r1", "Rapido", "Your captain is gone")
         rig.advance(1_500)
         assertEquals(UnknownReason.CLASSIFIER_LABEL, (rig.legs.events.single().second as UnknownUpdate).reason)
+    }
+
+    @Test
+    fun `no classification is spent where no label could change the outcome`() = runTest {
+        for (state in RideState.entries.filter { it !in Statechart.CLASSIFIABLE && !it.isTerminal }) {
+            val rig = Rig(this)
+            rig.classifier!!.rules += "update" to ClassifierLabel.ASSIGNED
+            rig.leg(Fixtures.RAPIDO, state)
+            val miss = rig.post(Fixtures.RAPIDO, "r1", "Rapido", "An update from your captain")
+            assertEquals(state.name, PostOutcome.EVENT, miss.outcome)
+            assertEquals(state.name, miss.arrivedAtElapsedMs, miss.resolvedAtElapsedMs)
+            assertTrue(state.name, rig.classifier.requests.isEmpty())
+            assertEquals(state.name, UnknownReason.LABEL_CANNOT_APPLY, (rig.legs.events.single().second as UnknownUpdate).reason)
+        }
+        for (state in Statechart.CLASSIFIABLE) {
+            val rig = Rig(this)
+            rig.leg(Fixtures.RAPIDO, state)
+            rig.post(Fixtures.RAPIDO, "r1", "Rapido", "An update from your captain")
+            assertEquals(state.name, 1, rig.classifier!!.requests.size)
+        }
+        // A post waiting behind a classification is not sent once its leg has moved somewhere no label matters.
+        val rig = Rig(this)
+        rig.classifier!!.latencyMs = 2_000
+        rig.leg(Fixtures.OLA)
+        rig.post(Fixtures.OLA, "o1", "Ola", "update alpha")
+        rig.advance(500)
+        val waiting = rig.post(Fixtures.OLA, "o1", "Ola", "update beta")
+        rig.leg(Fixtures.OLA, RideState.ASSIGNED)
+        rig.advance(1_500)
+        assertEquals(1, rig.classifier.requests.size)
+        assertEquals(PostOutcome.EVENT, waiting.outcome)
+        assertEquals(UnknownReason.LABEL_CANNOT_APPLY, waiting.unknownReason)
     }
 
     @Test
@@ -313,6 +346,21 @@ class RideWatchPipelineTest {
         assertTrue(removal.appCancel && removal.wasOngoing)
         // A removed post that comes back is processed as new.
         assertEquals(PostOutcome.EVENT, rig.post(Fixtures.UBER, "u1", Text.uberSearching).outcome)
+    }
+
+    @Test
+    fun `the post and removal logs keep only the most recent entries`() = runTest {
+        val clock = SchedulerClock(testScheduler)
+        val legs = FakeLegs().apply { this.legs[Fixtures.UBER] = LegView("leg", RideState.SEARCHING, 0, true) }
+        val pipeline = RideWatchPipeline(clock, backgroundScope, legs, legs, { Fixtures.templates }, maxLogEntries = 3)
+        repeat(5) { i ->
+            val post = PostSnapshot(Fixtures.UBER, "u$i", i, null, "trip", null, true, "Finding your ride", "We're looking $i", clock.wallMs(), 100)
+            pipeline.onPosted(PostSource.of(post))
+            pipeline.onRemoved(RemovalSource.of(PostRemoval(Fixtures.UBER, "u$i", RemovalReason.REASON_APP_CANCEL)))
+        }
+        assertEquals(listOf(3L, 4L, 5L), pipeline.audit.map { it.seq })
+        assertEquals(listOf("u2", "u3", "u4"), pipeline.removals.map { it.sbnKey })
+        assertEquals("every post still reached the leg", 10, legs.events.size)
     }
 
     @Test

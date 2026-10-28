@@ -3,6 +3,7 @@
 package app.ridemate.core.replay
 
 import app.ridemate.core.guardian.ActionKind
+import app.ridemate.core.guardian.FeeNote
 import app.ridemate.core.guardian.FeeNoteKind
 import app.ridemate.core.guardian.GuardianEffect
 import app.ridemate.core.guardian.LegRole
@@ -25,6 +26,8 @@ import app.ridemate.core.replay.Fixtures.UBER
 import app.ridemate.core.state.Answer
 import app.ridemate.core.state.Protocol
 import app.ridemate.core.state.ProtocolKind
+import app.ridemate.core.watch.PostSnapshot
+import app.ridemate.core.watch.PostSource
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -251,6 +254,75 @@ class GuardianFlowsReplayTest {
         assertEquals("reported once", 1, h.effectsOf<GuardianEffect.SameDriverNotice>().size)
     }
 
+    @Test
+    fun `riding a driver without answering the sheet makes it the kept ride and points out the other bookings`() = runTest {
+        val h = ReplayHarness(this, providers = listOf(Provider.UBER, Provider.RAPIDO))
+        h.book(Provider.UBER, Provider.RAPIDO)
+        h.post(UBER, "u1", Text.uberSearching)
+        h.post(RAPIDO, "r1", Text.rapidoAssigned())
+        val sheet = h.effectsOf<GuardianEffect.DriverSheet>().single()
+        h.advance(240_000)
+        val mark = h.mark()
+        h.post(RAPIDO, "r1", Text.rapidoTripStarted)
+        assertEquals(RideState.ON_TRIP, h.state(Provider.RAPIDO))
+        assertEquals(UiKey.SHEET_WITHDRAWN_TRIP_UNDERWAY, h.effectsOf<GuardianEffect.SheetWithdrawn>(mark).single { it.sheetId == sheet.sheetId }.key)
+        assertEquals(LegRole.KEPT, h.record(Provider.RAPIDO).role)
+        val alert = h.effectsOf<GuardianEffect.LoudAlert>(mark).single()
+        assertEquals(h.legId(Provider.UBER), alert.legId)
+        assertEquals(UiKey.ALERT_STILL_LIVE, alert.key)
+
+        // Uber then finds a driver while the user is already riding: never silent.
+        val mark2 = h.mark()
+        h.post(UBER, "u1", Text.uberAssigned())
+        assertEquals(h.legId(Provider.UBER), h.effectsOf<GuardianEffect.LoudAlert>(mark2).single().legId)
+        assertTrue(h.effectsOf<GuardianEffect.DriverSheet>(mark2).isEmpty())
+        h.post(RAPIDO, "r1", Text.rapidoEnded)
+        assertEquals(h.legId(Provider.RAPIDO), h.effectsOf<GuardianEffect.PayHandoffOffer>().single().legId)
+        assertClean(h)
+    }
+
+    @Test
+    fun `a booking that finds a driver while the kept captain is being replaced is pointed out, then offered`() = runTest {
+        val h = keepSearchingWith(this, keptEta = 4)
+        h.post(RAPIDO, "r1", Text.rapidoDriverCancelled)
+        assertEquals(RideState.DRIVER_CANCELLED, h.state(Provider.RAPIDO))
+        val mark = h.mark()
+        h.post(UBER, "u1", Text.uberAssigned(eta = 3))
+        val alert = h.effectsOf<GuardianEffect.LoudAlert>(mark).single()
+        assertEquals(h.legId(Provider.UBER), alert.legId)
+        assertEquals(listOf(UiAction.OPEN_APP, UiAction.DISMISS), alert.actions)
+
+        // Rapido's new captain: now both bookings have a driver, so the user keeps one and cancels the other.
+        val mark2 = h.mark()
+        h.post(RAPIDO, "r1", Text.rapidoAssigned(eta = 4, plate = "AS02XY9876"))
+        val sheet = h.effectsOf<GuardianEffect.BetterRideSheet>(mark2).single()
+        assertEquals(h.legId(Provider.RAPIDO), sheet.current.legId)
+        assertEquals(h.legId(Provider.UBER), sheet.candidate.legId)
+        h.act(UserAction.AnswerSheet(sheet.sheetId, SheetChoice.KEEP_CURRENT, h.tap()))
+        assertEquals(RideState.CANCEL_GUIDED, h.state(Provider.UBER))
+        assertEquals(LegRole.EXTRA, h.record(Provider.UBER).role)
+        assertClean(h)
+    }
+
+    @Test
+    fun `a leg that may already have a driver is never called free to cancel`() = runTest {
+        val h = ReplayHarness(this, providers = listOf(Provider.UBER, Provider.RAPIDO))
+        h.book(Provider.UBER, Provider.RAPIDO)
+        h.post(UBER, "u1", null, null)
+        assertEquals(RideState.MAYBE_ASSIGNED, h.state(Provider.UBER))
+        h.post(RAPIDO, "r1", Text.rapidoAssigned())
+        val sheet = h.effectsOf<GuardianEffect.DriverSheet>().single()
+        assertEquals(FeeNote(FeeNoteKind.MAY_APPLY, upToInr = 100), sheet.others.single().fee)
+        h.yes()
+        assertEquals(RideState.CANCEL_GUIDED, h.state(Provider.UBER))
+        assertEquals(FeeNoteKind.MAY_APPLY, h.effectsOf<GuardianEffect.CancelCard>().single().fee.kind)
+        // Uber's own searching post settles it.
+        val mark = h.mark()
+        h.post(UBER, "u1", Text.uberSearching)
+        assertEquals(FeeNoteKind.FREE_WHILE_SEARCHING, h.effectsOf<GuardianEffect.CancelCard>(mark).single().fee.kind)
+        assertClean(h)
+    }
+
     private fun keepSearchingWith(test: kotlinx.coroutines.test.TestScope, keptEta: Int): ReplayHarness {
         val h = ReplayHarness(test, providers = listOf(Provider.UBER, Provider.RAPIDO), keepSearching = true)
         h.book(Provider.UBER, Provider.RAPIDO)
@@ -399,6 +471,58 @@ class GuardianFlowsReplayTest {
         h.guardian.onCaptureVerdict(h.legId(Provider.UBER), cancelledKeywordsFound = true, tapId = again, frameAtElapsedMs = h.now)
         assertEquals(RideState.CANCEL_CONFIRMED, h.state(Provider.UBER))
         assertEquals(EvidenceRung.REMOVAL_PLUS_CAPTURE, h.guardian.state.evidence.single().rung)
+        assertClean(h)
+    }
+
+    @Test
+    fun `rung 3 - a searching post swapped for the assigned one is not half of a cancel proof`() = runTest {
+        val h = ReplayHarness(this, providers = listOf(Provider.UBER, Provider.RAPIDO))
+        h.book(Provider.UBER, Provider.RAPIDO)
+        h.post(UBER, "u-search", Text.uberSearching)
+        h.post(RAPIDO, "r1", Text.rapidoAssigned())
+        h.yes()
+        h.advance(10_000)
+        // Uber finds a driver: it removes its searching post (APP_CANCEL) and posts the assigned one.
+        h.remove(UBER, "u-search")
+        h.post(UBER, "u-ride", Text.uberAssigned())
+        h.advance(20_000)
+        // The user's capture shows Uber's "your ride will be cancelled" confirmation before they tap it.
+        val check = h.tap()
+        h.act(UserAction.CheckScreen(h.legId(Provider.UBER), check))
+        h.advance(300)
+        h.guardian.onCaptureVerdict(h.legId(Provider.UBER), cancelledKeywordsFound = true, tapId = check, frameAtElapsedMs = h.now)
+        assertEquals(RideState.CANCEL_GUIDED, h.state(Provider.UBER))
+        assertTrue(h.guardian.state.evidence.isEmpty())
+        assertTrue(h.guardian.needsForegroundService)
+        // Only the removal of the live ride post, after that capture, proves it.
+        h.remove(UBER, "u-ride")
+        assertEquals(RideState.CANCEL_CONFIRMED, h.state(Provider.UBER))
+        assertEquals(EvidenceRung.REMOVAL_PLUS_CAPTURE, h.guardian.state.evidence.single().rung)
+        assertClean(h)
+    }
+
+    @Test
+    fun `a cancelled post left in the shade from an earlier ride neither ends a leg nor proves its cancel`() = runTest {
+        val h = ReplayHarness(this, providers = listOf(Provider.UBER, Provider.RAPIDO))
+        val leftover = PostSnapshot(
+            UBER, "u-yesterday", 3, null, "trip", "status", false, Text.uberCancelled.first, Text.uberCancelled.second,
+            h.clock.wallMs() - 3_600_000, 100,
+        )
+        // The session start re-reads the shade.
+        h.pipeline.onListenerConnected(listOf(PostSource.of(leftover)))
+        assertEquals(RideState.SELECTED, h.state(Provider.UBER))
+        h.book(Provider.UBER, Provider.RAPIDO)
+        h.post(RAPIDO, "r1", Text.rapidoAssigned())
+        h.yes()
+        assertEquals(RideState.CANCEL_GUIDED, h.state(Provider.UBER))
+        // The listener reconnects while Uber (which has posted nothing yet) is being cancelled.
+        h.pipeline.onListenerDisconnected()
+        h.pipeline.onListenerConnected(listOf(PostSource.of(leftover)))
+        testScheduler.runCurrent()
+        assertEquals(RideState.CANCEL_GUIDED, h.state(Provider.UBER))
+        assertTrue(h.guardian.state.evidence.isEmpty())
+        h.advance(31_000)
+        assertEquals(1, h.historyOf<GuardianEffect.Reminder>().size)
         assertClean(h)
     }
 

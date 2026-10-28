@@ -8,6 +8,7 @@ import app.ridemate.core.state.NotificationRemoved
 import app.ridemate.core.state.ProviderUpdate
 import app.ridemate.core.state.RideEvent
 import app.ridemate.core.state.SignalSource
+import app.ridemate.core.state.Statechart
 import app.ridemate.core.state.UnknownReason
 import app.ridemate.core.state.UnknownUpdate
 import app.ridemate.core.time.Clock
@@ -34,6 +35,8 @@ class RideWatchPipeline(
     private val classifier: NotificationClassifier? = null,
     private val masker: TextMasker = TextMasker.NONE,
     private val classifierDeadlineMs: Long = CLASSIFIER_DEADLINE_MS,
+    /** The listener lives as long as the process and ride apps update posts every few seconds, so the logs are capped. */
+    private val maxLogEntries: Int = MAX_LOG_ENTRIES,
 ) : OngoingNotifications {
 
     /** Demo packages are read only while a demo session is explicitly active; they never mix with live legs. */
@@ -46,10 +49,16 @@ class RideWatchPipeline(
     var nonAllowlistedDropped: Long = 0
         private set
 
-    private val auditLog = mutableListOf<PostAuditEntry>()
-    private val removalLog = mutableListOf<RemovalAuditEntry>()
+    private val auditLog = ArrayDeque<PostAuditEntry>()
+    private val removalLog = ArrayDeque<RemovalAuditEntry>()
+
+    /** The most recent allowlisted posts (at most `maxLogEntries`), oldest first. */
     val audit: List<PostAuditEntry> get() = auditLog
     val removals: List<RemovalAuditEntry> get() = removalLog
+
+    init {
+        require(maxLogEntries > 0)
+    }
 
     private var seq = 0L
     private val lastFingerprint = HashMap<String, PostFingerprint>()
@@ -79,8 +88,8 @@ class RideWatchPipeline(
         val wasOngoing = ongoing[removal.packageName]?.remove(removal.sbnKey) == true
         lastFingerprint.remove(removal.sbnKey)
         val leg = legs.legFor(removal.packageName)
-        removalLog += RemovalAuditEntry(
-            removal.packageName, removal.sbnKey, removal.reason.code, wasOngoing, clock.elapsedMs(), leg?.legId,
+        removalLog.addCapped(
+            RemovalAuditEntry(removal.packageName, removal.sbnKey, removal.reason.code, wasOngoing, clock.elapsedMs(), leg?.legId),
         )
         if (leg != null) {
             sink.onRideEvent(
@@ -151,7 +160,7 @@ class RideWatchPipeline(
             legStateAtArrival = leg?.state,
             legBookedAtArrival = leg?.isBooked == true,
         )
-        auditLog += audit
+        auditLog.addCapped(audit)
 
         if (leg == null) {
             audit.resolve(PostOutcome.NO_ACTIVE_LEG, now)
@@ -180,6 +189,9 @@ class RideWatchPipeline(
         // §4.5.10 + cost: only booked, live legs of an active session are ever classified.
         if (sessionId == null || !leg.isBooked || leg.state.isTerminal) {
             return resolveNow(audit, leg, key, UnknownUpdate(UnknownReason.NOT_CLASSIFIED, key, post.postTimeMs, replayed))
+        }
+        if (leg.state !in Statechart.CLASSIFIABLE) {
+            return resolveNow(audit, leg, key, UnknownUpdate(UnknownReason.LABEL_CANNOT_APPLY, key, post.postTimeMs, replayed))
         }
         if (sessionId != cacheSessionId) {
             cache.clear()
@@ -212,6 +224,10 @@ class RideWatchPipeline(
         }
         cache[pending.cacheKey]?.let { label ->
             return resolvePending(pending, leg, label.toRideEvent(key, pending.post.postTimeMs, pending.replayed))
+        }
+        if (leg.state !in Statechart.CLASSIFIABLE) {
+            // The leg moved on while this post waited (e.g. a driver was assigned): no label could matter now.
+            return resolvePending(pending, leg, UnknownUpdate(UnknownReason.LABEL_CANNOT_APPLY, key, pending.post.postTimeMs, pending.replayed))
         }
         val remaining = pending.deadline - clock.elapsedMs()
         if (remaining <= 0) {
@@ -318,6 +334,11 @@ class RideWatchPipeline(
         if (isRidePost) keys += post.sbnKey else keys -= post.sbnKey
     }
 
+    private fun <T> ArrayDeque<T>.addCapped(entry: T) {
+        addLast(entry)
+        while (size > maxLogEntries) removeFirst()
+    }
+
     private data class CacheKey(val packageName: String, val versionCode: Long?, val normalised: String)
 
     private class Pending(
@@ -351,6 +372,7 @@ class RideWatchPipeline(
 
     companion object {
         const val CLASSIFIER_DEADLINE_MS = 6_000L
+        const val MAX_LOG_ENTRIES = 5_000
         val DEMO_PACKAGES: Set<String> = Provider.DEMO_APPS.map { it.packageName }.toSet()
     }
 }

@@ -89,6 +89,9 @@ enum class UnknownReason {
 
     /** A rule miss on a leg that is not booked yet: never sent to the classifier. */
     NOT_CLASSIFIED,
+
+    /** A rule miss in a state where no label could change the outcome (Statechart.CLASSIFIABLE): not sent, no spend. */
+    LABEL_CANNOT_APPLY,
 }
 
 /** A post RideWatch could not read deterministically. */

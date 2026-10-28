@@ -55,7 +55,25 @@ object Statechart {
 
     /** ONDC states in which a booking exists and can be soft-cancelled. */
     val ONDC_CANCELLABLE: Set<RideState> = setOf(CONFIRMED, ASSIGNED, ARRIVING)
+
+    /** §4.5.6: the states in which a classifier label may propose each status; anywhere else it is an UNKNOWN_UPDATE. */
+    internal val CLASSIFIER_PROPOSALS: Map<NotificationEvent, Set<RideState>> = mapOf(
+        NotificationEvent.SEARCHING to setOf(BOOK_REQUESTED, SEARCHING, DRIVER_CANCELLED),
+        NotificationEvent.ASSIGNED to setOf(SEARCHING, DRIVER_CANCELLED),
+    )
+
+    /**
+     * Ride-app states in which a classifier label can lead somewhere an UNKNOWN_UPDATE would not. In every other state
+     * the outcome is the same whatever the label, so RideWatch does not spend a classification (Modal credit) on it.
+     */
+    val CLASSIFIABLE: Set<RideState> = CLASSIFIER_PROPOSALS.values.flatten().toSet()
 }
+
+/** Provider statuses that mean the booking is still alive in the ride app. */
+private val LIVE_SIGNALS = setOf(
+    NotificationEvent.SEARCHING, NotificationEvent.ASSIGNED, NotificationEvent.ARRIVING,
+    NotificationEvent.DRIVER_CANCELLED, NotificationEvent.TRIP_STARTED,
+)
 
 private class Step(private val before: LegState, private val now: Moment) {
     var leg: LegState = before
@@ -88,15 +106,16 @@ private class Step(private val before: LegState, private val now: Moment) {
         if (u.source == SignalSource.CLASSIFIER && !classifierMayApply(u.signal)) {
             return unknown(UnknownUpdate(UnknownReason.CLASSIFIER_LABEL, u.sbnKey, u.postTimeWallMs, u.replayed))
         }
+        val stale = isStaleReplay(u.replayed, u.postTimeWallMs)
+        // The app says the ride is live after the removal or capture was seen: neither half of rung 3 still counts.
+        if (u.isDeterministic && !stale && u.signal in LIVE_SIGNALS) dropCancelProofHalves()
         val key = u.sbnKey
-        if (u.isDeterministic && key != null) {
-            if (leg.marks[key] == AppliedMark(u.type, leg.generation)) {
-                log(LogReason.IDEMPOTENT)
-                if (u.signal == NotificationEvent.ASSIGNED || u.signal == NotificationEvent.ARRIVING) refreshDriverValues(u)
-                return
-            }
-            if (isStaleReplay(u.replayed, u.postTimeWallMs)) return log(LogReason.STALE_REPLAY)
+        if (u.isDeterministic && key != null && leg.marks[key] == AppliedMark(u.type, leg.generation)) {
+            log(LogReason.IDEMPOTENT)
+            if (u.signal == NotificationEvent.ASSIGNED || u.signal == NotificationEvent.ARRIVING) refreshDriverValues(u)
+            return
         }
+        if (stale) return log(LogReason.STALE_REPLAY)
         applyProvider(u)
         if (u.isDeterministic) {
             if (key != null) mark(key, u.type)
@@ -105,11 +124,8 @@ private class Step(private val before: LegState, private val now: Moment) {
     }
 
     /** §4.5.6: a classifier label may propose SEARCHING/ASSIGNED only where that neither ends nor resolves anything. */
-    private fun classifierMayApply(signal: NotificationEvent): Boolean = when (signal) {
-        NotificationEvent.SEARCHING -> leg.state in setOf(BOOK_REQUESTED, SEARCHING, DRIVER_CANCELLED)
-        NotificationEvent.ASSIGNED -> leg.state in setOf(SEARCHING, DRIVER_CANCELLED)
-        else -> false
-    }
+    private fun classifierMayApply(signal: NotificationEvent): Boolean =
+        leg.state in Statechart.CLASSIFIER_PROPOSALS[signal].orEmpty()
 
     private fun applyProvider(u: ProviderUpdate) {
         val s = u.signal
@@ -530,10 +546,17 @@ private class Step(private val before: LegState, private val now: Moment) {
             if (merged.plateHash == null && u.plateHash != null) merged.copy(plateHash = u.plateHash) else merged
         }
 
+    /** A re-read post older than the leg's latest evidence, or older than the leg itself (left over from an earlier ride). */
     private fun isStaleReplay(replayed: Boolean, postTimeWallMs: Long?): Boolean {
         if (!replayed || postTimeWallMs == null) return false
-        val last = leg.lastEvidenceWallMs ?: return false
-        return postTimeWallMs < last
+        val floor = maxOf(leg.lastEvidenceWallMs ?: Long.MIN_VALUE, leg.notBeforeWallMs ?: Long.MIN_VALUE)
+        return postTimeWallMs < floor
+    }
+
+    private fun dropCancelProofHalves() {
+        if (leg.removalAtElapsedMs != null || leg.cancelledCaptureAtElapsedMs != null) {
+            leg = leg.copy(removalAtElapsedMs = null, cancelledCaptureAtElapsedMs = null)
+        }
     }
 
     private fun mark(key: String, type: EventType) {

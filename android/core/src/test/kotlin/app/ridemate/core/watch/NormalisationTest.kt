@@ -1,6 +1,8 @@
 package app.ridemate.core.watch
 
+import app.ridemate.core.model.RideState
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -71,5 +73,14 @@ class NormalisationTest {
         assertEquals(true, post("Rapido", "Sensitive content hidden", flag = true).isRedacted)
         assertEquals(false, post("Rapido", "Captain on the way").isRedacted)
         assertEquals("Rapido\nCaptain", post("Rapido", "Captain").matchText)
+    }
+
+    @Test
+    fun `posts and classifier requests never print notification text`() {
+        val post = PostSnapshot("com.rapido.passenger", "k", 1, null, "ride_status", null, true, "Captain Ravi", "OTP 4821", 0, 1)
+        val request = ClassifyRequest("rapido", 1, "Captain <m>", "OTP <m>", "ride_status", null, true, RideState.SEARCHING)
+        for (printed in listOf(post.toString(), request.toString(), "$post $request")) {
+            assertFalse(printed, printed.contains("Captain") || printed.contains("OTP") || printed.contains("4821"))
+        }
     }
 }
