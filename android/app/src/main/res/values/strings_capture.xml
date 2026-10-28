@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Screen capture and the share-a-screenshot fallback (app.ridemate.capture, app.ridemate.ocr). -->
+<resources>
+    <string name="capture_android_will_ask_again">Android will ask again</string>
+    <string name="capture_share_not_image">RideMate can only read a screenshot image. Share a screenshot of the ride app\'s price screen.</string>
+    <string name="capture_share_unreadable">RideMate couldn\'t open that screenshot. Take a new screenshot of the price screen and share it again, or type the price in RideMate.</string>
+    <string name="capture_share_reading">Reading the prices in your screenshot…</string>
+</resources>

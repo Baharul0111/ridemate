@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <item name="bubble_head" type="id" />
+    <item name="bubble_status" type="id" />
+    <item name="bubble_card" type="id" />
+</resources>

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="bubble_panel_background">#FF1B1E1C</color>
+    <color name="bubble_panel_outline">#33FFFFFF</color>
+    <color name="bubble_text">#FFF1F1EE</color>
+    <color name="bubble_text_secondary">#FFC3C8C4</color>
+    <color name="bubble_button_background">#FF7FD6BF</color>
+    <color name="bubble_button_text">#FF00382D</color>
+    <color name="bubble_chip_background">#FF22332D</color>
+    <color name="bubble_pointer">#FFF2C66B</color>
+</resources>

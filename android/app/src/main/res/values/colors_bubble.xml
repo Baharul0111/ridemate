@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- GuardianBubble / PointerOverlay / comparison list colours (app.ridemate.bubble, app.ridemate.compare). -->
+<resources>
+    <color name="bubble_panel_background">#FFFFFFFF</color>
+    <color name="bubble_panel_outline">#33000000</color>
+    <color name="bubble_text">#FF1B1E1C</color>
+    <color name="bubble_text_secondary">#FF4A4F4C</color>
+    <color name="bubble_button_background">#FF0F6E5A</color>
+    <color name="bubble_button_text">#FFFFFFFF</color>
+    <color name="bubble_chip_background">#FFE6F4EF</color>
+    <color name="bubble_pointer">#FFD9A441</color>
+</resources>
