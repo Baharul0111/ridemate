@@ -129,22 +129,21 @@ class RecorderTest {
         val json = RecorderExport.toJson(RecorderExport.build(rows, 1_793_000_200_000L, 1, "1.0.0"))
         val doc = Json.parseToJsonElement(json).jsonObject
         assertEquals("1.0", doc["schema"]!!.jsonPrimitive.content)
-        assertEquals("ridemate_recorder", doc["kind"]!!.jsonPrimitive.content)
+        assertEquals("recorder_posts", doc["kind"]!!.jsonPrimitive.content)
         assertEquals("2026-10-26T07:36:40Z", doc["exported_at_utc"]!!.jsonPrimitive.content)
         val posts: JsonArray = doc["posts"]!!.jsonArray
         assertEquals("non-allowlisted rows are left out", 3, posts.size)
         val keys = setOf(
-            "package", "channel_id", "category", "is_ongoing", "notification_id", "tag", "title_masked", "text_masked",
-            "redacted", "event", "removal_reason", "removal_reason_name", "at_utc", "at_ms",
+            "package", "version_code", "channel_id", "category", "is_ongoing", "id", "tag", "title", "text",
+            "redacted", "removal_reason", "removal_reason_name", "posted_at", "at_ms", "label",
         )
         posts.forEach { assertEquals(keys, (it as JsonObject).keys) }
         val first = posts[0].jsonObject
-        assertEquals("posted", first["event"]!!.jsonPrimitive.content)
         assertEquals(JsonNull, first["removal_reason"])
+        assertEquals(JsonNull, first["label"])
         val removed = posts[1].jsonObject
-        assertEquals("removed", removed["event"]!!.jsonPrimitive.content)
         assertEquals("REASON_APP_CANCEL", removed["removal_reason_name"]!!.jsonPrimitive.content)
-        assertFalse("5512" in posts[2].jsonObject["title_masked"]!!.jsonPrimitive.content)
+        assertFalse("5512" in posts[2].jsonObject["title"]!!.jsonPrimitive.content)
         assertTrue("redacted flag kept", posts[2].jsonObject["redacted"]!!.jsonPrimitive.content == "true")
         listOf("98765", "4821", "Ravi", "9876543210", "5512").forEach { assertFalse("$it leaked into the export", it in json) }
     }

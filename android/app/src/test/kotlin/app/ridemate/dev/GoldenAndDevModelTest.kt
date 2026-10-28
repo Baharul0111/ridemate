@@ -164,7 +164,7 @@ class GoldenAndDevModelTest {
         dev.exportRecorder { shared = it }.join()
         val text = shared!!.readText()
         assertTrue(shared!!.name.startsWith("ridemate-recorder-") && shared!!.name.endsWith(".json"))
-        assertTrue("\"kind\": \"ridemate_recorder\"" in text)
+        assertTrue("\"kind\": \"recorder_posts\"" in text)
         assertFalse("7781" in text)
         dev.clearRecorder().join()
         assertTrue(recorder.isEmpty())

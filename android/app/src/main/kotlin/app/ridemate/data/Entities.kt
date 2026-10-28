@@ -260,4 +260,6 @@ data class RecorderPostEntity(
     val redacted: Boolean,
     @ColumnInfo(name = "removal_reason") val removalReason: Int?,
     @ColumnInfo(name = "at_utc") val atUtc: Long,
+    /** The posting app's versionCode (templates are versioned by it; Template Doctor reads it). */
+    @ColumnInfo(name = "version_code") val versionCode: Long? = null,
 )

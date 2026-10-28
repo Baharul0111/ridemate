@@ -33,6 +33,8 @@ data class RecordedPost(
     val redacted: Boolean,
     val removalReason: Int?,
     val atUtcMs: Long,
+    /** The posting app's installed versionCode, when known. */
+    val versionCode: Long? = null,
 )
 
 /**
@@ -63,6 +65,7 @@ object RecorderMasking {
         redacted = post.redacted,
         removalReason = post.removalReason,
         atUtc = post.atUtcMs,
+        versionCode = post.versionCode,
     )
 }
 
@@ -103,27 +106,37 @@ data class RecorderExportFile(
 ) {
     companion object {
         const val SCHEMA = "1.0"
-        const val KIND = "ridemate_recorder"
+
+        /** The kind Template Doctor reads (tools/template_doctor/doctorlib/samples.py). */
+        const val KIND = "recorder_posts"
     }
 }
 
+/**
+ * One post in the export, in Template Doctor's sample shape (`tools/template_doctor/doctorlib/samples.py`):
+ * `package`, `version_code`, `channel_id`, `category`, `is_ongoing`, `id`, `tag`, `title`, `text` (both masked),
+ * `redacted`, `removal_reason`, `posted_at`, and the owner's optional `label` (null until the owner labels it).
+ */
 @Serializable
 data class RecorderExportPost(
     @SerialName("package") val packageName: String,
+    @SerialName("version_code") val versionCode: Long?,
     @SerialName("channel_id") val channelId: String?,
     val category: String?,
     @SerialName("is_ongoing") val isOngoing: Boolean,
-    @SerialName("notification_id") val notificationId: Int,
+    val id: Int,
     val tag: String?,
-    @SerialName("title_masked") val titleMasked: String?,
-    @SerialName("text_masked") val textMasked: String?,
+    /** Masked on the phone (and again on export). */
+    val title: String?,
+    /** Masked on the phone (and again on export). */
+    val text: String?,
     val redacted: Boolean,
-    /** "posted" or "removed". */
-    val event: String,
     @SerialName("removal_reason") val removalReason: Int?,
     @SerialName("removal_reason_name") val removalReasonName: String?,
-    @SerialName("at_utc") val atUtc: String,
+    @SerialName("posted_at") val postedAt: String,
     @SerialName("at_ms") val atMs: Long,
+    /** Owner's ground truth (a template event or OTHER); exported empty. */
+    val label: String? = null,
 )
 
 object RecorderExport {
@@ -158,18 +171,18 @@ object RecorderExport {
             posts = rows.filter { it.packageName in Provider.RIDE_APP_PACKAGES }.map { row ->
                 RecorderExportPost(
                     packageName = row.packageName,
+                    versionCode = row.versionCode,
                     channelId = row.channelId,
                     category = row.category,
                     isOngoing = row.isOngoing,
-                    notificationId = row.notifId,
+                    id = row.notifId,
                     tag = RecorderMasking.mask(row.tag),
-                    titleMasked = RecorderMasking.mask(row.titleMasked),
-                    textMasked = RecorderMasking.mask(row.textMasked),
+                    title = RecorderMasking.mask(row.titleMasked),
+                    text = RecorderMasking.mask(row.textMasked),
                     redacted = row.redacted,
-                    event = if (row.removalReason == null) "posted" else "removed",
                     removalReason = row.removalReason,
                     removalReasonName = reasonName(row.removalReason),
-                    atUtc = Instant.ofEpochMilli(row.atUtc).toString(),
+                    postedAt = Instant.ofEpochMilli(row.atUtc).toString(),
                     atMs = row.atUtc,
                 )
             },

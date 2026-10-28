@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 2,
-    "identityHash": "7f8057ce9263919539ae392e23c6407e",
+    "identityHash": "8fa67c1011c32015fff88fa27c24c7ad",
     "entities": [
       {
         "tableName": "session",
@@ -688,7 +688,7 @@
       },
       {
         "tableName": "recorder_post",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `package` TEXT NOT NULL, `channel_id` TEXT, `category` TEXT, `is_ongoing` INTEGER NOT NULL, `notif_id` INTEGER NOT NULL, `tag` TEXT, `title_masked` TEXT, `text_masked` TEXT, `redacted` INTEGER NOT NULL, `removal_reason` INTEGER, `at_utc` INTEGER NOT NULL)",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `package` TEXT NOT NULL, `channel_id` TEXT, `category` TEXT, `is_ongoing` INTEGER NOT NULL, `notif_id` INTEGER NOT NULL, `tag` TEXT, `title_masked` TEXT, `text_masked` TEXT, `redacted` INTEGER NOT NULL, `removal_reason` INTEGER, `at_utc` INTEGER NOT NULL, `version_code` INTEGER)",
         "fields": [
           {
             "fieldPath": "id",
@@ -755,6 +755,11 @@
             "columnName": "at_utc",
             "affinity": "INTEGER",
             "notNull": true
+          },
+          {
+            "fieldPath": "versionCode",
+            "columnName": "version_code",
+            "affinity": "INTEGER"
           }
         ],
         "primaryKey": {
@@ -778,7 +783,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '7f8057ce9263919539ae392e23c6407e')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '8fa67c1011c32015fff88fa27c24c7ad')"
     ]
   }
 }
