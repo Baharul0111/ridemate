@@ -132,7 +132,8 @@ class SessionBubble(
 
     /** What the bubble should show for [ui]; null hides it. Public for tests. */
     fun stateFor(status: GuardianStatus, ui: GuardianUiState, pasteDrop: Boolean): BubbleState? {
-        if (!status.sessionOpen || status.demo || status.stopRequested) return null
+        // Stop with extra bookings still pending keeps the session (I8): the bubble keeps guiding those cancels.
+        if (!status.sessionOpen || status.demo) return null
         currentCard(ui)?.let { card ->
             val presented = deps.presenter().present(card)
             val instruction = InstructionCard(
