@@ -42,6 +42,8 @@ import app.ridemate.precheck.AndroidPrecheckProbes
 import app.ridemate.precheck.PreSessionCheck
 import app.ridemate.precheck.RideWatchStatus
 import app.ridemate.trip.RecentPlacesStore
+import app.ridemate.ui.AppShell
+import app.ridemate.ui.FeatureBindings
 import app.ridemate.update.UpdateChecker
 import app.ridemate.util.BuildInfo
 import app.ridemate.util.Clock
@@ -214,6 +216,13 @@ class AppGraph(
 
     // ---- fare reading (bubble, capture, OCR + masking, Read fares, comparison list) ----
     val fareReading: FareReadingModule by lazy { FareReadingModule(this) }
+
+    // ---- app shell (app.ridemate.ui / onboarding / home / settings / dev) ----
+    /** Other areas' screens and services as the shell sees them; the integration step binds the real ones here. */
+    val featureBindings: FeatureBindings by lazy { FeatureBindings() }
+
+    /** Onboarding state, settings, language, developer mode, the Recorder sink and the self-test registry. */
+    val appShell: AppShell by lazy { AppShell(this) }
 
     @Volatile
     private var started = false

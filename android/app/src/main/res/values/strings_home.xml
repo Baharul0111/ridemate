@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Home (app.ridemate.home): compare, demo, active session, AI status, kill switches, update banner. -->
+<resources>
+    <string name="home_settings_cd">Settings</string>
+    <string name="home_intro">Tell RideMate where you\'re going once. It opens each ride app with your route and reads the prices into one list. You book in the apps yourself.</string>
+    <string name="home_compare">Compare ride prices</string>
+    <string name="home_checking">Checking RideMate\'s permissions…</string>
+    <string name="home_blocked_heading">Fix these to compare prices</string>
+    <string name="home_warnings_heading">Before you compare</string>
+    <string name="home_continue_anyway">Continue anyway</string>
+    <string name="home_check_close">Close</string>
+
+    <string name="home_demo_title">Try the demo</string>
+    <string name="home_demo_body">See RideMate read prices, find a driver, guide a cancel and offer a better ride, using made-up sample screens. No ride app or sign-in needed.</string>
+    <string name="home_demo_off">The demo is switched off for now. Try again later.</string>
+    <string name="home_try_demo">Try the demo</string>
+    <string name="home_try_demo_cd">Try the demo with made-up sample screens</string>
+
+    <string name="home_session_title">Ride in progress</string>
+    <string name="home_session_body">To %1$s · %2$s · started %3$s</string>
+    <string name="home_session_open">Open ride guardian</string>
+
+    <string name="home_update_download">Download update</string>
+    <string name="home_update_no_link">Check the RideMate GitHub page for the new version.</string>
+
+    <string name="home_ai_label">AI reading</string>
+    <string name="home_ai_checking">Checking…</string>
+    <string name="home_ai_on">On</string>
+    <plurals name="home_ai_on_reads_left">
+        <item quantity="one">On · %d read left today</item>
+        <item quantity="other">On · %d reads left today</item>
+    </plurals>
+    <string name="home_ai_switched_off">Switched off for now. Type prices yourself.</string>
+    <string name="home_ai_manual">Manual mode: you type prices. Sign in with Google for AI reading.</string>
+    <string name="home_ai_resumes_at">Paused. AI reading resumes at %1$s (IST). Type prices meanwhile.</string>
+    <string name="home_ai_paused">Paused for now. Type prices meanwhile.</string>
+    <string name="home_ai_retry">Check again</string>
+    <string name="home_sign_in">Sign in with Google</string>
+    <string name="home_guardian_keeps_working">The ride guardian and cancel reminders keep working.</string>
+
+    <string name="home_status_heading">Feature status</string>
+    <string name="home_switch_on">On</string>
+    <string name="home_switch_off">Off</string>
+    <string name="home_switch_ai">AI reading</string>
+    <string name="home_switch_reader">%1$s reading</string>
+    <string name="home_switch_ondc">Open network (ONDC)</string>
+    <string name="home_switch_demo">Demo</string>
+
+    <!-- Pre-session issues: what is wrong, why, and the fix. -->
+    <string name="home_issue_listener_title">RideMate can\'t see ride-app notifications</string>
+    <string name="home_issue_listener_body">Without notification access RideMate can\'t tell when a driver accepts, so it can\'t remind you to cancel extra bookings.</string>
+    <string name="home_issue_listener_action">Turn on notification access</string>
+    <string name="home_issue_overlay_title">The floating button is off</string>
+    <string name="home_issue_overlay_body">RideMate needs \"Display over other apps\" to show its button over the ride apps.</string>
+    <string name="home_issue_overlay_action">Turn on the floating button</string>
+    <string name="home_issue_notif_title">Notifications are off</string>
+    <string name="home_issue_notif_body">Reminders to cancel extra bookings appear as notifications.</string>
+    <string name="home_issue_notif_action">Turn on notifications</string>
+    <string name="home_issue_no_app_title">No ride app installed</string>
+    <string name="home_issue_no_app_body">Install Uber, Ola or Rapido to compare real prices, or try the demo now.</string>
+    <string name="home_issue_battery_title">Battery saving may delay reminders</string>
+    <string name="home_issue_battery_body">Allow RideMate to run in the background so reminders arrive on time.</string>
+    <string name="home_issue_battery_action">Allow background running</string>
+    <string name="home_issue_location_title">Location is off</string>
+    <string name="home_issue_location_body">You\'ll type your pickup address yourself. Turn on location in App info → Permissions to fill it in automatically.</string>
+    <string name="home_issue_location_action">Open App info</string>
+    <string name="home_issue_offline_title">You\'re offline</string>
+    <string name="home_issue_offline_body">Ride apps and AI reading need the internet. Connect, then check again.</string>
+    <string name="home_issue_offline_action">Check again</string>
+</resources>

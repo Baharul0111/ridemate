@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Developer mode (app.ridemate.dev): Recorder, capture test, golden captures, budget, owner alerts. -->
+<resources>
+    <string name="dev_title">Developer mode</string>
+    <string name="dev_intro">Owner tools. Everything here stays on this phone until you share it yourself. RideMate never acts inside the ride apps.</string>
+    <string name="dev_off_title">Developer mode is off</string>
+    <string name="dev_off_body">Developer mode is only for RideMate\'s owner. Sign in with the owner\'s Google account and tap the version in About seven times.</string>
+    <string name="dev_ok">OK</string>
+    <string name="dev_yes">Yes</string>
+    <string name="dev_no">No</string>
+    <string name="dev_close">Close</string>
+    <string name="dev_choose">Choose…</string>
+    <string name="dev_share_title">Share export</string>
+
+    <string name="dev_recorder">Recorder</string>
+    <string name="dev_recorder_body">Logs every post and removal from Uber, Ola and Rapido with masked text: package, channel, category, ongoing flag, id and tag, redaction and removal reason.</string>
+    <string name="dev_recorder_switch">Record ride-app notifications</string>
+    <plurals name="dev_recorder_recent">
+        <item quantity="one">%d recent entry</item>
+        <item quantity="other">%d recent entries</item>
+    </plurals>
+    <string name="dev_recorder_posted">posted</string>
+    <string name="dev_recorder_removed">removed (%1$s)</string>
+    <string name="dev_recorder_meta">channel %1$s · category %2$s · ongoing %3$s · id %4$d · redacted %5$s</string>
+    <string name="dev_recorder_export">Export as JSON</string>
+    <string name="dev_recorder_clear">Clear the Recorder log</string>
+
+    <string name="dev_capture_test">Capture test</string>
+    <string name="dev_capture_test_body">Open a ride app screen, come back and run one capture. Android asks for permission first. Shows whether the frame was black (the app blocks capture) and whether the bubble was visible.</string>
+    <string name="dev_capture_test_run">Run capture test</string>
+    <string name="dev_capture_test_running">Capturing…</string>
+    <string name="dev_capture_black_frame">Black frame</string>
+    <string name="dev_capture_bubble_visible">Bubble visible</string>
+    <string name="dev_capture_denied">Capture permission was declined. Run the test again and allow it.</string>
+    <string name="dev_capture_unavailable">Screen capture isn\'t available in this build yet.</string>
+
+    <string name="dev_golden">Golden captures</string>
+    <string name="dev_golden_body">Capture masked screens, label the true price and ETA of every row, then export labels.json and the images for the private golden set.</string>
+    <string name="dev_golden_capture">Capture a masked screen</string>
+    <string name="dev_golden_item">Capture %1$d</string>
+    <string name="dev_golden_image_cd">Masked capture %1$d</string>
+    <string name="dev_golden_no_image">Image missing</string>
+    <string name="dev_golden_app">App</string>
+    <string name="dev_golden_screen_type">Screen type</string>
+    <string name="dev_golden_trip_km">Trip distance (km, optional)</string>
+    <string name="dev_golden_row">Row %1$d</string>
+    <string name="dev_golden_vehicle">Vehicle class</string>
+    <string name="dev_golden_label">Label on screen</string>
+    <string name="dev_golden_price_min">Price (₹, lowest)</string>
+    <string name="dev_golden_price_max">Price (₹, highest)</string>
+    <string name="dev_golden_eta">Pickup ETA (min)</string>
+    <string name="dev_golden_struck">Crossed-out price (₹)</string>
+    <string name="dev_golden_remove_row">Remove row %1$d</string>
+    <string name="dev_golden_add_row">Add a row</string>
+    <string name="dev_golden_driver_eta">Driver ETA (min)</string>
+    <string name="dev_golden_driver_distance">Driver distance (e.g. 1.2 km)</string>
+    <string name="dev_golden_tags">Tags (comma-separated)</string>
+    <string name="dev_golden_complete">Ready to export</string>
+    <string name="dev_golden_incomplete">Needs</string>
+    <string name="dev_golden_save">Save labels</string>
+    <string name="dev_golden_delete">Delete this capture</string>
+    <string name="dev_golden_ready">%1$d of %2$d captures ready to export</string>
+    <string name="dev_golden_export">Export labels and images</string>
+    <string name="dev_golden_p_app">the app</string>
+    <string name="dev_golden_p_type">the screen type</string>
+    <string name="dev_golden_p_rows">at least one row</string>
+    <string name="dev_golden_p_label">a label in every row</string>
+    <string name="dev_golden_p_price">a price in every row</string>
+    <string name="dev_golden_p_order">lowest price not above highest</string>
+    <string name="dev_golden_p_class">a vehicle class in every row</string>
+    <string name="dev_golden_p_number">numbers that aren\'t negative</string>
+
+    <string name="dev_budget">Modal credit budget</string>
+    <string name="dev_budget_idle">Load the budget from RideMate\'s server.</string>
+    <string name="dev_budget_loading">Loading…</string>
+    <string name="dev_budget_load">Load budget</string>
+    <string name="dev_budget_failed">Couldn\'t load the budget</string>
+    <string name="dev_budget_not_owner">The server shows the budget only to owner accounts. Sign in with the owner\'s Google account.</string>
+    <string name="dev_budget_of">%1$s of %2$s (%3$d%%)</string>
+    <string name="dev_budget_unknown">Not reported</string>
+    <string name="dev_budget_ai">AI spend</string>
+    <string name="dev_budget_compute">Server compute spend</string>
+    <string name="dev_budget_today">Today (pacing cap)</string>
+    <string name="dev_budget_horizon">Budget horizon ends</string>
+    <string name="dev_budget_profile">Cap profile</string>
+    <string name="dev_budget_ai_state">AI reading</string>
+    <string name="dev_budget_ai_on">On</string>
+    <string name="dev_budget_ai_off">Off</string>
+    <string name="dev_budget_ai_off_because">Off: %1$s</string>
+    <string name="dev_budget_ai_off_code">Off (server code %1$s)</string>
+    <string name="dev_reason_signed_out">not signed in</string>
+    <string name="dev_reason_anonymous">not signed in with Google</string>
+    <string name="dev_reason_kill_switch">switched off by the owner</string>
+    <string name="dev_reason_budget">credit budget used up</string>
+    <string name="dev_reason_day_cap">today\'s pacing cap reached</string>
+    <string name="dev_reason_tier_pause">paused for new and heavy accounts</string>
+    <string name="dev_reason_quota">this account\'s daily fair share is used</string>
+    <string name="dev_reason_breaker">the model endpoint is failing (circuit breaker open)</string>
+    <string name="dev_reason_meter">spend meter unreadable (fails closed)</string>
+    <string name="dev_reason_model_missing">the pinned model is missing</string>
+    <string name="dev_profile_normal">Normal</string>
+    <string name="dev_profile_judging">Judging week</string>
+
+    <string name="dev_owner_alerts">Owner alerts</string>
+    <string name="dev_owner_alerts_switch">Send owner alerts to this phone</string>
+    <string name="dev_owner_alerts_body">Registers this phone\'s push token with RideMate\'s server for alerts such as reading accuracy dropping.</string>
+    <string name="dev_owner_alerts_working">Updating…</string>
+    <string name="dev_owner_alerts_registered">This phone will receive owner alerts.</string>
+    <string name="dev_owner_alerts_off">Owner alerts are off for this phone.</string>
+    <string name="dev_owner_alerts_no_token">Couldn\'t get a push token. Check that Google Play services is up to date, then try again.</string>
+
+    <string name="dev_leave">Leave developer mode</string>
+    <string name="dev_disable">Turn off developer mode</string>
+
+    <string name="dev_msg_recorder_empty">The Recorder log is empty. Turn recording on and use a ride app first.</string>
+    <string name="dev_msg_recorder_cleared">The Recorder log was cleared.</string>
+    <string name="dev_msg_golden_saved">Labels saved.</string>
+    <string name="dev_msg_golden_nothing">No capture is fully labelled yet. Finish the labels, then export.</string>
+    <string name="dev_msg_golden_denied">Capture permission was declined. Try again and allow it.</string>
+    <string name="dev_msg_golden_black">That app blocks screen capture (black frame). Nothing was saved.</string>
+    <string name="dev_msg_golden_unavailable">Screen capture isn\'t available in this build yet.</string>
+    <string name="dev_msg_golden_captured">Masked capture saved. Add its labels below.</string>
+    <string name="dev_msg_export_failed">The export couldn\'t be written. Free some storage and try again.</string>
+    <string name="dev_msg_storage_failed">The phone\'s storage couldn\'t be read or written, so nothing changed. Free some storage and try again.</string>
+</resources>

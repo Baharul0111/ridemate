@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="home_settings_cd">सेटिंग्स</string>
+    <string name="home_intro">RideMate को एक बार बताइए कि आप कहाँ जा रहे हैं। वह हर राइड ऐप को आपके रूट के साथ खोलता है और किराए एक सूची में पढ़ता है। बुकिंग आप ऐप्स में स्वयं करते हैं।</string>
+    <string name="home_compare">राइड के किराए की तुलना करें</string>
+    <string name="home_checking">RideMate की अनुमतियाँ जाँची जा रही हैं…</string>
+    <string name="home_blocked_heading">किराए की तुलना के लिए इन्हें ठीक करें</string>
+    <string name="home_warnings_heading">तुलना से पहले</string>
+    <string name="home_continue_anyway">फिर भी आगे बढ़ें</string>
+    <string name="home_check_close">बंद करें</string>
+
+    <string name="home_demo_title">डेमो आज़माएँ</string>
+    <string name="home_demo_body">काल्पनिक नमूना स्क्रीन से देखें कि RideMate किराए कैसे पढ़ता है, ड्राइवर मिलने पर क्या करता है, रद्द करने में कैसे मदद करता है और बेहतर राइड कैसे सुझाता है। किसी राइड ऐप या साइन-इन की ज़रूरत नहीं।</string>
+    <string name="home_demo_off">डेमो अभी बंद है। बाद में फिर कोशिश करें।</string>
+    <string name="home_try_demo">डेमो आज़माएँ</string>
+    <string name="home_try_demo_cd">काल्पनिक नमूना स्क्रीन के साथ डेमो आज़माएँ</string>
+
+    <string name="home_session_title">राइड जारी है</string>
+    <string name="home_session_body">%1$s तक · %2$s · %3$s पर शुरू</string>
+    <string name="home_session_open">राइड गार्डियन खोलें</string>
+
+    <string name="home_update_download">अपडेट डाउनलोड करें</string>
+    <string name="home_update_no_link">नए संस्करण के लिए RideMate का GitHub पेज देखें।</string>
+
+    <string name="home_ai_label">AI से पढ़ना</string>
+    <string name="home_ai_checking">जाँच हो रही है…</string>
+    <string name="home_ai_on">चालू</string>
+    <plurals name="home_ai_on_reads_left">
+        <item quantity="one">चालू · आज %d बार और पढ़ सकते हैं</item>
+        <item quantity="other">चालू · आज %d बार और पढ़ सकते हैं</item>
+    </plurals>
+    <string name="home_ai_switched_off">अभी बंद है। किराए स्वयं टाइप करें।</string>
+    <string name="home_ai_manual">मैनुअल मोड: आप किराए टाइप करते हैं। AI से पढ़ने के लिए Google से साइन इन करें।</string>
+    <string name="home_ai_resumes_at">रुका हुआ है। AI से पढ़ना %1$s (IST) पर फिर शुरू होगा। तब तक किराए टाइप करें।</string>
+    <string name="home_ai_paused">अभी रुका हुआ है। तब तक किराए टाइप करें।</string>
+    <string name="home_ai_retry">फिर से जाँचें</string>
+    <string name="home_sign_in">Google से साइन इन करें</string>
+    <string name="home_guardian_keeps_working">राइड गार्डियन और रद्द करने के रिमाइंडर काम करते रहते हैं।</string>
+
+    <string name="home_status_heading">सुविधाओं की स्थिति</string>
+    <string name="home_switch_on">चालू</string>
+    <string name="home_switch_off">बंद</string>
+    <string name="home_switch_ai">AI से पढ़ना</string>
+    <string name="home_switch_reader">%1$s पढ़ना</string>
+    <string name="home_switch_ondc">ओपन नेटवर्क (ONDC)</string>
+    <string name="home_switch_demo">डेमो</string>
+
+    <string name="home_issue_listener_title">RideMate राइड ऐप्स की सूचनाएँ नहीं देख पा रहा</string>
+    <string name="home_issue_listener_body">सूचना-पहुँच के बिना RideMate नहीं जान सकता कि ड्राइवर ने राइड कब स्वीकार की, इसलिए वह अतिरिक्त बुकिंग रद्द करने की याद नहीं दिला सकता।</string>
+    <string name="home_issue_listener_action">सूचना-पहुँच चालू करें</string>
+    <string name="home_issue_overlay_title">तैरता बटन बंद है</string>
+    <string name="home_issue_overlay_body">राइड ऐप्स के ऊपर अपना बटन दिखाने के लिए RideMate को \"दूसरे ऐप्स के ऊपर दिखाने\" की अनुमति चाहिए।</string>
+    <string name="home_issue_overlay_action">तैरता बटन चालू करें</string>
+    <string name="home_issue_notif_title">सूचनाएँ बंद हैं</string>
+    <string name="home_issue_notif_body">अतिरिक्त बुकिंग रद्द करने के रिमाइंडर सूचनाओं के रूप में आते हैं।</string>
+    <string name="home_issue_notif_action">सूचनाएँ चालू करें</string>
+    <string name="home_issue_no_app_title">कोई राइड ऐप इंस्टॉल नहीं है</string>
+    <string name="home_issue_no_app_body">असली किराए की तुलना के लिए Uber, Ola या Rapido इंस्टॉल करें, या अभी डेमो आज़माएँ।</string>
+    <string name="home_issue_battery_title">बैटरी बचत से रिमाइंडर देर से आ सकते हैं</string>
+    <string name="home_issue_battery_body">RideMate को बैकग्राउंड में चलने दें ताकि रिमाइंडर समय पर आएँ।</string>
+    <string name="home_issue_battery_action">बैकग्राउंड में चलने की अनुमति दें</string>
+    <string name="home_issue_location_title">लोकेशन बंद है</string>
+    <string name="home_issue_location_body">आपको पिकअप पता स्वयं टाइप करना होगा। इसे अपने आप भरने के लिए ऐप जानकारी → अनुमतियाँ में लोकेशन चालू करें।</string>
+    <string name="home_issue_location_action">ऐप जानकारी खोलें</string>
+    <string name="home_issue_offline_title">आप ऑफ़लाइन हैं</string>
+    <string name="home_issue_offline_body">राइड ऐप्स और AI से पढ़ने के लिए इंटरनेट चाहिए। इंटरनेट से जुड़ें, फिर दोबारा जाँचें।</string>
+    <string name="home_issue_offline_action">फिर से जाँचें</string>
+</resources>

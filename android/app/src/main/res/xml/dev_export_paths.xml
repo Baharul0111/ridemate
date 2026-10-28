@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Developer exports (Recorder JSON, golden captures) shared by hand through the share sheet. -->
+<paths>
+    <cache-path name="dev_exports" path="dev_exports/" />
+</paths>

@@ -145,6 +145,17 @@
             </intent-filter>
         </service>
 
+        <!-- Developer mode exports (Recorder JSON, golden captures): shared by hand via the share sheet, read-only. -->
+        <provider
+            android:name=".dev.DevExportFileProvider"
+            android:authorities="${applicationId}.devexports"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/dev_export_paths" />
+        </provider>
+
         <meta-data
             android:name="firebase_analytics_collection_deactivated"
             android:value="true" />

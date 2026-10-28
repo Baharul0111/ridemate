@@ -1,0 +1,106 @@
+package app.ridemate.ui
+
+import app.ridemate.AppGraph
+import app.ridemate.dev.DevExports
+import app.ridemate.dev.DeveloperModeGate
+import app.ridemate.dev.FirebaseOwnerPushTokens
+import app.ridemate.dev.GoldenStore
+import app.ridemate.dev.OwnerEmails
+import app.ridemate.dev.OwnerPushTokens
+import app.ridemate.dev.RecorderSink
+import app.ridemate.dev.RoomRecorderSink
+import app.ridemate.home.AndroidConnectivity
+import app.ridemate.home.DefaultPreSessionGate
+import app.ridemate.home.PackageManagerRideApps
+import app.ridemate.home.PreSessionGate
+import app.ridemate.onboarding.AndroidPermissionChecker
+import app.ridemate.onboarding.AndroidSelfTestNotifier
+import app.ridemate.onboarding.DeviceProfile
+import app.ridemate.onboarding.HealthCheck
+import app.ridemate.onboarding.OnboardingController
+import app.ridemate.onboarding.OnboardingStore
+import app.ridemate.onboarding.PermissionChecker
+import app.ridemate.onboarding.RideWatchSelfTest
+import app.ridemate.onboarding.SelfTestRegistry
+import app.ridemate.onboarding.SignInReoffer
+import app.ridemate.privacy.LocalDataWiper
+import app.ridemate.settings.DefaultLanguageController
+import app.ridemate.settings.LanguageController
+import app.ridemate.settings.SettingsStore
+import kotlinx.coroutines.CoroutineScope
+import java.io.File
+
+/**
+ * The app shell's singletons (onboarding, home, settings, developer mode), reached as `graph.appShell`. Other areas
+ * use:
+ * - [recorderSink]: RideWatch hands every allowlisted post to it while `isRecording` (§4.19 a);
+ * - [selfTestRegistry]: RideWatch reports RideMate's own `rm_selftest` post to it (onboarding health check);
+ * - [settingsStore]: `keepSearchingDefault`;
+ * - [signInReoffer]: the one-time Google sign-in offer at the first "Read fares";
+ * - [developerMode]: `isEnabled()` / `isRecording()`.
+ */
+class AppShell(private val graph: AppGraph) {
+    private val context get() = graph.context
+
+    val device: DeviceProfile by lazy { DeviceProfile.of(context) }
+    val permissions: PermissionChecker by lazy { AndroidPermissionChecker(context) }
+
+    val onboardingStore: OnboardingStore by lazy { OnboardingStore(SharedPrefsKeyValueStore(context, PREFS_ONBOARDING)) }
+    val settingsStore: SettingsStore by lazy { SettingsStore(SharedPrefsKeyValueStore(context, SettingsStore.PREFS_NAME)) }
+    val language: LanguageController by lazy { DefaultLanguageController.create(context, settingsStore) }
+
+    val selfTestRegistry: SelfTestRegistry = SelfTestRegistry()
+
+    /** A3's RideWatchStatus when bound, else the registry RideWatch feeds. */
+    val rideWatchSelfTest: RideWatchSelfTest get() = graph.featureBindings.rideWatchSelfTest ?: selfTestRegistry
+
+    val healthCheck: HealthCheck by lazy { HealthCheck(permissions, AndroidSelfTestNotifier(context), { rideWatchSelfTest }) }
+    val signInReoffer: SignInReoffer by lazy { SignInReoffer(onboardingStore, graph.authGateway.state) }
+
+    val developerMode: DeveloperModeGate by lazy {
+        DeveloperModeGate(
+            store = SharedPrefsKeyValueStore(context, PREFS_DEV),
+            auth = graph.authGateway.state,
+            ownerHashes = { OwnerEmails.hashesFrom(graph.configRepository) },
+            clock = graph.clock,
+        )
+    }
+
+    val recorderSink: RecorderSink by lazy {
+        RoomRecorderSink({ graph.db.recorderPostDao() }, developerMode, graph.appScope, graph.dispatchers.io, graph.crashReporter)
+    }
+
+    val goldenStore: GoldenStore by lazy { GoldenStore(File(context.filesDir, GOLDEN_DIR)) }
+    val exports: DevExports by lazy { DevExports(context) }
+    val ownerPushTokens: OwnerPushTokens by lazy { FirebaseOwnerPushTokens() }
+
+    private val defaultPreSessionGate: PreSessionGate by lazy {
+        DefaultPreSessionGate(permissions, PackageManagerRideApps(context), AndroidConnectivity(context))
+    }
+
+    /** A2's PreSessionCheck when bound, else the permission-based default. */
+    val preSessionGate: PreSessionGate get() = graph.featureBindings.preSessionGate ?: defaultPreSessionGate
+
+    fun onboardingController(scope: CoroutineScope): OnboardingController =
+        OnboardingController(onboardingStore, permissions, device, graph.authGateway, healthCheck, scope)
+
+    init {
+        // Erase also forgets onboarding answers, the keep-searching choice, developer mode and every developer export.
+        // The display language stays: it is how the phone shows text, not data about the user.
+        graph.localWipers.add(LocalDataWiper { wipeLocal() })
+    }
+
+    fun wipeLocal() {
+        onboardingStore.clear()
+        settingsStore.setKeepSearchingDefault(false)
+        developerMode.reset()
+        goldenStore.clear()
+        exports.clear()
+    }
+
+    companion object {
+        const val PREFS_ONBOARDING = "ridemate_onboarding"
+        const val PREFS_DEV = "ridemate_developer"
+        const val GOLDEN_DIR = "golden"
+    }
+}
