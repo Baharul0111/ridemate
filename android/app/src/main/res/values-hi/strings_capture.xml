@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="capture_android_will_ask_again">Android फिर से पूछेगा</string>
+    <string name="capture_share_not_image">RideMate सिर्फ़ स्क्रीनशॉट की तस्वीर पढ़ सकता है। राइड ऐप की दाम वाली स्क्रीन का स्क्रीनशॉट शेयर करें।</string>
+    <string name="capture_share_unreadable">RideMate वह स्क्रीनशॉट नहीं खोल सका। दाम वाली स्क्रीन का नया स्क्रीनशॉट लेकर फिर से शेयर करें, या RideMate में दाम टाइप करें।</string>
+    <string name="capture_share_reading">आपके स्क्रीनशॉट के दाम पढ़े जा रहे हैं…</string>
+</resources>

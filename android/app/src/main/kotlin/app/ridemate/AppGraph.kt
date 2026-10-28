@@ -7,6 +7,7 @@ import androidx.lifecycle.LifecycleOwner
 import app.ridemate.auth.AuthGateway
 import app.ridemate.auth.AuthState
 import app.ridemate.auth.DefaultAuthGateway
+import app.ridemate.compare.FareReadingModule
 import app.ridemate.config.ConfigRepository
 import app.ridemate.crash.CrashKey
 import app.ridemate.crash.CrashReporter
@@ -144,6 +145,9 @@ class AppGraph(
             scope = appScope,
         )
     }
+
+    // ---- fare reading (bubble, capture, OCR + masking, Read fares, comparison list) ----
+    val fareReading: FareReadingModule by lazy { FareReadingModule(this) }
 
     @Volatile
     private var started = false

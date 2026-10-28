@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="bubble_action_read_fares">किराया पढ़ें</string>
+    <string name="bubble_action_read_fares_description">किराया पढ़ें: RideMate इस स्क्रीन के दाम एक बार पढ़ेगा</string>
+    <string name="bubble_action_show_me">मुझे दिखाएँ</string>
+    <string name="bubble_action_show_me_description">दिखाएँ कि Cancel कहाँ टैप करना है। Android आपकी स्क्रीन शेयर करने की अनुमति फिर से माँगेगा</string>
+    <string name="bubble_action_booked_here">यहाँ बुक किया</string>
+    <string name="bubble_action_booked_here_description">यहाँ बुक किया: RideMate को बताएँ कि आपने इस ऐप में राइड बुक की</string>
+    <string name="bubble_action_done">हो गया</string>
+    <string name="bubble_action_done_description">हो गया: इस ऐप में मेरा काम पूरा हुआ</string>
+    <string name="bubble_action_paste_drop">ड्रॉप पेस्ट करें</string>
+    <string name="bubble_action_paste_drop_description">ड्रॉप पेस्ट करें: अपना ड्रॉप पता फिर से कॉपी करें, फिर ऐप के गंतव्य बॉक्स को देर तक दबाकर Paste टैप करें</string>
+    <string name="bubble_action_stop">रोकें</string>
+    <string name="bubble_action_stop_description">इस यात्रा के लिए RideMate रोकें</string>
+
+    <string name="bubble_head_description">RideMate नियंत्रण। खोलने या बंद करने के लिए दो बार टैप करें। हटाने के लिए खींचें।</string>
+    <string name="bubble_head_open">खुला</string>
+    <string name="bubble_head_closed">बंद</string>
+
+    <string name="bubble_status_reading">दाम पढ़े जा रहे हैं…</string>
+    <string name="bubble_status_working">काम चल रहा है</string>
+    <string name="bubble_status_kind_info">जानकारी</string>
+    <string name="bubble_status_kind_problem">समस्या</string>
+    <string name="bubble_status_kind_reminder">याद दिलाना</string>
+    <string name="bubble_status_spoken">%1$s: %2$s</string>
+</resources>

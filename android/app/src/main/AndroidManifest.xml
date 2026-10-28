@@ -85,6 +85,13 @@
             </intent-filter>
         </activity>
 
+        <!-- The comparison list and the type-a-price form (opened from the bubble in manual mode). Never exported. -->
+        <activity
+            android:name=".compare.ComparisonActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize"
+            android:theme="@style/Theme.RideMate" />
+
         <!-- RideWatch: reads posts from com.ubercab, com.olacabs.customer, com.rapido.passenger only (I7). -->
         <service
             android:name=".watch.RideWatchService"

@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Reading fares and the comparison list (app.ridemate.compare). Names without the compare_ prefix are core GateText keys. -->
+<resources>
+    <!-- core GateText keys (§4.3): never change the names. -->
+    <string name="quote_unreadable">Couldn\'t read · check in app</string>
+    <string name="eta_see_in_app">ETA: see in app</string>
+    <!-- %1$s: ride app name -->
+    <string name="driver_see_in_app">see in %1$s</string>
+    <string name="quote_entered_by_you">entered by you</string>
+    <string name="quote_network">network quote</string>
+    <!-- %1$s: ride app name; %2$s: time like 1:05:09 PM (IST) -->
+    <string name="quote_seen_at">seen in %1$s at %2$s</string>
+    <string name="quote_stale">old, tap to refresh</string>
+    <string name="quote_cheapest">cheapest</string>
+
+    <!-- Outcomes of a Read fares tap (bubble status line). -->
+    <string name="compare_not_fare_screen">This doesn\'t look like a fare screen. Open %1$s\'s price list and tap Read fares again.</string>
+    <string name="compare_capture_blocked">%1$s hides its screen from capture. Take a screenshot and share it to RideMate, or type the price in RideMate.</string>
+    <string name="compare_consent_needed">Screen sharing wasn\'t allowed. Tap Read fares to try again, or type the price in RideMate.</string>
+    <string name="compare_capture_failed">RideMate couldn\'t read the screen. Tap Read fares again.</string>
+    <string name="compare_too_slow">The screen wasn\'t read in time, so it wasn\'t used. Tap Read fares again.</string>
+    <string name="compare_timed_out">That took too long. Tap Read fares again, or type the price in RideMate.</string>
+    <string name="compare_no_comparison">Start a comparison in RideMate first, then open a ride app from there.</string>
+    <string name="compare_no_prices_found">No prices found on this screen. Open %1$s\'s price list and tap Read fares again.</string>
+    <string name="compare_none_verified">RideMate couldn\'t confirm the prices in %1$s. Check them in the app, or type the price in RideMate.</string>
+    <plurals name="compare_prices_checked">
+        <item quantity="one">%1$d price checked in %2$s.</item>
+        <item quantity="other">%1$d prices checked in %2$s.</item>
+    </plurals>
+    <plurals name="compare_rows_unreadable">
+        <item quantity="one">%1$d couldn\'t be read: check it in the app.</item>
+        <item quantity="other">%1$d couldn\'t be read: check them in the app.</item>
+    </plurals>
+    <string name="compare_manual_switched_off">AI reading is switched off for now. You can type the price meanwhile.</string>
+    <string name="compare_manual_reader_unavailable">RideMate can\'t check %1$s prices right now. You can type the price meanwhile.</string>
+
+    <!-- Providers and vehicle classes. -->
+    <string name="compare_provider_ondc">Open network (ONDC)</string>
+    <!-- %1$s: fictional demo provider name -->
+    <string name="compare_provider_demo">%1$s (DEMO)</string>
+    <string name="compare_class_bike">Bike</string>
+    <string name="compare_class_auto">Auto</string>
+    <string name="compare_class_cab_economy">Cab</string>
+    <string name="compare_class_cab_premium">Premium cab</string>
+    <string name="compare_class_cab_xl">XL cab</string>
+    <string name="compare_class_other">Other</string>
+
+    <!-- The list. -->
+    <string name="compare_title">Prices</string>
+    <string name="compare_empty">No prices yet. Open a ride app from RideMate and tap Read fares on the bubble.</string>
+    <string name="compare_refresh">Refresh the %1$s price</string>
+    <string name="compare_book">Book in %1$s</string>
+    <string name="compare_book_description">Open %1$s to book. You tap Book there yourself.</string>
+    <string name="compare_booked_heading">Booked already?</string>
+    <string name="compare_booked_here">Booked in %1$s</string>
+    <string name="compare_booked_done">Marked as booked in %1$s. RideMate is watching that ride.</string>
+    <string name="compare_booked_failed">Couldn\'t mark the booking in %1$s. Open RideMate\'s trip screen and try again.</string>
+    <string name="compare_type_price">Type a price</string>
+    <plurals name="compare_eta_minutes">
+        <item quantity="one">Pickup in %1$d min</item>
+        <item quantity="other">Pickup in %1$d min</item>
+    </plurals>
+
+    <!-- Manual mode (goal 21). -->
+    <string name="compare_manual_title">Type the price you see</string>
+    <string name="compare_manual_app">Ride app</string>
+    <string name="compare_manual_vehicle">Vehicle type</string>
+    <string name="compare_manual_price_label">Price in ₹</string>
+    <string name="compare_manual_price_hint">For example 120 or 110–130</string>
+    <string name="compare_manual_save">Save price</string>
+    <string name="compare_manual_saved">Saved. It shows as \"entered by you\".</string>
+    <string name="compare_manual_choose">Choose the ride app and vehicle type first.</string>
+    <string name="compare_manual_not_a_price">Type the price as a number, like 120 or 110–130.</string>
+    <!-- %1$s and %2$s: ₹15 and ₹5,000 -->
+    <string name="compare_manual_out_of_range">Prices must be between %1$s and %2$s. Check the number and try again.</string>
+    <string name="compare_manual_no_leg">This comparison has ended. Start a new one from RideMate\'s home screen.</string>
+</resources>

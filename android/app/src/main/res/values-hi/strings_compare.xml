@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="quote_unreadable">पढ़ा नहीं जा सका · ऐप में देखें</string>
+    <string name="eta_see_in_app">पहुँचने का समय: ऐप में देखें</string>
+    <string name="driver_see_in_app">%1$s में देखें</string>
+    <string name="quote_entered_by_you">आपके द्वारा लिखा गया</string>
+    <string name="quote_network">नेटवर्क कोट</string>
+    <string name="quote_seen_at">%1$s में %2$s पर देखा गया</string>
+    <string name="quote_stale">पुराना, ताज़ा करने के लिए टैप करें</string>
+    <string name="quote_cheapest">सबसे सस्ता</string>
+
+    <string name="compare_not_fare_screen">यह किराये की स्क्रीन नहीं लगती। %1$s की दाम सूची खोलें और फिर से किराया पढ़ें टैप करें।</string>
+    <string name="compare_capture_blocked">%1$s अपनी स्क्रीन कैप्चर नहीं होने देता। स्क्रीनशॉट लेकर RideMate में शेयर करें, या RideMate में दाम टाइप करें।</string>
+    <string name="compare_consent_needed">स्क्रीन शेयर करने की अनुमति नहीं मिली। फिर से कोशिश करने के लिए किराया पढ़ें टैप करें, या RideMate में दाम टाइप करें।</string>
+    <string name="compare_capture_failed">RideMate स्क्रीन नहीं पढ़ सका। फिर से किराया पढ़ें टैप करें।</string>
+    <string name="compare_too_slow">स्क्रीन समय पर नहीं पढ़ी गई, इसलिए उसका उपयोग नहीं हुआ। फिर से किराया पढ़ें टैप करें।</string>
+    <string name="compare_timed_out">बहुत समय लगा। फिर से किराया पढ़ें टैप करें, या RideMate में दाम टाइप करें।</string>
+    <string name="compare_no_comparison">पहले RideMate में तुलना शुरू करें, फिर वहीं से राइड ऐप खोलें।</string>
+    <string name="compare_no_prices_found">इस स्क्रीन पर कोई दाम नहीं मिला। %1$s की दाम सूची खोलें और फिर से किराया पढ़ें टैप करें।</string>
+    <string name="compare_none_verified">RideMate %1$s के दाम पक्के नहीं कर सका। उन्हें ऐप में देखें, या RideMate में दाम टाइप करें।</string>
+    <plurals name="compare_prices_checked">
+        <item quantity="one">%2$s में %1$d दाम जाँचा गया।</item>
+        <item quantity="other">%2$s में %1$d दाम जाँचे गए।</item>
+    </plurals>
+    <plurals name="compare_rows_unreadable">
+        <item quantity="one">%1$d पढ़ा नहीं जा सका: उसे ऐप में देखें।</item>
+        <item quantity="other">%1$d पढ़े नहीं जा सके: उन्हें ऐप में देखें।</item>
+    </plurals>
+    <string name="compare_manual_switched_off">AI से पढ़ना अभी बंद है। तब तक आप दाम टाइप कर सकते हैं।</string>
+    <string name="compare_manual_reader_unavailable">RideMate अभी %1$s के दाम नहीं जाँच सकता। तब तक आप दाम टाइप कर सकते हैं।</string>
+
+    <string name="compare_provider_ondc">ओपन नेटवर्क (ONDC)</string>
+    <string name="compare_provider_demo">%1$s (डेमो)</string>
+    <string name="compare_class_bike">बाइक</string>
+    <string name="compare_class_auto">ऑटो</string>
+    <string name="compare_class_cab_economy">कैब</string>
+    <string name="compare_class_cab_premium">प्रीमियम कैब</string>
+    <string name="compare_class_cab_xl">XL कैब</string>
+    <string name="compare_class_other">अन्य</string>
+
+    <string name="compare_title">दाम</string>
+    <string name="compare_empty">अभी कोई दाम नहीं। RideMate से राइड ऐप खोलें और बबल पर किराया पढ़ें टैप करें।</string>
+    <string name="compare_refresh">%1$s का दाम ताज़ा करें</string>
+    <string name="compare_book">%1$s में बुक करें</string>
+    <string name="compare_book_description">बुक करने के लिए %1$s खोलें। वहाँ Book आप खुद टैप करें।</string>
+    <string name="compare_booked_heading">पहले ही बुक कर लिया?</string>
+    <string name="compare_booked_here">%1$s में बुक किया</string>
+    <string name="compare_booked_done">%1$s में बुकिंग दर्ज हुई। RideMate उस राइड पर नज़र रख रहा है।</string>
+    <string name="compare_booked_failed">%1$s में बुकिंग दर्ज नहीं हो सकी। RideMate की यात्रा स्क्रीन खोलकर फिर से कोशिश करें।</string>
+    <string name="compare_type_price">दाम टाइप करें</string>
+    <plurals name="compare_eta_minutes">
+        <item quantity="one">%1$d मिनट में पिकअप</item>
+        <item quantity="other">%1$d मिनट में पिकअप</item>
+    </plurals>
+
+    <string name="compare_manual_title">जो दाम दिख रहा है वह टाइप करें</string>
+    <string name="compare_manual_app">राइड ऐप</string>
+    <string name="compare_manual_vehicle">वाहन का प्रकार</string>
+    <string name="compare_manual_price_label">दाम ₹ में</string>
+    <string name="compare_manual_price_hint">जैसे 120 या 110–130</string>
+    <string name="compare_manual_save">दाम सेव करें</string>
+    <string name="compare_manual_saved">सेव हो गया। यह \"आपके द्वारा लिखा गया\" दिखेगा।</string>
+    <string name="compare_manual_choose">पहले राइड ऐप और वाहन का प्रकार चुनें।</string>
+    <string name="compare_manual_not_a_price">दाम संख्या में लिखें, जैसे 120 या 110–130।</string>
+    <string name="compare_manual_out_of_range">दाम %1$s और %2$s के बीच होना चाहिए। संख्या जाँचकर फिर से कोशिश करें।</string>
+    <string name="compare_manual_no_leg">यह तुलना खत्म हो चुकी है। RideMate की होम स्क्रीन से नई तुलना शुरू करें।</string>
+</resources>

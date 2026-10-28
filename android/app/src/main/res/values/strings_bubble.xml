@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- GuardianBubble and PointerOverlay (app.ridemate.bubble). Labels are short; descriptions are what TalkBack reads. -->
+<resources>
+    <string name="bubble_action_read_fares">Read fares</string>
+    <string name="bubble_action_read_fares_description">Read fares: RideMate reads the prices on this screen once</string>
+    <string name="bubble_action_show_me">Show me</string>
+    <string name="bubble_action_show_me_description">Show me where to tap Cancel. Android will ask to share your screen again</string>
+    <string name="bubble_action_booked_here">Booked here</string>
+    <string name="bubble_action_booked_here_description">Booked here: tell RideMate you booked a ride in this app</string>
+    <string name="bubble_action_done">Done</string>
+    <string name="bubble_action_done_description">Done: I have finished in this app</string>
+    <string name="bubble_action_paste_drop">Paste drop</string>
+    <string name="bubble_action_paste_drop_description">Paste drop: copy your drop address again, then long-press the app\'s destination box and tap Paste</string>
+    <string name="bubble_action_stop">Stop</string>
+    <string name="bubble_action_stop_description">Stop RideMate for this trip</string>
+
+    <string name="bubble_head_description">RideMate controls. Double-tap to open or close. Drag to move.</string>
+    <string name="bubble_head_open">Open</string>
+    <string name="bubble_head_closed">Closed</string>
+
+    <string name="bubble_status_reading">Reading prices…</string>
+    <string name="bubble_status_working">Working</string>
+    <string name="bubble_status_kind_info">Info</string>
+    <string name="bubble_status_kind_problem">Problem</string>
+    <string name="bubble_status_kind_reminder">Reminder</string>
+    <!-- %1$s: kind (Info, Problem, …); %2$s: the message -->
+    <string name="bubble_status_spoken">%1$s: %2$s</string>
+</resources>
