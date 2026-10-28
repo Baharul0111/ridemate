@@ -22,6 +22,7 @@
     <string name="platform_erase_waiting">इस फ़ोन का आपका डेटा मिटा दिया गया। RideMate जैसे ही अपने सर्वर तक पहुँचेगा, सर्वर का डेटा और अकाउंट भी मिटा दिया जाएगा।</string>
     <string name="platform_erase_reauth">अकाउंट पूरी तरह मिटाने के लिए एक बार फिर Google से साइन इन करें।</string>
     <string name="platform_erase_failed">हम आपका अकाउंट पूरी तरह नहीं मिटा सके। %1$s पर ईमेल करें, हम 30 दिनों में मिटा देंगे।</string>
+    <string name="platform_erase_local_failed">RideMate इस फ़ोन का डेटा नहीं मिटा सका। थोड़ी स्टोरेज खाली करें, फिर से Erase पर टैप करें।</string>
 
     <string name="platform_my_data_sessions">किराया तुलनाएँ</string>
     <string name="platform_my_data_legs">ट्रैक की गई राइड बुकिंग</string>

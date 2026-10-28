@@ -54,6 +54,10 @@ class OutboxRepository(
 
     private var nextMemoryId = -1L
 
+    /** Whether rows from an earlier boot were moved onto this boot's elapsed-realtime base in this process. */
+    @Volatile
+    private var rebased = false
+
     /** Schedules [kind] to fire [delayMs] from now. */
     suspend fun schedule(kind: OutboxKind, legId: String?, delayMs: Long, payload: String? = null): OutboxItem =
         scheduleAt(kind, legId, clock.elapsedRealtimeMs() + delayMs.coerceAtLeast(0), payload)
@@ -63,14 +67,19 @@ class OutboxRepository(
         mutex.withLock { insertOrKeep(newEntity(kind, legId, dueElapsedMs, payload)) }
 
     /** All pending items (Room + memory), earliest first. */
-    suspend fun pending(): List<OutboxItem> = merge(readDisk { dao.pending() }, memory.value, unwritten.value)
+    suspend fun pending(): List<OutboxItem> {
+        ensureRebased()
+        return merge(readDisk { dao.pending() }, memory.value, unwritten.value)
+    }
 
     fun observePending(): Flow<List<OutboxItem>> =
         combine(dao.observePending(), memory, unwritten) { disk, mem, hidden -> merge(disk, mem, hidden) }
 
     /** Pending items due at or before [nowElapsedMs]. */
-    suspend fun due(nowElapsedMs: Long = clock.elapsedRealtimeMs()): List<OutboxItem> =
-        merge(readDisk { dao.due(nowElapsedMs) }, memory.value, unwritten.value).filter { it.dueElapsedMs <= nowElapsedMs }
+    suspend fun due(nowElapsedMs: Long = clock.elapsedRealtimeMs()): List<OutboxItem> {
+        ensureRebased()
+        return merge(readDisk { dao.due(nowElapsedMs) }, memory.value, unwritten.value).filter { it.dueElapsedMs <= nowElapsedMs }
+    }
 
     suspend fun nextDueElapsedMs(): Long? = pending().minOfOrNull { it.dueElapsedMs }
 
@@ -91,10 +100,10 @@ class OutboxRepository(
         val moved = row.copy(attempts = row.attempts + 1, dueElapsedMs = due, dueWallMs = wallFor(due), bootId = bootIds.currentBootId())
         try {
             dao.update(moved)
-            storage.onWriteSucceeded()
+            markHealthyIfClean()
         } catch (e: Exception) {
             if (!StorageHealth.isStorageFailure(e)) throw e
-            storage.onWriteFailed(e)
+            storage.onWriteFailed(e, SOURCE)
             // Replace the stale disk row by an in-memory copy with the new due time.
             unwritten.value = unwritten.value + (row.id to OutboxStatus.DONE)
             memory.value = memory.value + moved.toItem().copy(id = nextMemoryId--)
@@ -106,9 +115,10 @@ class OutboxRepository(
         memory.value = memory.value.filterNot { it.legId == legId && it.kind in kinds }
         try {
             dao.completeForLeg(legId, kinds.toList())
+            markHealthyIfClean()
         } catch (e: Exception) {
             if (!StorageHealth.isStorageFailure(e)) throw e
-            storage.onWriteFailed(e)
+            storage.onWriteFailed(e, SOURCE)
             val ids = readDisk { dao.pending() }.filter { it.legId == legId && it.kind in kinds }.map { it.id }
             unwritten.value = unwritten.value + ids.associateWith { OutboxStatus.DONE }
         }
@@ -118,7 +128,9 @@ class OutboxRepository(
 
     /**
      * Moves rows written during an earlier boot onto this boot's elapsed-realtime base, keeping their wall-clock
-     * due instant (an overdue row becomes due now). Call once per process start. Returns the number of rows moved.
+     * due instant (an overdue row becomes due now). Returns the number of rows moved. App start calls it, and
+     * [pending] / [due] run it first if nobody has yet in this process, so a tick that comes before the start-up
+     * rebase never fires a row on the previous boot's clock.
      */
     suspend fun rebaseAfterReboot(): Int = mutex.withLock {
         val boot = bootIds.currentBootId()
@@ -129,8 +141,12 @@ class OutboxRepository(
             val due = (nowElapsed + (row.dueWallMs - nowWall)).coerceAtLeast(0)
             dao.update(row.copy(dueElapsedMs = due, bootId = boot))
         }
+        rebased = true
         stale.size
     }
+
+    /** True while some change lives only in memory (Room refused it); [flushMemory] writes it once Room recovers. */
+    fun hasUnsavedChanges(): Boolean = memory.value.isNotEmpty() || unwritten.value.isNotEmpty()
 
     /**
      * Writes in-memory changes to Room once it accepts writes again (pending statuses first, then memory rows).
@@ -145,7 +161,7 @@ class OutboxRepository(
                 written++
             } catch (e: Exception) {
                 if (!StorageHealth.isStorageFailure(e)) throw e
-                storage.onWriteFailed(e)
+                storage.onWriteFailed(e, SOURCE)
                 return@withLock written
             }
         }
@@ -156,14 +172,14 @@ class OutboxRepository(
                 written++
             } catch (e: Exception) {
                 if (StorageHealth.isStorageFailure(e)) {
-                    storage.onWriteFailed(e)
+                    storage.onWriteFailed(e, SOURCE)
                     return@withLock written
                 }
                 // Constraint failure: the leg was deleted meanwhile, so the action is moot.
             }
             memory.value = memory.value.filterNot { it.id == item.id }
         }
-        if (written > 0) storage.onWriteSucceeded()
+        markHealthyIfClean()
         written
     }
 
@@ -171,6 +187,7 @@ class OutboxRepository(
     suspend fun clearMemory() = mutex.withLock {
         memory.value = emptyList()
         unwritten.value = emptyMap()
+        markHealthyIfClean()
     }
 
     private suspend fun finish(item: OutboxItem, status: OutboxStatus): Unit = mutex.withLock {
@@ -181,24 +198,39 @@ class OutboxRepository(
         val row = readDiskRow(item.id) ?: return@withLock
         try {
             dao.update(row.copy(status = status))
-            storage.onWriteSucceeded()
+            markHealthyIfClean()
         } catch (e: Exception) {
             if (!StorageHealth.isStorageFailure(e)) throw e
-            storage.onWriteFailed(e)
+            storage.onWriteFailed(e, SOURCE)
             unwritten.value = unwritten.value + (row.id to status)
         }
     }
 
     private suspend fun insertOrKeep(entity: ActionOutboxEntity): OutboxItem = try {
         val id = dao.insert(entity)
-        storage.onWriteSucceeded()
+        markHealthyIfClean()
         entity.copy(id = id).toItem()
     } catch (e: Exception) {
         if (!StorageHealth.isStorageFailure(e)) throw e
-        storage.onWriteFailed(e)
+        storage.onWriteFailed(e, SOURCE)
         val item = entity.toItem().copy(id = nextMemoryId--)
         memory.value = memory.value + item
         item
+    }
+
+    /** Clears this repository's storage warning only when nothing it holds is memory-only any more. */
+    private fun markHealthyIfClean() {
+        if (!hasUnsavedChanges()) storage.onWriteSucceeded(SOURCE)
+    }
+
+    private suspend fun ensureRebased() {
+        if (rebased) return
+        try {
+            rebaseAfterReboot()
+        } catch (e: Exception) {
+            // A storage failure leaves the rows on their old base; the next read tries again.
+            if (!StorageHealth.isStorageFailure(e)) throw e
+        }
     }
 
     private suspend fun readDisk(block: suspend () -> List<ActionOutboxEntity>): List<ActionOutboxEntity> = try {
@@ -235,6 +267,8 @@ class OutboxRepository(
     private fun wallFor(dueElapsedMs: Long): Long = clock.wallMs() + (dueElapsedMs - clock.elapsedRealtimeMs())
 
     companion object {
+        private const val SOURCE = StorageHealth.SOURCE_OUTBOX
+
         /** Kinds tied to a leg (everything but ERASE_SERVER). */
         val LEG_KINDS: Set<OutboxKind> = setOf(OutboxKind.REMINDER, OutboxKind.FOLLOWUP_CHECK, OutboxKind.OPEN_NEXT_APP)
         private val ORDER = compareBy<OutboxItem>({ it.dueElapsedMs }, { it.id })

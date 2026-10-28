@@ -8,11 +8,13 @@ import app.ridemate.crash.CrashSite
 import app.ridemate.data.OutboxKind
 import app.ridemate.net.ApiClient
 import app.ridemate.net.ApiResult
+import app.ridemate.outbox.OutboxDispatch
 import app.ridemate.outbox.OutboxDriver
 import app.ridemate.outbox.OutboxHandler
 import app.ridemate.outbox.OutboxItem
 import app.ridemate.outbox.OutboxOutcome
 import app.ridemate.outbox.OutboxRepository
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -44,10 +46,15 @@ enum class ServerErase {
 /** Firebase Auth account part of an erase. */
 enum class AccountErase { DELETED, WAITING_FOR_SERVER, REAUTH_REQUIRED, FAILED, SKIPPED }
 
+/**
+ * What an erase did. [localWiped] is false when the phone's own data could not be wiped (e.g. storage so full that
+ * SQLite cannot even delete); nothing else is attempted then, so the user frees space and erases again.
+ */
 data class EraseResult(
     val server: ServerErase,
     val account: AccountErase,
     val signedOut: Boolean,
+    val localWiped: Boolean = true,
 )
 
 /** For the Settings screen. */
@@ -60,6 +67,10 @@ sealed interface EraseStatus {
 
     /** Sign in with Google again, then erase again, to finish deleting the account. */
     data object NeedsReauth : EraseStatus
+
+    /** The data on this phone could not be wiped (nothing else was touched): free up storage and erase again. */
+    data object LocalWipeFailed : EraseStatus
+
     data class Finished(val result: EraseResult) : EraseStatus
 }
 
@@ -87,15 +98,36 @@ class EraseUseCase(
     private val _status = MutableStateFlow<EraseStatus>(EraseStatus.Idle)
     val status: StateFlow<EraseStatus> = _status.asStateFlow()
 
-    /** Registers this use case as the ERASE_SERVER handler. */
-    fun registerWith(driver: OutboxDriver): AutoCloseable = driver.register(setOf(OutboxKind.ERASE_SERVER), this)
+    /**
+     * Registers this use case as the ERASE_SERVER handler. It calls the network, so it runs in the background and
+     * never holds up a reminder in the session service's tick.
+     */
+    fun registerWith(driver: OutboxDriver): AutoCloseable =
+        driver.register(setOf(OutboxKind.ERASE_SERVER), OutboxDispatch.BACKGROUND, this)
 
     suspend fun erase(): EraseResult = mutex.withLock {
         _status.value = EraseStatus.Running
+        try {
+            eraseLocked()
+        } finally {
+            // An unexpected failure (or cancellation) must not leave the Settings screen spinning forever.
+            if (_status.value == EraseStatus.Running) _status.value = EraseStatus.Idle
+        }
+    }
+
+    private suspend fun eraseLocked(): EraseResult {
         val state = auth.state.value
         val uid = auth.currentUid()
 
-        wipeLocal()
+        try {
+            wipeLocal()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            crash.recordNonFatal(e, CrashSite.ERASE)
+            _status.value = EraseStatus.LocalWipeFailed
+            return EraseResult(ServerErase.SKIPPED, AccountErase.SKIPPED, signedOut = false, localWiped = false)
+        }
 
         val server = when (state) {
             is AuthState.Google -> when (val r = api.erase()) {
@@ -119,7 +151,7 @@ class EraseUseCase(
             finishAccount(server, signedIn = state != AuthState.SignedOut)
         }
         _status.value = statusOf(result)
-        result
+        return result
     }
 
     /** ERASE_SERVER delivery (outbox). */

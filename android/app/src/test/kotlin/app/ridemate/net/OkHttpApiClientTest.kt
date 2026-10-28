@@ -7,6 +7,7 @@ import app.ridemate.core.model.Provider
 import app.ridemate.core.model.RideState
 import app.ridemate.util.Clock
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.int
@@ -306,7 +307,6 @@ class OkHttpApiClientTest {
             error(503, "ai_unavailable") to ApiResult.AiPaused("ai_unavailable", null, null),
             error(503, "meter_unavailable") to ApiResult.AiPaused("meter_unavailable", null, null),
             error(503, "ondc_unavailable") to ApiResult.Http(503, "ondc_unavailable"),
-            error(504, "model_timeout") to ApiResult.Timeout,
         )
         for ((response, expected) in cases) {
             server.enqueue(response)
@@ -423,6 +423,69 @@ class OkHttpApiClientTest {
         )
         assertEquals(ApiResult.Timeout, result)
         assertTrue(clock.elapsedRealtimeMs() - started < 2_000)
+    }
+
+    @Test
+    fun `a slow model is tried once more within the budget, with the same request id`() = runBlocking {
+        server.enqueue(error(504, "model_timeout"))
+        server.enqueue(json(200, """{"read":{"options":[]},"source":"live"}"""))
+
+        assertTrue(client().readScreen(readRequest(), budget()) is ApiResult.Ok)
+
+        val first = server.takeRequest()
+        val second = server.takeRequest()
+        assertEquals(first.getHeader("X-Request-Id"), second.getHeader("X-Request-Id"))
+        // The retry carries the smaller remaining tap budget.
+        assertTrue(second.getHeader("X-Tap-Deadline-Ms")!!.toLong() <= first.getHeader("X-Tap-Deadline-Ms")!!.toLong())
+        assertEquals(listOf("READ_SCREEN:Ok:2"), calls)
+    }
+
+    @Test
+    fun `a model timeout is final when the tap budget cannot fit another server attempt`() = runBlocking {
+        val production = FAST.copy(serverDeadlineOverridesMs = emptyMap())
+        server.enqueue(error(504, "model_timeout"))
+        server.enqueue(json(200, """{"read":{"options":[]}}"""))
+        // 9 s left: less than the 12 s the server needs, so the phone types-the-price instead of retrying.
+        assertEquals(ApiResult.Timeout, client(production).readScreen(readRequest(), budget(9_000)))
+        assertEquals(1, server.requestCount)
+    }
+
+    @Test
+    fun `a hanging token refresh cannot stretch the call past its deadline`() = runBlocking {
+        val hanging = IdTokenSource { _ -> kotlinx.coroutines.awaitCancellation() }
+        val api = OkHttpApiClient(
+            http = OkHttpClient(),
+            baseUrl = { baseUrl },
+            tokens = hanging,
+            appVersionCode = 42,
+            clock = clock,
+            timing = FAST,
+        )
+        val started = clock.elapsedRealtimeMs()
+
+        assertEquals(ApiResult.Timeout, withTimeout(5_000) { api.readScreen(readRequest(), budget(300)) })
+
+        assertTrue("returned at the tap deadline", clock.elapsedRealtimeMs() - started < 2_000)
+        assertEquals(0, server.requestCount)
+    }
+
+    @Test
+    fun `a hanging forced refresh after a 401 is bounded too`() = runBlocking {
+        var calls = 0
+        val tokensThenHang = IdTokenSource { force ->
+            calls++
+            if (force) kotlinx.coroutines.awaitCancellation() else IdTokenResult.Token("stale", Long.MAX_VALUE)
+        }
+        val timing = FAST.copy(phoneMarginMs = 200, serverDeadlineOverridesMs = mapOf(Endpoint.CONFIG_CHECK to 200L))
+        val api = OkHttpApiClient(OkHttpClient(), { baseUrl }, tokensThenHang, 42, clock, timing)
+        server.enqueue(error(401, "auth_invalid"))
+        val started = clock.elapsedRealtimeMs()
+
+        assertEquals(ApiResult.Timeout, withTimeout(5_000) { api.configCheck() })
+
+        assertTrue(clock.elapsedRealtimeMs() - started < 2_000)
+        assertEquals(2, calls)
+        assertEquals(1, server.requestCount)
     }
 
     @Test

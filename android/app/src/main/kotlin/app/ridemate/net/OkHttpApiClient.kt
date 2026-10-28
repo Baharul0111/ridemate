@@ -6,6 +6,7 @@ import app.ridemate.core.model.LatLng
 import app.ridemate.util.Clock
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -254,10 +255,11 @@ class OkHttpApiClient(
         val requestId = newRequestId()
         var token: String? = null
         if (endpoint.auth == AuthMode.REQUIRED) {
-            when (val t = tokens.idToken(false)) {
+            when (val t = idTokenWithin(false, deadlineElapsedMs)) {
                 is IdTokenResult.Token -> token = t.value
                 IdTokenResult.NetworkError -> return ApiResult.Offline
                 IdTokenResult.SignedOut, IdTokenResult.Failed -> return ApiResult.AuthNeeded
+                null -> return ApiResult.Timeout
             }
         }
         var transientRetryUsed = false
@@ -303,19 +305,30 @@ class OkHttpApiClient(
             if (raw.code == 401) {
                 if (endpoint.auth != AuthMode.REQUIRED || authRefreshUsed) return ApiResult.AuthNeeded
                 authRefreshUsed = true
-                when (val t = tokens.idToken(true)) {
+                when (val t = idTokenWithin(true, deadlineElapsedMs)) {
                     is IdTokenResult.Token -> {
                         token = t.value
                         continue
                     }
                     IdTokenResult.NetworkError -> return ApiResult.Offline
                     IdTokenResult.SignedOut, IdTokenResult.Failed -> return ApiResult.AuthNeeded
+                    null -> return ApiResult.Timeout
                 }
             }
             val mapped = mapHttpError(raw.code, raw.body, raw.retryAfter)
             if (mapped.retryable && mayRetry()) continue
             return mapped.result
         }
+    }
+
+    /**
+     * The ID token, fetched within the call's deadline: a Firebase refresh that hangs (flaky network) must not
+     * stretch the call past its budget ("it never hangs"). Null when the deadline passed first.
+     */
+    private suspend fun idTokenWithin(forceRefresh: Boolean, deadlineElapsedMs: Long): IdTokenResult? {
+        val remaining = deadlineElapsedMs - clock.elapsedRealtimeMs()
+        if (remaining <= 0) return null
+        return withTimeoutOrNull(remaining) { tokens.idToken(forceRefresh) }
     }
 
     private fun resolveUrl(endpoint: Endpoint): HttpUrl? {
@@ -426,7 +439,9 @@ internal class MappedError(val result: ApiResult<Nothing>, val retryable: Boolea
 
 /**
  * Maps a non-2xx, non-401 response with the §1.2 error envelope to an [ApiResult]. Unknown or missing codes fall
- * back on the status; transient statuses without a definitive code (500/502/503/504) are retryable.
+ * back on the status; transient statuses without a definitive code (500/502/503/504) are retryable, and so is
+ * `model_timeout` (goal 21: "if the AI is slow … it tries once more"). Whether the retry is actually made is
+ * still decided by the budget rule in [OkHttpApiClient]: only if what is left exceeds the server deadline.
  */
 internal fun mapHttpError(status: Int, body: String, retryAfterHeader: String?): MappedError {
     val error = runCatching { ApiJson.decodeFromString(ErrorEnvelopeWire.serializer(), body).error }.getOrNull()
@@ -438,7 +453,7 @@ internal fun mapHttpError(status: Int, body: String, retryAfterHeader: String?):
         code == "rate_limited" -> MappedError(ApiResult.RateLimited(retryAfter), false)
         code != null && code in ApiResult.AI_PAUSE_CODES ->
             MappedError(ApiResult.AiPaused(code, error?.resumeAtIst, error?.reason), false)
-        code == "model_timeout" -> MappedError(ApiResult.Timeout, false)
+        code == "model_timeout" -> MappedError(ApiResult.Timeout, true)
         status == 429 -> MappedError(ApiResult.RateLimited(retryAfter), false)
         status == 504 -> MappedError(ApiResult.Timeout, code == null)
         status == 500 || status == 502 || status == 503 -> MappedError(ApiResult.Http(status, code), code == null)

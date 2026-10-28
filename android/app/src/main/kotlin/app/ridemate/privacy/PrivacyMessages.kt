@@ -47,6 +47,7 @@ object PrivacyMessages {
         EraseStatus.Idle, EraseStatus.Running -> null
         EraseStatus.WaitingForServer -> context.getString(R.string.platform_erase_waiting)
         EraseStatus.NeedsReauth -> context.getString(R.string.platform_erase_reauth)
+        EraseStatus.LocalWipeFailed -> context.getString(R.string.platform_erase_local_failed)
         is EraseStatus.Finished -> when {
             status.result.server == ServerErase.FAILED || status.result.account == AccountErase.FAILED ->
                 context.getString(R.string.platform_erase_failed, privacyEmail)

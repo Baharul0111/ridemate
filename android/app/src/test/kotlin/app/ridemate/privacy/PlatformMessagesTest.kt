@@ -54,6 +54,7 @@ class PlatformMessagesTest {
         assertNull(PrivacyMessages.eraseStatusText(context, EraseStatus.Running, "p@example.com"))
         assertTrue(PrivacyMessages.eraseStatusText(context, EraseStatus.WaitingForServer, "p@example.com")!!.contains("as soon as"))
         assertTrue(PrivacyMessages.eraseStatusText(context, EraseStatus.NeedsReauth, "p@example.com")!!.contains("Sign in"))
+        assertTrue(PrivacyMessages.eraseStatusText(context, EraseStatus.LocalWipeFailed, "p@example.com")!!.contains("Free up some storage"))
         val done = EraseStatus.Finished(EraseResult(ServerErase.DONE, AccountErase.DELETED, true))
         assertEquals("Your RideMate data and account were erased.", PrivacyMessages.eraseStatusText(context, done, "p@example.com"))
         val failed = EraseStatus.Finished(EraseResult(ServerErase.FAILED, AccountErase.DELETED, true))

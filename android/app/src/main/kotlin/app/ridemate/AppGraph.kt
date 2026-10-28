@@ -110,7 +110,10 @@ class AppGraph(
     val outboxRepository: OutboxRepository by lazy {
         OutboxRepository(db.outboxDao(), clock, seams.bootIds(app), storageHealth)
     }
-    val outboxDriver: OutboxDriver by lazy { OutboxDriver(outboxRepository, clock, sessionActivity, crashReporter) }
+    /** Register handlers with `outboxDriver.register(kinds) { … }`; network-bound ones with `register(kinds, OutboxDispatch.BACKGROUND) { … }`. */
+    val outboxDriver: OutboxDriver by lazy {
+        OutboxDriver(outboxRepository, clock, sessionActivity, crashReporter, backgroundScope = appScope)
+    }
     val outboxScheduler: OutboxWorkScheduler by lazy { WorkManagerOutboxScheduler({ seams.workManager(app) }, clock) }
 
     // ---- privacy / update ----

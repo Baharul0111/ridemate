@@ -13,6 +13,7 @@ import app.ridemate.RideMateApp
 import app.ridemate.data.OutboxKind
 import app.ridemate.testing.FakeClock
 import app.ridemate.testing.TestData
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -52,6 +53,24 @@ class OutboxWorkerTest {
     }
 
     @Test
+    fun `the worker waits for background deliveries before it finishes`() = runBlocking {
+        val graph = RideMateApp.graph(context)
+        val delivered = CopyOnWriteArrayList<OutboxItem>()
+        graph.outboxDriver.register(setOf(OutboxKind.ERASE_SERVER), OutboxDispatch.BACKGROUND) {
+            delay(200) // a slow network call
+            delivered += it
+            OutboxOutcome.Done
+        }
+        graph.outboxRepository.schedule(OutboxKind.ERASE_SERVER, null, 0, payload = """{"uid":"u"}""")
+
+        val result = TestListenableWorkerBuilder<OutboxWorker>(context).build().doWork()
+
+        assertEquals(ListenableWorker.Result.success(), result)
+        assertEquals(1, delivered.size)
+        assertTrue(graph.outboxRepository.pending().isEmpty())
+    }
+
+    @Test
     fun `the scheduler keeps one unique job and re-enqueues only on change`() {
         val workManager = WorkManager.getInstance(context)
         val clock = FakeClock(elapsed = 10_000L)
@@ -64,6 +83,13 @@ class OutboxWorkerTest {
 
         scheduler.scheduleAt(40_000L, needsNetwork = false)
         assertEquals(first.id, workManager.getWorkInfosForUniqueWork(OutboxWorker.UNIQUE_NAME).get().single().id)
+
+        // The job ran (the worker invalidates): the same target is enqueued again rather than silently dropped.
+        scheduler.invalidate()
+        scheduler.scheduleAt(40_000L, needsNetwork = false)
+        val again = workManager.getWorkInfosForUniqueWork(OutboxWorker.UNIQUE_NAME).get()
+            .single { it.state == WorkInfo.State.ENQUEUED }
+        assertTrue(again.id != first.id)
 
         scheduler.scheduleAt(5_000L, needsNetwork = true)
         val replaced = workManager.getWorkInfosForUniqueWork(OutboxWorker.UNIQUE_NAME).get()

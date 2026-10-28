@@ -1,5 +1,6 @@
 package app.ridemate.privacy
 
+import android.database.sqlite.SQLiteFullException
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.ridemate.auth.AuthFailure
@@ -9,8 +10,11 @@ import app.ridemate.crash.CrashReporter
 import app.ridemate.data.OutboxKind
 import app.ridemate.data.RideMateDb
 import app.ridemate.data.StorageHealth
+import app.ridemate.net.ApiClient
 import app.ridemate.net.ApiResult
+import app.ridemate.net.EraseResponse
 import app.ridemate.outbox.OutboxDriver
+import app.ridemate.outbox.OutboxHandler
 import app.ridemate.outbox.OutboxOutcome
 import app.ridemate.outbox.OutboxRepository
 import app.ridemate.outbox.TickReport
@@ -22,7 +26,13 @@ import app.ridemate.testing.FakeGoogleCredentialSource
 import app.ridemate.testing.TestData
 import app.ridemate.testing.TestSeams
 import app.ridemate.util.SessionActivity
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -142,6 +152,92 @@ class EraseUseCaseTest {
         assertNull(auth.user)
         assertTrue(outbox.pending().isEmpty())
         assertEquals(EraseStatus.Finished(EraseResult(ServerErase.DONE, AccountErase.DELETED, signedOut = true)), erase.status.value)
+    }
+
+    @Test
+    fun `the queued server erase runs beside the session tick, never inside it`() = runBlocking {
+        auth.user = FakeAuthBackend.googleUser("u-1")
+        val gate = CompletableDeferred<Unit>()
+        var slow = false
+        val slowApi = object : ApiClient by api {
+            override suspend fun erase(): ApiResult<EraseResponse> {
+                if (slow) gate.await()
+                return api.erase()
+            }
+        }
+        gateway = DefaultAuthGateway(auth, FakeGoogleCredentialSource(), clock)
+        erase = EraseUseCase({ db.clearAllTables() }, outbox, slowApi, gateway, CrashReporter { crashBackend })
+        api.eraseResults += ApiResult.Offline
+        assertEquals(ServerErase.QUEUED, erase.erase().server)
+
+        // A new ride session runs while the erase retry is due: its reminder is due in the same second.
+        db.sessionDao().insert(TestData.session("s2"))
+        db.legDao().upsert(TestData.leg("l2", sessionId = "s2"))
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        try {
+            val driver = OutboxDriver(outbox, clock, SessionActivity(), backgroundScope = scope)
+            erase.registerWith(driver)
+            val reminders = CopyOnWriteArrayList<Long>()
+            driver.register(setOf(OutboxKind.REMINDER), OutboxHandler { reminders += it.id; OutboxOutcome.Done })
+            clock.advance(EraseUseCase.FIRST_RETRY_DELAY_MS)
+            outbox.schedule(OutboxKind.REMINDER, "l2", 0)
+            slow = true
+
+            val report = withTimeout(2_000) { driver.tick() }
+
+            assertEquals("the reminder fired while the erase call is still waiting", 1, report.delivered)
+            assertEquals(1, reminders.size)
+            assertEquals(1, report.inBackground)
+            assertTrue(auth.user != null)
+
+            gate.complete(Unit)
+            withTimeout(5_000) { driver.awaitBackground() }
+            assertNull(auth.user)
+            assertTrue(outbox.pending().isEmpty())
+        } finally {
+            scope.cancel()
+        }
+    }
+
+    @Test
+    fun `a local wipe that fails stops the erase and says how to recover`() = runBlocking {
+        auth.user = FakeAuthBackend.googleUser()
+        gateway = DefaultAuthGateway(auth, FakeGoogleCredentialSource(), clock)
+        erase = EraseUseCase(
+            wipeDatabase = {
+                log += "wipe"
+                throw SQLiteFullException("database or disk is full")
+            },
+            outbox = outbox,
+            api = api,
+            auth = gateway,
+            crash = CrashReporter { crashBackend },
+        )
+        log.clear()
+
+        val result = erase.erase()
+
+        assertEquals(EraseResult(ServerErase.SKIPPED, AccountErase.SKIPPED, signedOut = false, localWiped = false), result)
+        assertEquals(EraseStatus.LocalWipeFailed, erase.status.value)
+        // Nothing else was touched: no server call, no account deletion, no sign-out.
+        assertEquals(listOf("wipe", "crash.record"), log)
+        assertTrue(auth.user != null)
+        assertEquals(1, db.sessionDao().count())
+    }
+
+    @Test
+    fun `an unexpected failure never leaves the erase screen spinning`() = runBlocking {
+        auth.user = FakeAuthBackend.googleUser()
+        val broken = object : ApiClient by api {
+            override suspend fun erase(): ApiResult<EraseResponse> = throw IllegalStateException("bug")
+        }
+        gateway = DefaultAuthGateway(auth, FakeGoogleCredentialSource(), clock)
+        erase = EraseUseCase({ db.clearAllTables() }, outbox, broken, gateway, CrashReporter { crashBackend })
+
+        val thrown = runCatching { erase.erase() }.exceptionOrNull()
+
+        assertTrue(thrown is IllegalStateException)
+        assertEquals(EraseStatus.Idle, erase.status.value)
     }
 
     @Test

@@ -131,6 +131,41 @@ class OutboxRepositoryTest {
     }
 
     @Test
+    fun `a tick that comes before the start-up rebase still uses the rebased due times`() = runBlocking {
+        repo().schedule(OutboxKind.REMINDER, "l1", 120_000) // due in 2 min: elapsed 170 000 on boot-1
+
+        // Reboot 60 s later; the new boot's elapsed clock is already past the old due value.
+        boot.id = "boot-2"
+        clock.elapsed = 200_000L
+        clock.wall += 60_000
+        val newProcess = OutboxRepository(db.outboxDao(), clock, boot, StorageHealth())
+
+        assertTrue("not fired on the previous boot's clock", newProcess.due().isEmpty())
+        assertEquals(260_000L, newProcess.pending().single().dueElapsedMs)
+        clock.advance(60_000)
+        assertEquals(OutboxKind.REMINDER, newProcess.due().single().kind)
+        assertEquals(0, newProcess.rebaseAfterReboot())
+    }
+
+    @Test
+    fun `the storage warning stays up while any row is held only in memory`() = runBlocking {
+        val repo = repo()
+        dao.failWrites = true
+        repo.schedule(OutboxKind.REMINDER, "l1", 0)
+        assertTrue(repo.hasUnsavedChanges())
+
+        // The disk takes writes again: a new row lands in Room, but the first one is still memory-only.
+        dao.failWrites = false
+        assertTrue(repo.schedule(OutboxKind.FOLLOWUP_CHECK, "l1", 0).id > 0)
+        assertEquals(StorageWarning.FULL, health.warning.value)
+
+        assertEquals(1, repo.flushMemory())
+        assertTrue(!repo.hasUnsavedChanges())
+        assertEquals(StorageWarning.NONE, health.warning.value)
+        assertEquals(2, db.outboxDao().count())
+    }
+
+    @Test
     fun `a full disk keeps rows in memory, warns, and flushes later`() = runBlocking {
         val repo = repo()
         dao.failWrites = true

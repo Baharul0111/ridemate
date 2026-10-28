@@ -17,10 +17,16 @@ class ApiErrorMappingTest {
             429 to env("quota_exhausted"),
             503 to env("ai_unavailable"),
             503 to env("ondc_unavailable"),
-            504 to env("model_timeout"),
             422 to env("invalid"),
         )
         definitive.forEach { (status, body) -> assertFalse("$status $body", mapHttpError(status, body, null).retryable) }
+    }
+
+    @Test
+    fun `a model timeout is worth one more try`() {
+        val mapped = mapHttpError(504, env("model_timeout"), null)
+        assertEquals(ApiResult.Timeout, mapped.result)
+        assertTrue(mapped.retryable)
     }
 
     @Test
