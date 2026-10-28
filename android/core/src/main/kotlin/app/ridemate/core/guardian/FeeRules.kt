@@ -43,6 +43,8 @@ data class FeeQuery(
     val nowElapsedMs: Long,
     val fareInr: Int? = null,
     val ondcFeeInr: Int? = null,
+    /** An unreadable update may mean a driver already accepted (MAYBE states): never call it free while searching. */
+    val driverPossible: Boolean = false,
 )
 
 /** Fee notes for sheets and cancel cards; also orders the cancel queue by when each free window closes. */
@@ -100,7 +102,7 @@ class RuleBasedFeeEstimator(private val rules: FeeRules, private val stateCode: 
         }
         val rule = rules.ruleFor(query.provider.packageName, stateCode)
         val hasDriver = query.rideState == RideState.ASSIGNED || query.rideState == RideState.ARRIVING
-        if (!hasDriver && rule.freeWhileSearching != false) return FeeNote(FeeNoteKind.FREE_WHILE_SEARCHING)
+        if (!hasDriver && !query.driverPossible && rule.freeWhileSearching != false) return FeeNote(FeeNoteKind.FREE_WHILE_SEARCHING)
         if (hasDriver) {
             freeWindowEndsAtElapsedMs(query)?.let { end ->
                 if (query.nowElapsedMs < end) {

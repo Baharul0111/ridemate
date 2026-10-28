@@ -59,6 +59,11 @@ data class LegState(
     val ondcFeeInr: Int? = null,
     /** Closed by the ride app itself (expired / provider-cancelled) while a cancel chain was running. */
     val endedByApp: Boolean = false,
+    /**
+     * Wall time the leg was created. A post re-read from the shade that is older than this belongs to an earlier ride
+     * (a cancelled or expired notification left over from before the session) and must not move this leg.
+     */
+    val notBeforeWallMs: Long? = null,
 ) {
     val isNetwork: Boolean get() = provider.isNetwork
 

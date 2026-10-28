@@ -71,6 +71,11 @@ class RulesTest {
             FeeQuery(provider, state, assignedAt, eta, now, fare)
 
         assertEquals(FeeNote(FeeNoteKind.FREE_WHILE_SEARCHING), noState.note(q(Provider.UBER, RideState.SEARCHING, 0)))
+        assertEquals(
+            "a driver may have accepted",
+            FeeNote(FeeNoteKind.MAY_APPLY, upToInr = 100),
+            noState.note(FeeQuery(Provider.UBER, RideState.SEARCHING, null, null, 0, driverPossible = true)),
+        )
         assertEquals(FeeNote(FeeNoteKind.FREE_WINDOW, freeForSeconds = 120), noState.note(q(Provider.UBER, RideState.ASSIGNED, 0)))
         assertEquals(FeeNote(FeeNoteKind.FREE_WINDOW, freeForSeconds = 1), noState.note(q(Provider.UBER, RideState.ASSIGNED, 119_500)))
         assertEquals(FeeNote(FeeNoteKind.MAY_APPLY, upToInr = 100), noState.note(q(Provider.UBER, RideState.ARRIVING, 120_000)))

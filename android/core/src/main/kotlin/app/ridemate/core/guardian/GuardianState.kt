@@ -81,6 +81,8 @@ data class LegRecord(
     /** The tap that queued this leg for cancelling (the chain's Yes, a switch, or an ONDC cancel). */
     var cancelTap: TapId? = null,
     var bookedFareInr: Int? = null,
+    /** Queued for cancelling from a MAYBE state: a driver may have accepted until the app's own posts say otherwise. */
+    var driverUncertain: Boolean = false,
 ) {
     val legId: String get() = leg.legId
     val provider: Provider get() = leg.provider

@@ -27,6 +27,11 @@ data class PostSnapshot(
     /** The text templates are matched against (contracts §2.1). */
     val matchText: String
         get() = (title ?: "") + "\n" + (text ?: "")
+
+    /** B12: title and text (OTPs, phone numbers, names) never reach a log line or a crash report through this. */
+    override fun toString(): String =
+        "PostSnapshot($packageName, key=$sbnKey, id=$id, tag=$tag, channel=$channelId, category=$category, " +
+            "ongoing=$isOngoing, redacted=$isRedacted, postTime=$postTimeMs, versionCode=$versionCode)"
 }
 
 /**

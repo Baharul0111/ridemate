@@ -36,7 +36,11 @@ data class ClassifyRequest(
     val category: String?,
     val isOngoing: Boolean,
     val legState: RideState,
-)
+) {
+    /** B12: even masked notification text stays out of logs and crash reports. */
+    override fun toString(): String =
+        "ClassifyRequest($app, versionCode=$versionCode, channel=$channelId, category=$category, ongoing=$isOngoing, legState=$legState)"
+}
 
 enum class UnavailableReason { SIGNED_OUT, ANONYMOUS, QUOTA, AI_PAUSED, BREAKER_OPEN, KILL_SWITCH, OFFLINE }
 

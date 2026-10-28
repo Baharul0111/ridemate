@@ -165,6 +165,52 @@ class StatechartBehaviourTest {
     }
 
     @Test
+    fun `a live post after the removal or the capture voids that half of rung 3`() {
+        val guided = fresh(RideState.CANCEL_GUIDED).copy(providerState = RideState.SEARCHING, marks = mapOf("k1" to AppliedMark(EventType.SEARCHING, 0)))
+        // The app swaps its searching post for the assigned one (APP_CANCEL): the booking is alive, not cancelled.
+        val swapped = guided.on(NotificationRemoved("k1", 8, appCancel = true, wasOngoing = true)).after
+            .on(tpl(NotificationEvent.ASSIGNED, key = "k2", plate = "p1")).after
+        assertNull(swapped.removalAtElapsedMs)
+        now = now.copy(elapsedMs = now.elapsedMs + 30_000)
+        assertEquals(RideState.CANCEL_GUIDED, swapped.on(CaptureVerdict(true, TapId("t"))).after.state)
+
+        // A cancelled-looking capture, then the same live post again (an idempotent repeat), then a removal.
+        val captured = guided.on(CaptureVerdict(true, TapId("t"))).after
+        val reposted = captured.on(tpl(NotificationEvent.SEARCHING, key = "k1"))
+        assertEquals(LogReason.IDEMPOTENT, reposted.logReason)
+        assertNull(reposted.after.cancelledCaptureAtElapsedMs)
+        assertEquals(RideState.CANCEL_GUIDED, reposted.after.on(NotificationRemoved("k1", 8, appCancel = true, wasOngoing = true)).after.state)
+
+        // A stale re-read of an old live post voids nothing, and neither does an unreadable update.
+        val removed = guided.copy(lastEvidenceWallMs = now.wallMs).on(NotificationRemoved("k1", 8, appCancel = true, wasOngoing = true)).after
+        val staleReplay = removed.on(tpl(NotificationEvent.SEARCHING, key = "k0", postTime = now.wallMs - 60_000, replayed = true))
+        assertEquals(LogReason.STALE_REPLAY, staleReplay.logReason)
+        val unknown = staleReplay.after.on(UnknownUpdate(UnknownReason.REDACTED, "k3")).after
+        assertEquals(RideState.CANCEL_CONFIRMED, unknown.on(CaptureVerdict(true, TapId("t"))).after.state)
+    }
+
+    @Test
+    fun `a post re-read from the shade that is older than the leg belongs to an earlier ride`() {
+        val selected = LegState("L", Provider.UBER, RideState.SELECTED, notBeforeWallMs = now.wallMs)
+        val hourAgo = now.wallMs - 3_600_000
+        for (signal in listOf(NotificationEvent.CANCELLED, NotificationEvent.NO_DRIVERS, NotificationEvent.ASSIGNED)) {
+            val leftover = selected.on(tpl(signal, key = "old", postTime = hourAgo, replayed = true))
+            assertEquals(signal.name, LogReason.STALE_REPLAY, leftover.logReason)
+            assertEquals(signal.name, RideState.SELECTED, leftover.after.state)
+        }
+        // A leg being cancelled that has seen no post of its own is not "confirmed" by yesterday's cancelled post.
+        val guided = selected.copy(state = RideState.CANCEL_GUIDED, providerState = RideState.BOOK_REQUESTED)
+        assertEquals(RideState.CANCEL_GUIDED, guided.on(tpl(NotificationEvent.CANCELLED, key = "old", postTime = hourAgo, replayed = true)).after.state)
+        assertEquals(LogReason.STALE_REPLAY, guided.on(UnknownUpdate(UnknownReason.REDACTED, "old", hourAgo, replayed = true)).logReason)
+        val booked = selected.copy(state = RideState.SEARCHING)
+        val label = ProviderUpdate(NotificationEvent.ASSIGNED, SignalSource.CLASSIFIER, "old", postTimeWallMs = hourAgo, replayed = true)
+        assertEquals(LogReason.STALE_REPLAY, booked.on(label).logReason)
+        // Live callbacks are never judged by their post time; a re-read newer than the leg applies as usual.
+        assertEquals(RideState.SEARCHING, selected.on(tpl(NotificationEvent.SEARCHING, key = "new", postTime = hourAgo)).after.state)
+        assertEquals(RideState.SEARCHING, selected.on(tpl(NotificationEvent.SEARCHING, key = "new", replayed = true)).after.state)
+    }
+
+    @Test
     fun `the user-cancel chain queues, guides and aborts back to the provider state`() {
         val maybe = fresh(RideState.MAYBE_CHANGED).copy(returnState = RideState.ARRIVING)
         val queued = maybe.on(Chain(ChainStep.QUEUE))

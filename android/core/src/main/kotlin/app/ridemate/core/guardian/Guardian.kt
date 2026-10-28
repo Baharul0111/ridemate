@@ -533,7 +533,10 @@ class Guardian(
                 is StateOutput.RaisePrompt -> openPrompt(rec, output.kind)
                 is StateOutput.RePrompt -> rePrompt(rec)
                 is StateOutput.WithdrawPrompt -> closePrompt(rec, output.reason)
-                is StateOutput.CancelCardUpdate -> onCancelCardUpdate(rec)
+                is StateOutput.CancelCardUpdate -> {
+                    rec.driverUncertain = false
+                    onCancelCardUpdate(rec)
+                }
                 is StateOutput.EndedByApp -> emit(GuardianEffect.Banner(rec.legId, rec.provider, UiKey.BANNER_ENDED_BY_APP))
                 is StateOutput.CancelConfirmed -> {
                     s.evidence += EvidenceRecord(rec.legId, output.rung, now().elapsedMs)
@@ -577,6 +580,12 @@ class Guardian(
             LegRole.KEPT -> onKeptChanged(rec, before, after, newDriver)
             LegRole.EXTRA -> if (after.state.isTerminal || after.state == RideState.USER_SAYS_CANCELLED) chainLegDone(rec)
             LegRole.NONE, LegRole.CANDIDATE -> {
+                if (after.state == RideState.ON_TRIP && keptLeg() == null) {
+                    // The user is riding this one without having answered the sheet: it is the kept ride now, and
+                    // every other live booking is pointed out.
+                    makeKept(rec)
+                    onTripStarted(rec)
+                }
                 if (newDriver) driverFound(rec)
                 if (after.state == RideState.SEARCH_EXPIRED || after.state == RideState.PROVIDER_CANCELLED) {
                     emit(GuardianEffect.Banner(rec.legId, rec.provider, UiKey.BANNER_ENDED_BY_APP))
@@ -597,6 +606,11 @@ class Guardian(
             newDriver -> {
                 announceRide(rec)
                 scheduleBetterRideStop(rec)
+                // Bookings that found a driver while this one had none are offered now (keep one, cancel the other).
+                activeLegs().filter {
+                    it !== rec && (it.role == LegRole.NONE || it.role == LegRole.CANDIDATE) && !it.dismissed &&
+                        it.leg.state in LegState.DRIVER_STATES
+                }.forEach { betterRideCheck(rec, it) }
             }
             after.state == RideState.ON_TRIP -> onTripStarted(rec)
         }
@@ -628,7 +642,13 @@ class Guardian(
 
     private fun driverFound(rec: LegRecord) {
         val kept = keptLeg() ?: return // with no kept leg, firstDriverDecision decides
-        if (kept.leg.state in LegState.DRIVER_STATES) betterRideCheck(kept, rec)
+        if (kept.leg.state in LegState.DRIVER_STATES) {
+            betterRideCheck(kept, rec)
+        } else if (rec.leg.state in LegState.DRIVER_STATES) {
+            // The kept ride has no driver right now (re-searching, uncertain, on the trip or over): a driver heading to
+            // another booking is never passed over in silence.
+            emit(GuardianEffect.LoudAlert(rec.legId, rec.provider, UiKey.ALERT_STILL_LIVE, listOf(UiAction.OPEN_APP, UiAction.DISMISS)))
+        }
     }
 
     private fun firstDriverDecision() {
@@ -764,6 +784,7 @@ class Guardian(
             rec.extraSinceElapsedMs = now
             rec.cancelTap = tap
             s.sheets.filter { sheet -> sheet.bindings.any { it.legId == rec.legId } }.forEach { closeSheet(it, UiKey.SHEET_CLOSED) }
+            rec.driverUncertain = rec.leg.state in MAYBE_DRIVER_STATES
             if (!rec.leg.isNetwork) apply(rec, Chain(ChainStep.QUEUE))
             if (rec.legId !in chain.queue && chain.currentLegId != rec.legId) chain.queue += rec.legId
         }
@@ -890,6 +911,7 @@ class Guardian(
                 other.role = LegRole.NONE
                 other.extraSinceElapsedMs = null
                 other.cancelTap = null
+                other.driverUncertain = false
                 s.chain?.queue?.remove(other.legId)
                 if (s.chain?.currentLegId == other.legId) s.chain?.currentLegId = null
                 if (!other.leg.isNetwork) apply(other, Chain(ChainStep.ABORT))
@@ -1110,7 +1132,9 @@ class Guardian(
 
     private fun addLeg(sessionId: String, provider: Provider, round: Int, now: Moment) {
         val legId = if (round == 1) "$sessionId:${provider.wireId}" else "$sessionId:${provider.wireId}:r$round"
-        s.legs[legId] = LegRecord(LegState(legId = legId, provider = provider, enteredAtElapsedMs = now.elapsedMs))
+        s.legs[legId] = LegRecord(
+            LegState(legId = legId, provider = provider, enteredAtElapsedMs = now.elapsedMs, notBeforeWallMs = now.wallMs),
+        )
     }
 
     private fun nextId(prefix: String): String = "$prefix-${s.nextId++}"
@@ -1145,6 +1169,7 @@ class Guardian(
         nowElapsedMs = now().elapsedMs,
         fareInr = rec.bookedFareInr,
         ondcFeeInr = rec.leg.ondcFeeInr,
+        driverPossible = rec.leg.state in MAYBE_DRIVER_STATES || rec.driverUncertain,
     )
 
     private fun feeNote(rec: LegRecord): FeeNote = feeEstimator.note(feeQuery(rec))
@@ -1174,16 +1199,23 @@ class Guardian(
 
     companion object {
         private const val MAX_FIRES_PER_TICK = 64
+
+        /** Wall-clock corrections (NTP/NITZ) smaller than this are not taken for a reboot. */
+        private const val REBOOT_SLACK_MS = 60_000L
         private val FIRST_DRIVER_KINDS = setOf(SheetKind.CANCEL_OTHERS, SheetKind.TWO_DRIVERS, SheetKind.SAME_DRIVER)
+
+        /** "Got a driver?" / "Is a new driver coming?" are open: a driver may already be on the way. */
+        private val MAYBE_DRIVER_STATES = setOf(RideState.MAYBE_ASSIGNED, RideState.MAYBE_NEW_DRIVER)
 
         /** Rebuilds a guardian from [snapshot]. After a reboot the monotonic clock restarted, so its frame is rebased. */
         fun restore(json: String, clock: Clock, feeEstimator: FeeEstimator, config: GuardianConfig = GuardianConfig()): Guardian {
             val state = GuardianJson.decodeFromString(GuardianState.serializer(), json)
-            val frameNow = clock.elapsedMs() + state.elapsedOffsetMs
-            if (frameNow < state.savedAtElapsedMs) {
-                val wallGap = (clock.wallMs() - state.savedAtWallMs).coerceAtLeast(0)
-                state.elapsedOffsetMs = state.savedAtElapsedMs + wallGap - clock.elapsedMs()
-            }
+            val frameGap = clock.elapsedMs() + state.elapsedOffsetMs - state.savedAtElapsedMs
+            val wallGap = clock.wallMs() - state.savedAtWallMs
+            // The monotonic clock counts deep sleep, so it only falls behind the wall clock when it restarted: it went
+            // backwards, or the phone rebooted and has now been up longer than it had been at the save.
+            val rebooted = frameGap < 0 || wallGap - frameGap > REBOOT_SLACK_MS
+            if (rebooted) state.elapsedOffsetMs = state.savedAtElapsedMs + wallGap.coerceAtLeast(0) - clock.elapsedMs()
             return Guardian(clock, feeEstimator, config, state)
         }
     }

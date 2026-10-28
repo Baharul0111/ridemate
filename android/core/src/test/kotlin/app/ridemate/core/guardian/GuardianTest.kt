@@ -241,6 +241,29 @@ class GuardianTest {
     }
 
     @Test
+    fun `a reboot is recognised even when the phone has since been up longer than at the save`() {
+        val g = guardian(Provider.UBER, Provider.RAPIDO)
+        g.book(Provider.UBER, Provider.RAPIDO)
+        g.tpl(Provider.RAPIDO, NotificationEvent.ASSIGNED)
+        g.onUserAction(UserAction.AnswerSheet(g.state.sheets.single().sheetId, SheetChoice.YES_CANCEL_OTHERS, tap()))
+        clock.advanceBy(130_000)
+        g.tick()
+        val json = g.snapshot()
+        val untilDue = g.nextDueElapsedMs()!! - clock.elapsedMs()
+        assertEquals("the 240 s reminder", 110_000L, untilDue)
+
+        // Down for 90 s, then up for 10 s longer than the uptime at the save: the monotonic clock never went backwards.
+        clock.reboot(downtimeMs = 90_000, elapsedAfter = clock.elapsedMs() + 10_000)
+        val rebooted = Guardian.restore(json, clock, fees)
+        assertEquals(untilDue - 90_000, rebooted.nextDueElapsedMs()!! - clock.elapsedMs())
+
+        // A small wall-clock correction without a reboot moves nothing.
+        val corrected = ManualClock(elapsed = 131_000, wall = ManualClock.DEFAULT_WALL_MS + 131_000 + 20_000)
+        val restored = Guardian.restore(json, corrected, fees)
+        assertEquals(untilDue - 1_000, restored.nextDueElapsedMs()!! - corrected.elapsedMs())
+    }
+
+    @Test
     fun `resume re-announces the foreground service and catches up`() {
         val g = guardian(Provider.UBER, Provider.RAPIDO)
         g.book(Provider.UBER, Provider.RAPIDO)
