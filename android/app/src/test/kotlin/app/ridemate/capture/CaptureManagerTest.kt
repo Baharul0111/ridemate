@@ -8,6 +8,7 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.ridemate.testing.FakeClock
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.yield
@@ -19,6 +20,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 
+@OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(AndroidJUnit4::class)
 class CaptureManagerTest {
     private val context: Context = ApplicationProvider.getApplicationContext()
@@ -105,7 +107,7 @@ class CaptureManagerTest {
         clock.advance(2_500)
         manager.onConsentResult(Activity.RESULT_OK, okData)
 
-        assertEquals(ConsentResult.Granted(clock.elapsed), answer.await())
+        assertEquals(ConsentResult.Granted(clock.elapsed, fresh = true), answer.await())
         assertEquals(listOf("fgs.enter", "gateway.start"), log)
         assertTrue(manager.isActive)
         assertEquals(CapturePurpose.FARE_READING, (manager.state.value as CaptureState.Active).purpose)
@@ -118,7 +120,11 @@ class CaptureManagerTest {
         manager.onConsentResult(Activity.RESULT_OK, okData)
         first.await()
 
-        assertTrue(manager.obtainConsent(CapturePurpose.FARE_READING) is ConsentResult.Granted)
+        val startedAt = clock.elapsed
+        clock.advance(30_000)
+
+        // Reused, not fresh: the reader keeps the user's own Read fares tap as the I6 tap (no synthetic tap time).
+        assertEquals(ConsentResult.Granted(startedAt, fresh = false), manager.obtainConsent(CapturePurpose.FARE_READING))
         assertEquals(1, launched.size)
         assertEquals(1, gateway.sessions.size)
     }
@@ -252,5 +258,64 @@ class CaptureManagerTest {
         assertEquals(StopReason.ONE_SHOT_DONE, manager.lastStop.value)
         frame!!.close()
         assertNull(manager.captureOnceAndStop(clock.elapsed))
+    }
+
+    @Test
+    fun `a fare projection nobody reads with stops by itself, and each read pushes the stop back`() = runTest {
+        val idle = CaptureManager(
+            context = context,
+            gateway = gateway,
+            clock = clock,
+            overlays = { FakeOverlays() },
+            mainDispatcher = Dispatchers.Unconfined,
+            launchConsentScreen = { true },
+            idleScope = backgroundScope,
+            idleStopMs = 60_000,
+        ).apply { foregroundHost = FakeHost() }
+        idle.obtainConsentAndGrant()
+        log.clear()
+
+        testScheduler.advanceTimeBy(50_000)
+        idle.captureTwoFrames(clock.elapsed).let { (it as CaptureOutcome.Frames).close() }
+        testScheduler.advanceTimeBy(50_000)
+        testScheduler.runCurrent()
+        assertTrue("a read 50 s ago keeps it running", idle.isActive)
+
+        testScheduler.advanceTimeBy(11_000)
+        testScheduler.runCurrent()
+
+        assertFalse(idle.isActive)
+        assertEquals(StopReason.IDLE, idle.lastStop.value)
+        assertTrue("the mediaProjection type is dropped", "fgs.exit" in log)
+    }
+
+    @Test
+    fun `optional captures never idle-stop and a stop for one purpose leaves another purpose's projection alone`() = runTest {
+        val idle = CaptureManager(
+            context = context,
+            gateway = gateway,
+            clock = clock,
+            overlays = { FakeOverlays() },
+            mainDispatcher = Dispatchers.Unconfined,
+            launchConsentScreen = { true },
+            idleScope = backgroundScope,
+            idleStopMs = 1_000,
+        ).apply { foregroundHost = FakeHost() }
+        idle.obtainConsentAndGrant()
+
+        idle.stopIfRunningFor(CapturePurpose.SHOW_ME, StopReason.ONE_SHOT_DONE)
+        assertTrue("a Show me clean-up never ends fare reading", idle.isActive)
+
+        val showMe = async { idle.obtainConsent(CapturePurpose.SHOW_ME) }
+        yield()
+        idle.onConsentResult(Activity.RESULT_OK, okData)
+        assertTrue(showMe.await() is ConsentResult.Granted)
+        testScheduler.advanceTimeBy(5_000)
+        testScheduler.runCurrent()
+        assertEquals(CapturePurpose.SHOW_ME, (idle.state.value as CaptureState.Active).purpose)
+
+        idle.stopIfRunningFor(CapturePurpose.SHOW_ME, StopReason.ONE_SHOT_DONE)
+        assertFalse(idle.isActive)
+        assertEquals(StopReason.ONE_SHOT_DONE, idle.lastStop.value)
     }
 }

@@ -160,11 +160,12 @@ class ManualEntryUseCaseTest {
     private lateinit var db: RideMateDb
     private val clock = FakeClock()
     private lateinit var manual: ManualEntryUseCase
+    private var projectionStops = 0
 
     @Before
     fun setUp() {
         db = TestSeams.inMemoryDb(context)
-        manual = ManualEntryUseCase(RoomQuoteStore(db, clock), clock) { SanityBandsConfig.DEFAULT }
+        manual = ManualEntryUseCase(RoomQuoteStore(db, clock), clock, onAllFaresRead = { projectionStops++ }) { SanityBandsConfig.DEFAULT }
         runBlocking {
             db.sessionDao().insert(TestData.session("s1"))
             db.legDao().upsert(TestData.leg("l1", "s1", Provider.RAPIDO, RideState.OPENED))
@@ -199,5 +200,20 @@ class ManualEntryUseCaseTest {
         val message = manualEntryError(context, ManualEntryResult.OutOfRange(15, 5000))!!
         assertTrue(message, message.contains("₹15") && message.contains("₹5,000"))
         assertNull(manualEntryError(context, ManualEntryResult.Saved(GatedRow.userEntered(Provider.RAPIDO, VehicleClass.AUTO, 120..120, 0))))
+    }
+
+    @Test
+    fun `typing the price of the last app still waiting ends fare reading and stops the projection`() = runBlocking {
+        db.legDao().upsert(TestData.leg("l2", "s1", Provider.OLA, RideState.OPENED))
+
+        manual.enter("l1", Provider.RAPIDO, VehicleClass.AUTO, "120")
+        assertEquals("Ola still waits for a price", 0, projectionStops)
+
+        manual.enter("l2", Provider.OLA, VehicleClass.AUTO, "130")
+        assertEquals(1, projectionStops)
+
+        manual.enter("gone", Provider.OLA, VehicleClass.AUTO, "130")
+        manual.enter("l2", Provider.OLA, VehicleClass.AUTO, "nonsense")
+        assertEquals("refused entries change nothing", 1, projectionStops)
     }
 }

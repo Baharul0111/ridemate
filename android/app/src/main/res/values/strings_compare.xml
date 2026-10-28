@@ -33,6 +33,8 @@
     </plurals>
     <string name="compare_manual_switched_off">AI reading is switched off for now. You can type the price meanwhile.</string>
     <string name="compare_manual_reader_unavailable">RideMate can\'t check %1$s prices right now. You can type the price meanwhile.</string>
+    <!-- %1$s: ride app name -->
+    <string name="compare_manual_screenshot_blank">This screenshot is blank: %1$s blocks screenshots too. Type the price you see in %1$s.</string>
 
     <!-- Providers and vehicle classes. -->
     <string name="compare_provider_ondc">Open network (ONDC)</string>
@@ -74,4 +76,22 @@
     <!-- %1$s and %2$s: ₹15 and ₹5,000 -->
     <string name="compare_manual_out_of_range">Prices must be between %1$s and %2$s. Check the number and try again.</string>
     <string name="compare_manual_no_leg">This comparison has ended. Start a new one from RideMate\'s home screen.</string>
+
+    <!-- Show me (§4.7 step 3): an arrow beside the control to tap; every problem falls back to the card. -->
+    <string name="show_me_looking">Looking for the spot to tap…</string>
+    <!-- %1$s: ride app name -->
+    <string name="show_me_shown">Look for the arrow: tap there in %1$s yourself.</string>
+    <string name="show_me_not_found">RideMate couldn\'t find that button on this screen. Follow the steps on the card.</string>
+    <string name="show_me_no_room">There\'s no room for an arrow beside that button. Follow the steps on the card.</string>
+    <string name="show_me_unsupported">Show me isn\'t available. Follow the steps on the card.</string>
+    <string name="show_me_unavailable">Show me needs AI, which isn\'t available right now. Follow the steps on the card.</string>
+    <!-- %1$s: time like 1:30 pm -->
+    <string name="show_me_paused_until">Show me is back at %1$s (IST). Until then, follow the steps on the card.</string>
+    <string name="show_me_consent_needed">Screen sharing wasn\'t allowed. Tap Show me to try again, or follow the steps on the card.</string>
+    <string name="show_me_capture_failed">RideMate couldn\'t see the screen. Tap Show me again, or follow the steps on the card.</string>
+    <!-- %1$s: ride app name -->
+    <string name="show_me_blocked">%1$s hides its screen, so RideMate can\'t point. Follow the steps on the card.</string>
+    <string name="show_me_timed_out">That took too long. Tap Show me again, or follow the steps on the card.</string>
+    <!-- %1$s: ride app name. Spoken description of the arrow overlay. -->
+    <string name="show_me_pointer_description">Arrow beside the button to tap in %1$s</string>
 </resources>

@@ -105,7 +105,7 @@ fun rememberWallClock(clock: Clock, periodMs: Long = 1_000): Long {
 /**
  * The comparison list (goals 5–8): rows grouped by vehicle type; only VERIFIED rows are sorted and marked cheapest
  * (icon + word, not colour); unreadable rows say "Couldn't read · check in app" with no number; every row says when
- * it was seen and greys out with "old, tap to refresh" after 60 s; ONDC rows say "network quote" and typed rows
+ * it was seen and, after 60 s, greys out and adds "old, tap to refresh"; ONDC rows say "network quote" and typed rows
  * "entered by you". Each row has Book (opens the app), and each app has "Booked in <app>".
  */
 @Composable
@@ -172,11 +172,10 @@ private fun QuoteRow(entry: ComparisonEntry, callbacks: ComparisonCallbacks) {
     val label = if (row.labelFromOcr || row.status == QuoteStatus.NETWORK) row.displayLabel else stringResource(FareReadingMessages.vehicleClassRes(row.vehicleClass))
     val refreshLabel = stringResource(R.string.compare_refresh, app)
     val bookDescription = stringResource(R.string.compare_book_description, app)
-    val freshness = if (entry.stale) {
-        stringResource(R.string.quote_stale)
-    } else {
-        stringResource(R.string.quote_seen_at, app, entry.seenAtText)
-    }
+    // §4.3.6: every row keeps "seen in <app> at …"; after 60 s it also says "old, tap to refresh" (never colour alone).
+    val seenAt = stringResource(R.string.quote_seen_at, app, entry.seenAtText)
+    val staleText = stringResource(R.string.quote_stale)
+    val freshness = if (entry.stale) staleText else seenAt
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -227,12 +226,15 @@ private fun QuoteRow(entry: ComparisonEntry, callbacks: ComparisonCallbacks) {
             } else if (entry.etaTextKey != null) {
                 Text(stringResource(FareReadingMessages.gateTextRes(entry.etaTextKey!!)), style = MaterialTheme.typography.bodyMedium)
             }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                if (entry.stale) {
+            if (entry.stale) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Filled.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(4.dp))
+                    Text(staleText, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
                 }
-                Text(freshness, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(seenAt, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
                 if (!row.provider.isNetwork) {
                     OutlinedButton(
                         onClick = { callbacks.onBook(row.provider) },

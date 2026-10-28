@@ -64,9 +64,10 @@ object OverlayParams {
 
     /**
      * The bubble: an application overlay that never takes key focus (`FLAG_NOT_FOCUSABLE`, so the ride app keeps its
-     * keyboard), wraps its content, and is positioned from the top-left at ([x], [y]).
+     * keyboard), wraps its content, and is positioned from the top-left at ([x], [y]). [windowTitle] is the window's
+     * localised name.
      */
-    fun bubble(x: Int, y: Int): WindowManager.LayoutParams = WindowManager.LayoutParams(
+    fun bubble(x: Int, y: Int, windowTitle: CharSequence? = null): WindowManager.LayoutParams = WindowManager.LayoutParams(
         WindowManager.LayoutParams.WRAP_CONTENT,
         WindowManager.LayoutParams.WRAP_CONTENT,
         WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
@@ -76,14 +77,16 @@ object OverlayParams {
         gravity = Gravity.TOP or Gravity.START
         this.x = x
         this.y = y
-        title = "RideMate bubble"
+        title = windowTitle ?: "RideMate bubble"
     }
 
     /**
      * The pointer arrow at [box] (screen pixels): it can't be touched (`FLAG_NOT_TOUCHABLE`, taps pass to the ride
-     * app), never takes focus, and is at most [POINTER_MAX_ALPHA] opaque.
+     * app), never takes focus, and is at most [POINTER_MAX_ALPHA] opaque. Its position is absolute: system bars and
+     * the display cutout don't shift it (API 30+ would otherwise inset the window by the status bar and could push
+     * the arrow onto the very control it points at).
      */
-    fun pointer(box: Box): WindowManager.LayoutParams = WindowManager.LayoutParams(
+    fun pointer(box: Box, windowTitle: CharSequence? = null): WindowManager.LayoutParams = WindowManager.LayoutParams(
         box.width,
         box.height,
         WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
@@ -95,6 +98,15 @@ object OverlayParams {
         x = box.l
         y = box.t
         alpha = POINTER_MAX_ALPHA
-        title = "RideMate pointer"
+        title = windowTitle ?: "RideMate pointer"
+        layoutInDisplayCutoutMode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
+        } else {
+            WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            fitInsetsTypes = 0
+            isFitInsetsIgnoringVisibility = true
+        }
     }
 }

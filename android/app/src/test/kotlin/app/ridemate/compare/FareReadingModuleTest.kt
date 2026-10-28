@@ -53,6 +53,8 @@ class FareReadingModuleTest {
         assertSame(module.capture, module.capture)
         assertSame(module.readFares, module.readFares)
         assertSame(module.coordinator, module.coordinator)
+        assertSame(module.showMe, module.showMe)
+        assertFalse("Show me needs Google sign-in", module.showMe.isAvailable(Provider.UBER))
         assertEquals(CaptureState.Idle, module.capture.state.value)
         assertNull(module.capture.foregroundHost)
         assertNull(module.bubbleHosts.surface)

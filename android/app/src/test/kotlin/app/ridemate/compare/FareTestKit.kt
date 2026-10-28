@@ -228,6 +228,8 @@ class FakeMasker : FrameMasker {
 class ScriptedApiClient : ApiClient {
     var readScreenResult: suspend (ReadScreenRequest) -> ApiResult<ReadScreenResponse> = { ApiResult.NotConfigured }
     var rereadResult: suspend (RereadRequest) -> ApiResult<RereadResponse> = { ApiResult.NotConfigured }
+    var pointResult: suspend (PointRequest) -> ApiResult<PointResponse> = { ApiResult.NotConfigured }
+    val pointRequests = mutableListOf<PointRequest>()
     val readRequests = mutableListOf<ReadScreenRequest>()
     val rereadRequests = mutableListOf<RereadRequest>()
     val budgets = mutableListOf<TapBudget>()
@@ -244,7 +246,10 @@ class ScriptedApiClient : ApiClient {
         return rereadResult(request)
     }
 
-    override suspend fun point(request: PointRequest): ApiResult<PointResponse> = ApiResult.NotConfigured
+    override suspend fun point(request: PointRequest): ApiResult<PointResponse> {
+        pointRequests += request
+        return pointResult(request)
+    }
     override suspend fun parseNotification(request: ParseNotificationRequest, sessionId: String?): ApiResult<ParseNotificationResponse> =
         ApiResult.NotConfigured
     override suspend fun placePick(request: PlacePickRequest, sessionId: String?): ApiResult<PlacePickResponse> = ApiResult.NotConfigured

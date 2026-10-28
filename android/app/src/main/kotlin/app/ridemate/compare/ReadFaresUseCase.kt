@@ -5,6 +5,7 @@ import app.ridemate.capture.BlackFrameDetector
 import app.ridemate.capture.CaptureOutcome
 import app.ridemate.capture.FareFrameSource
 import app.ridemate.capture.FrameImage
+import app.ridemate.capture.FrameOrigin
 import app.ridemate.capture.FrameTiming
 import app.ridemate.core.fare.FareParser
 import app.ridemate.core.fare.looksLikeFareScreen
@@ -125,7 +126,14 @@ class ReadFaresUseCase(
         } catch (e: OcrFailedException) {
             return ReadFaresResult.CaptureFailed
         }
-        if (looksSecure(first, ocr1) && looksSecure(second, ocr2)) return ReadFaresResult.CaptureBlocked(provider)
+        if (looksSecure(first, ocr1) && looksSecure(second, ocr2)) {
+            // Never bypassed. A blank *shared* screenshot means screenshots are blocked too: sharing again won't help.
+            return if (second.origin == FrameOrigin.SHARED) {
+                ReadFaresResult.ManualMode(provider, ManualReason.SCREENSHOT_BLANK)
+            } else {
+                ReadFaresResult.CaptureBlocked(provider)
+            }
+        }
         if (!looksLikeFareScreen(ocr2, provider, parsers, version)) return ReadFaresResult.NotFareScreen(provider)
 
         val frame1Masked = ocr1.copy(tokens = masker.maskTokensOnly(ocr1).maskedTokens)

@@ -8,9 +8,12 @@ import app.ridemate.crash.CrashSite
 import app.ridemate.util.Clock
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -30,8 +33,12 @@ sealed interface CaptureState {
 
 /** The user's answer on Android's "share your screen" dialog. */
 sealed interface ConsentResult {
-    /** Projection running; [atElapsedMs] is when the user tapped "Start now" (a user tap for I6). */
-    data class Granted(val atElapsedMs: Long) : ConsentResult
+    /**
+     * Projection running. [fresh]: the user just tapped "Start now" on Android's dialog, at [atElapsedMs] (a user tap
+     * for I6). Not fresh: the comparison's running projection was reused without asking, [atElapsedMs] is when it
+     * started, and the caller's own tap stays the I6 tap.
+     */
+    data class Granted(val atElapsedMs: Long, val fresh: Boolean = true) : ConsentResult
 
     data object Denied : ConsentResult
 
@@ -43,7 +50,16 @@ sealed interface ConsentResult {
 }
 
 /** Why a projection ended. */
-enum class StopReason { FARE_READING_DONE, ONE_SHOT_DONE, SESSION_ENDED, STOPPED_BY_SYSTEM, ERROR }
+enum class StopReason {
+    FARE_READING_DONE,
+    ONE_SHOT_DONE,
+    SESSION_ENDED,
+    STOPPED_BY_SYSTEM,
+    ERROR,
+
+    /** No "Read fares" tap for [CaptureManager.FARE_IDLE_STOP_MS]: the user moved on, so fare reading is over. */
+    IDLE,
+}
 
 /**
  * CaptureManager (§4.2): MediaProjection of the user's own screen, only on the user's tap.
@@ -55,6 +71,8 @@ enum class StopReason { FARE_READING_DONE, ONE_SHOT_DONE, SESSION_ENDED, STOPPED
  *   [onProjectionStopped].
  * - A "Read fares" tap hides RideMate's overlays, grabs 2 frames 400 ms apart and shows the overlays again.
  * - [stop] ends the projection (right after the last fare read) and drops the foreground type.
+ * - Safety net: a fare-reading projection nobody reads with for [FARE_IDLE_STOP_MS] stops by itself ([StopReason.IDLE]),
+ *   so the `mediaProjection` type never outlives fare reading when the user moves on without Done or Stop.
  *
  * Frames live in memory only. Call [onConsentResult] and [stop] on the main thread.
  */
@@ -67,6 +85,9 @@ class CaptureManager(
     private val overlays: () -> CaptureOverlayControl? = { null },
     private val mainDispatcher: CoroutineDispatcher = Dispatchers.Main.immediate,
     private val launchConsentScreen: (Intent) -> Boolean = { intent -> defaultLaunch(context, intent) },
+    /** Runs the idle stop timer; null disables it. */
+    private val idleScope: CoroutineScope? = null,
+    private val idleStopMs: Long = FARE_IDLE_STOP_MS,
 ) : FareFrameSource {
 
     private val _state = MutableStateFlow<CaptureState>(CaptureState.Idle)
@@ -85,6 +106,7 @@ class CaptureManager(
     private var session: ProjectionSession? = null
     private var pendingConsent: CompletableDeferred<ConsentResult>? = null
     private var pendingPurpose: CapturePurpose? = null
+    private var idleJob: Job? = null // guarded by lock
     private val grabMutex = Mutex()
 
     val isActive: Boolean get() = _state.value is CaptureState.Active
@@ -101,7 +123,7 @@ class CaptureManager(
         synchronized(lock) {
             val current = _state.value
             if (current is CaptureState.Active && current.purpose == purpose && !purpose.asksAgain) {
-                return ConsentResult.Granted(clock.elapsedRealtimeMs())
+                return ConsentResult.Granted(current.startedAtElapsedMs, fresh = false)
             }
             pendingConsent?.complete(ConsentResult.NoAnswer)
             deferred = CompletableDeferred()
@@ -163,6 +185,7 @@ class CaptureManager(
             session = started
             _state.value = CaptureState.Active(purpose, now)
         }
+        armIdleStop()
         settleConsent(deferred, ConsentResult.Granted(now))
     }
 
@@ -191,6 +214,7 @@ class CaptureManager(
             CaptureOutcome.Frames(first, second)
         } finally {
             withContext(NonCancellable + mainDispatcher) { overlayControl?.restoreAfterCapture() }
+            armIdleStop()
         }
     }
 
@@ -217,13 +241,42 @@ class CaptureManager(
         stopSession(reason, notifyHost = true)
     }
 
+    /**
+     * Stops the projection only while it runs for [purpose]: an optional capture abandoned before its one frame (a
+     * deadline hit after consent) must not leave its projection running, nor end another purpose's.
+     */
+    fun stopIfRunningFor(purpose: CapturePurpose, reason: StopReason) {
+        val current = _state.value
+        if (current is CaptureState.Active && current.purpose == purpose) stop(reason)
+    }
+
     /** `MediaProjection.Callback.onStop`: Android or the user ended the projection. */
     fun onProjectionStopped() {
         stopSession(StopReason.STOPPED_BY_SYSTEM, notifyHost = true)
     }
 
+    /** (Re)starts the idle timer of a running fare-reading projection; every Read fares grab pushes it back. */
+    private fun armIdleStop() {
+        val scope = idleScope ?: return
+        synchronized(lock) {
+            idleJob?.cancel()
+            idleJob = null
+            val running = session ?: return
+            val current = _state.value
+            if (current !is CaptureState.Active || current.purpose != CapturePurpose.FARE_READING) return
+            idleJob = scope.launch {
+                delay(idleStopMs)
+                withContext(mainDispatcher) {
+                    if (synchronized(lock) { session === running }) stop(StopReason.IDLE)
+                }
+            }
+        }
+    }
+
     private fun stopSession(reason: StopReason, notifyHost: Boolean) {
         val ending = synchronized(lock) {
+            idleJob?.cancel()
+            idleJob = null
             val s = session ?: return
             session = null
             if (_state.value is CaptureState.Active) {
@@ -247,6 +300,9 @@ class CaptureManager(
         const val SECOND_FRAME_WAIT_MS: Long = 100
 
         const val CONSENT_TIMEOUT_MS: Long = 120_000
+
+        /** A fare-reading projection with no Read fares tap for this long has outlived fare reading and stops. */
+        const val FARE_IDLE_STOP_MS: Long = 5 * 60_000
 
         private fun defaultLaunch(context: Context, intent: Intent): Boolean {
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_ANIMATION)

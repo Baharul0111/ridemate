@@ -23,4 +23,7 @@
     <string name="bubble_status_kind_problem">समस्या</string>
     <string name="bubble_status_kind_reminder">याद दिलाना</string>
     <string name="bubble_status_spoken">%1$s: %2$s</string>
+
+    <string name="bubble_window_title">RideMate के बटन</string>
+    <string name="bubble_pointer_window_title">RideMate का तीर</string>
 </resources>

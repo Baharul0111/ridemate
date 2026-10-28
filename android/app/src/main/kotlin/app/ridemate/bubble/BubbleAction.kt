@@ -69,6 +69,11 @@ object NotificationMirror {
 /**
  * Extras for notification action intents. A3's receiver puts the action in with [put] and hands received intents to
  * [dispatch], which mints the tap id at the moment of the user's tap.
+ *
+ * Capture actions ([BubbleAction.READ_FARES], [BubbleAction.SHOW_ME]) must collapse the notification shade before
+ * the frame is grabbed, or the capture shows the shade instead of the ride app (and K3 rejects it). A broadcast
+ * action does not collapse the shade; use an activity `PendingIntent` (a transparent, non-exported activity that
+ * calls [dispatch] and finishes) for these two.
  */
 object BubbleActionIntents {
     const val EXTRA_ACTION = "app.ridemate.bubble.extra.ACTION"

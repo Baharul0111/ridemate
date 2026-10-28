@@ -94,10 +94,11 @@ class FareReadingCoordinator(
         showWorking()
         var tapAt = tappedAtElapsedMs
         when (val answer = consent.ensure()) {
-            is ConsentResult.Granted -> if (answer.atElapsedMs > tappedAtElapsedMs) {
-                // Consent was just given: that tap starts the read, once the system dialog has left the screen.
+            is ConsentResult.Granted -> if (answer.fresh && answer.atElapsedMs > tappedAtElapsedMs) {
+                // Consent was just given: the user's "Start now" tap starts the read (I6 counts from that tap), once
+                // the system dialog has left the screen. A reused projection keeps the user's own Read fares tap.
                 delay(CONSENT_DIALOG_SETTLE_MS)
-                tapAt = clock.elapsedRealtimeMs()
+                tapAt = answer.atElapsedMs
             }
             ConsentResult.Denied, ConsentResult.NoAnswer -> return ReadFaresResult.NeedsConsent.also { present(leg, it) }
             ConsentResult.Failed -> return ReadFaresResult.CaptureFailed.also { present(leg, it) }
@@ -132,7 +133,7 @@ class FareReadingCoordinator(
                     onError(e)
                     ReadFaresResult.CaptureFailed
                 }
-                present(leg, result, toastIfNoBubble = true)
+                present(leg, result)
             }
         }
         return context.getString(R.string.capture_share_reading)
@@ -142,14 +143,19 @@ class FareReadingCoordinator(
         bubble()?.setReaderStatus(BubbleStatus(context.getString(R.string.bubble_status_reading), StatusKind.WORKING), busy = true)
     }
 
-    private suspend fun present(leg: ActiveLeg?, result: ReadFaresResult, toastIfNoBubble: Boolean = false) {
+    /**
+     * Shows the outcome on the bubble. Without a bubble on screen (the tap came from the notification because the
+     * ride app hides overlays, or a screenshot was shared) the outcome is shown as a toast, so a tap never ends
+     * silently; [lastRead] carries it for the notification too.
+     */
+    private suspend fun present(leg: ActiveLeg?, result: ReadFaresResult) {
         _lastRead.value = LastRead(leg, result, clock.wallMs())
         val status = FareReadingMessages.status(context, result)
         withContext(main) {
             val surface = bubble()
             if (surface != null && surface.isShowing) {
                 surface.setReaderStatus(status, busy = false)
-            } else if (toastIfNoBubble) {
+            } else {
                 Toast.makeText(context, status.text, Toast.LENGTH_LONG).show()
             }
             if (leg != null && result is ReadFaresResult.ManualMode) openManualEntry(leg, result)

@@ -54,8 +54,13 @@ class MediaProjectionGateway(private val context: Context, private val clock: Cl
         }
     }
 
+    private fun defaultDisplayMetrics(): DisplayMetrics = DefaultDisplay.realMetrics(context)
+}
+
+/** The user's own default display, in real pixels (what a projection mirrors and the pointer is placed in). */
+object DefaultDisplay {
     @Suppress("DEPRECATION")
-    private fun defaultDisplayMetrics(): DisplayMetrics {
+    fun realMetrics(context: Context): DisplayMetrics {
         val metrics = DisplayMetrics()
         val display = context.getSystemService(DisplayManager::class.java).getDisplay(Display.DEFAULT_DISPLAY)
         display.getRealMetrics(metrics)

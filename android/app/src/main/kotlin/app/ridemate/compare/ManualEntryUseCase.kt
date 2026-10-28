@@ -23,11 +23,13 @@ sealed interface ManualEntryResult {
 
 /**
  * Manual mode (goal 21): the user types the price they see. Stored as USER_ENTERED and always labelled "entered by
- * you"; it is never marked cheapest (§4.3.7). Indian formats are parsed by core [RupeeParser].
+ * you"; it is never marked cheapest (§4.3.7). Indian formats are parsed by core [RupeeParser]. A typed price for the
+ * last app still waiting ends fare reading like a read does: [onAllFaresRead] stops the screen projection.
  */
 class ManualEntryUseCase(
     private val store: QuoteStore,
     private val clock: Clock,
+    private val onAllFaresRead: suspend () -> Unit = {},
     private val bands: () -> SanityBandsConfig,
 ) {
     suspend fun enter(legId: String, provider: Provider, vehicleClass: VehicleClass, text: String): ManualEntryResult {
@@ -37,6 +39,9 @@ class ManualEntryUseCase(
             return ManualEntryResult.OutOfRange(limits.priceMinInr, limits.priceMaxInr)
         }
         val row = GatedRow.userEntered(provider, vehicleClass, amount.range, clock.wallMs())
-        return if (store.saveUserEntered(legId, row)) ManualEntryResult.Saved(row) else ManualEntryResult.NoSuchLeg
+        if (!store.saveUserEntered(legId, row)) return ManualEntryResult.NoSuchLeg
+        val sessionId = store.sessionIdOf(legId)
+        if (sessionId != null && store.pendingReads(sessionId) == 0) onAllFaresRead()
+        return ManualEntryResult.Saved(row)
     }
 }

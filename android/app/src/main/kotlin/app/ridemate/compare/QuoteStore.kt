@@ -26,6 +26,9 @@ interface QuoteStore {
 
     /** How many ride-app legs of [sessionId] still wait for their first fare read. */
     suspend fun pendingReads(sessionId: String): Int
+
+    /** The session leg [legId] belongs to; null when the leg doesn't exist. */
+    suspend fun sessionIdOf(legId: String): String?
 }
 
 class RoomQuoteStore(private val db: RideMateDb, private val clock: Clock) : QuoteStore {
@@ -60,6 +63,8 @@ class RoomQuoteStore(private val db: RideMateDb, private val clock: Clock) : Quo
 
     override suspend fun pendingReads(sessionId: String): Int =
         db.legDao().forSession(sessionId).count { !it.provider.isNetwork && it.state in QUOTABLE && !it.dismissed }
+
+    override suspend fun sessionIdOf(legId: String): String? = db.legDao().get(legId)?.sessionId
 
     companion object {
         /** States a fare read moves forward to QUOTED (never backwards from a booking). */

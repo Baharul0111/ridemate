@@ -220,6 +220,36 @@ class BubbleControllerTest {
     }
 
     @Test
+    fun `the pointer is placed in absolute screen pixels - system bars and the cutout never shift it onto the target`() {
+        controller.show(BubbleState.cancelGuide(InstructionCard("Cancel", emptyList()), showMe = true))
+        val metrics = context.resources.displayMetrics
+        // A Cancel button near the top: an arrow ABOVE or BELOW it would land on it if the status bar inset shifted it.
+        val target = Box(0, 40, metrics.widthPixels, 120)
+
+        assertTrue(controller.showPointer(target, "Cancel is here"))
+
+        val params = controller.pointerParams!!
+        assertEquals("no system-bar insets", 0, params.fitInsetsTypes)
+        assertTrue(params.isFitInsetsIgnoringVisibility)
+        assertEquals(WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS, params.layoutInDisplayCutoutMode)
+        val placed = Box(params.x, params.y, params.x + params.width, params.y + params.height)
+        assertFalse(PointerLayout.overlaps(placed, target))
+    }
+
+    @Test
+    fun `screen readers hear localised window names, not debug titles`() {
+        controller.show(BubbleState.cancelGuide(InstructionCard("Cancel", emptyList()), showMe = true))
+        val metrics = context.resources.displayMetrics
+        controller.showPointer(Box(metrics.widthPixels / 2, metrics.heightPixels / 2, metrics.widthPixels / 2 + 80, metrics.heightPixels / 2 + 40), "x")
+
+        assertEquals(context.getString(R.string.bubble_window_title), controller.bubbleParams!!.title.toString())
+        assertEquals(context.getString(R.string.bubble_window_title), controller.bubbleView!!.accessibilityPaneTitle.toString())
+        assertEquals(context.getString(R.string.bubble_pointer_window_title), controller.pointerParams!!.title.toString())
+        val pointer = windows.windows.keys.single { it is PointerView }
+        assertEquals(context.getString(R.string.bubble_pointer_window_title), pointer.accessibilityPaneTitle.toString())
+    }
+
+    @Test
     fun `dragging the head moves the window and a tap opens or closes the panel`() {
         controller.show(BubbleState.comparing())
         val head = controller.bubbleView!!.head

@@ -75,7 +75,7 @@ fun ComparisonRoute(module: FareReadingModule, sessionId: String?, manualProvide
     }.collectAsState(initial = ComparisonData.empty(id.orEmpty()))
     val lastRead by module.coordinator.lastRead.collectAsState()
     val now = rememberWallClock(module.clock)
-    val manual = remember(lastRead, manualProvider) { manualPromptFor(context, lastRead, manualProvider) }
+    val manual = remember(lastRead, manualProvider, id) { manualPromptFor(context, lastRead, manualProvider, id) }
     val bookedText = { app: String -> resources.getString(R.string.compare_booked_done, app) }
     val callbacks = remember(module, data) {
         ComparisonCallbacks(
@@ -111,9 +111,13 @@ fun ComparisonRoute(module: FareReadingModule, sessionId: String?, manualProvide
     ComparisonScreen(data = data, nowMs = now, manual = manual, callbacks = callbacks, modifier = modifier)
 }
 
-/** The form's prompt: the latest manual-mode tap, or an explicit request to type a price for [manualProvider]. */
-fun manualPromptFor(context: Context, lastRead: LastRead?, manualProvider: Provider?): ManualPrompt? {
-    val manual = lastRead?.result as? ReadFaresResult.ManualMode
+/**
+ * The form's prompt: the latest manual-mode tap of comparison [sessionId] (a tap from an earlier comparison never
+ * prompts this one), or an explicit request to type a price for [manualProvider].
+ */
+fun manualPromptFor(context: Context, lastRead: LastRead?, manualProvider: Provider?, sessionId: String? = null): ManualPrompt? {
+    val sameComparison = sessionId == null || lastRead?.leg?.sessionId == sessionId
+    val manual = (lastRead?.result as? ReadFaresResult.ManualMode)?.takeIf { sameComparison }
     return when {
         manual != null && (manualProvider == null || manual.provider == manualProvider) ->
             ManualPrompt(FareReadingMessages.manualText(context, manual), manual.provider, manual.suggestedClasses)

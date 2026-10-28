@@ -44,6 +44,8 @@ import org.junit.runner.RunWith
 
 class RecordingBubble(override var isShowing: Boolean = true) : BubbleSurface {
     val statuses = mutableListOf<Pair<BubbleStatus?, Boolean>>()
+    val pointers = mutableListOf<Pair<Box, String>>()
+    var pointerAccepted = true
     var hidden = 0
     var restored = 0
 
@@ -54,7 +56,10 @@ class RecordingBubble(override var isShowing: Boolean = true) : BubbleSurface {
     }
     override fun hide() = Unit
     override fun pulse(announcement: String?) = Unit
-    override fun showPointer(target: Box, description: String): Boolean = false
+    override fun showPointer(target: Box, description: String): Boolean {
+        if (pointerAccepted) pointers += target to description
+        return pointerAccepted
+    }
     override fun hidePointer() = Unit
     override suspend fun hideForCapture() {
         hidden++
@@ -173,11 +178,48 @@ class FareReadingCoordinatorTest {
     @Test
     fun `a running projection reads straight away from the original tap`() = runBlocking {
         val tap = clock.elapsed
-        consentAnswer = { ConsentResult.Granted(tap - 10_000) }
+        consentAnswer = { ConsentResult.Granted(tap - 10_000, fresh = false) }
 
         coordinator.readFares("t1", tap)
 
         assertEquals(tap, frames.calls.single())
+    }
+
+    @Test
+    fun `I6 - a reused projection never moves the tap, even when time passed before the read started`() = runBlocking {
+        val tap = clock.elapsed
+        consentAnswer = {
+            clock.advance(40) // main-thread hops between the tap and the read
+            ConsentResult.Granted(clock.elapsed, fresh = false)
+        }
+
+        coordinator.readFares("t1", tap)
+
+        assertEquals("the user's Read fares tap stays the I6 tap", tap, frames.calls.single())
+    }
+
+    @Test
+    fun `I6 - after a fresh consent the frames count from the Start now tap itself`() = runBlocking {
+        val tap = clock.elapsed
+        consentAnswer = {
+            clock.advance(3_000)
+            ConsentResult.Granted(clock.elapsed - 120) // Start now was tapped 120 ms before the answer arrived
+        }
+
+        coordinator.readFares("t1", tap)
+
+        assertEquals(tap + 2_880, frames.calls.single())
+    }
+
+    @Test
+    fun `without a bubble on screen the outcome is shown as a toast, so a notification tap never ends silently`() = runBlocking {
+        bubble.isShowing = false
+
+        val result = coordinator.readFares("t1", clock.elapsed) as ReadFaresResult.Read
+
+        assertEquals(3, result.verifiedCount)
+        assertEquals("3 prices checked in Uber.", org.robolectric.shadows.ShadowToast.getTextOfLatestToast())
+        assertTrue("nothing goes to a bubble that isn't shown", bubble.statuses.none { it.second == false })
     }
 
     @Test
@@ -268,6 +310,18 @@ class FareReadingMessagesTest {
         assertEquals(context.getString(R.string.platform_offline), FareReadingMessages.manualText(context, offline))
         val off = ReadFaresResult.ManualMode(Provider.UBER, ManualReason.KILL_SWITCH)
         assertEquals(context.getString(R.string.compare_manual_switched_off), FareReadingMessages.manualText(context, off))
+    }
+
+    @Test
+    fun `the price form only takes up a manual-mode tap of the comparison it shows`() {
+        val manual = ReadFaresResult.ManualMode(Provider.OLA, ManualReason.OFFLINE, apiResult = ApiResult.Offline)
+        val tap = LastRead(ActiveLeg("s1", "l2", Provider.OLA, null), manual, 0)
+
+        val same = manualPromptFor(context, tap, null, "s1")!!
+        assertEquals(Provider.OLA, same.provider)
+        assertEquals(context.getString(R.string.platform_offline), same.message)
+        assertNull("an earlier comparison's tap never prompts a new one", manualPromptFor(context, tap, null, "s2"))
+        assertEquals(ManualPrompt(null, Provider.UBER), manualPromptFor(context, tap, Provider.UBER, "s2"))
     }
 
     @Test

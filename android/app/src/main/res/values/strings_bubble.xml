@@ -25,4 +25,7 @@
     <string name="bubble_status_kind_reminder">Reminder</string>
     <!-- %1$s: kind (Info, Problem, …); %2$s: the message -->
     <string name="bubble_status_spoken">%1$s: %2$s</string>
+
+    <string name="bubble_window_title">RideMate controls</string>
+    <string name="bubble_pointer_window_title">RideMate arrow</string>
 </resources>

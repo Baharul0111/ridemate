@@ -59,6 +59,7 @@ object FareReadingMessages {
             ManualReason.ANONYMOUS, ManualReason.GOOGLE_REQUIRED -> context.getString(R.string.platform_google_required)
             ManualReason.KILL_SWITCH -> context.getString(R.string.compare_manual_switched_off)
             ManualReason.READER_UNAVAILABLE -> context.getString(R.string.compare_manual_reader_unavailable, name(context, result.provider))
+            ManualReason.SCREENSHOT_BLANK -> context.getString(R.string.compare_manual_screenshot_blank, name(context, result.provider))
             ManualReason.AI_PAUSED -> context.getString(R.string.platform_ai_paused)
             ManualReason.RATE_LIMITED -> context.getString(R.string.platform_rate_limited)
             ManualReason.OFFLINE -> context.getString(R.string.platform_offline)

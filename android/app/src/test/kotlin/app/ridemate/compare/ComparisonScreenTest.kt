@@ -138,6 +138,9 @@ class ComparisonScreenTest {
         show(seenAt + 60_000)
 
         compose.onAllNodesWithText("old, tap to refresh").assertCountEquals(rows.size)
+        // §4.3.6: the row still says when and where it was seen.
+        compose.onNodeWithTag(rowTag(Provider.UBER, VehicleClass.AUTO), useUnmergedTree = true)
+            .assert(hasAnyDescendant(hasText("seen in Uber at ${IstTime.seenAt(seenAt)}")))
         compose.onNodeWithTag(rowTag(Provider.UBER, VehicleClass.AUTO)).assert(hasClickAction()).performClick()
         assertEquals(listOf(Provider.UBER), refreshed)
         compose.onNodeWithTag(rowTag(Provider.UBER, VehicleClass.AUTO))

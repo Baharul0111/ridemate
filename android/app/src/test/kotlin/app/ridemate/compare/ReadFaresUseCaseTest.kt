@@ -23,6 +23,7 @@ import app.ridemate.testing.TestData
 import app.ridemate.testing.TestSeams
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -40,6 +41,7 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 
+@OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(AndroidJUnit4::class)
 class ReadFaresUseCaseTest {
     private val context: Context = ApplicationProvider.getApplicationContext()
@@ -317,6 +319,22 @@ class ReadFaresUseCaseTest {
 
         assertEquals(ReadFaresResult.CaptureBlocked(Provider.UBER), useCase().read(request()))
         assertEquals(0, masker.uploads)
+    }
+
+    @Test
+    fun `a blank shared screenshot means screenshots are blocked too - manual mode, never share again`() = runBlocking {
+        val blank = frameAt(clock.elapsed, FrameOrigin.SHARED, suspectedSecure = true)
+        ocr.forFrame = { OcrFrame(1080, 2400, listOf(OcrToken("10:42", Box(40, 20, 120, 50), 0, 0))) }
+
+        val result = useCase().readShared(request(), blank) as ReadFaresResult.ManualMode
+
+        assertEquals(ManualReason.SCREENSHOT_BLANK, result.reason)
+        assertEquals(Provider.UBER, result.provider)
+        assertEquals(0, masker.uploads)
+        assertTrue(api.readRequests.isEmpty())
+        val text = FareReadingMessages.manualText(context, result)
+        assertTrue(text, text.contains("blocks screenshots") && !text.contains("share", ignoreCase = true))
+        blank.close()
     }
 
     @Test

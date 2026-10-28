@@ -121,7 +121,10 @@ class BubbleController(
         val p = OverlayParams.bubble(
             x = metrics.widthPixels - dp(BubbleView.HEAD_DP + EDGE_MARGIN_DP),
             y = (metrics.heightPixels * START_HEIGHT_FRACTION).roundToInt(),
+            windowTitle = viewContext.getString(R.string.bubble_window_title),
         )
+        // Screen readers announce the window by this localised name when it appears.
+        v.accessibilityPaneTitle = viewContext.getString(R.string.bubble_window_title)
         view = v
         params = p
         render()
@@ -190,9 +193,10 @@ class BubbleController(
             shortPx = dp(POINTER_SHORT_DP),
             gapPx = dp(POINTER_GAP_DP),
         ) ?: return false
-        val p = OverlayParams.pointer(placement.box)
+        val p = OverlayParams.pointer(placement.box, viewContext.getString(R.string.bubble_pointer_window_title))
         val pv = PointerView(viewContext, placement.side, ContextCompat.getColor(viewContext, R.color.bubble_pointer)).apply {
             contentDescription = description
+            accessibilityPaneTitle = viewContext.getString(R.string.bubble_pointer_window_title)
             if (hiddenForCapture) visibility = View.INVISIBLE
         }
         if (!windows.add(pv, p)) return false

@@ -28,6 +28,7 @@
     </plurals>
     <string name="compare_manual_switched_off">AI से पढ़ना अभी बंद है। तब तक आप दाम टाइप कर सकते हैं।</string>
     <string name="compare_manual_reader_unavailable">RideMate अभी %1$s के दाम नहीं जाँच सकता। तब तक आप दाम टाइप कर सकते हैं।</string>
+    <string name="compare_manual_screenshot_blank">यह स्क्रीनशॉट खाली है: %1$s स्क्रीनशॉट भी नहीं लेने देता। %1$s में जो दाम दिख रहा है वह टाइप करें।</string>
 
     <string name="compare_provider_ondc">ओपन नेटवर्क (ONDC)</string>
     <string name="compare_provider_demo">%1$s (डेमो)</string>
@@ -64,4 +65,17 @@
     <string name="compare_manual_not_a_price">दाम संख्या में लिखें, जैसे 120 या 110–130।</string>
     <string name="compare_manual_out_of_range">दाम %1$s और %2$s के बीच होना चाहिए। संख्या जाँचकर फिर से कोशिश करें।</string>
     <string name="compare_manual_no_leg">यह तुलना खत्म हो चुकी है। RideMate की होम स्क्रीन से नई तुलना शुरू करें।</string>
+
+    <string name="show_me_looking">टैप करने की जगह ढूँढ रहे हैं…</string>
+    <string name="show_me_shown">तीर देखें: %1$s में वहाँ आप खुद टैप करें।</string>
+    <string name="show_me_not_found">RideMate इस स्क्रीन पर वह बटन नहीं ढूँढ सका। कार्ड पर दिए कदम अपनाएँ।</string>
+    <string name="show_me_no_room">उस बटन के पास तीर के लिए जगह नहीं है। कार्ड पर दिए कदम अपनाएँ।</string>
+    <string name="show_me_unsupported">मुझे दिखाएँ अभी उपलब्ध नहीं है। कार्ड पर दिए कदम अपनाएँ।</string>
+    <string name="show_me_unavailable">मुझे दिखाएँ के लिए AI चाहिए, जो अभी उपलब्ध नहीं है। कार्ड पर दिए कदम अपनाएँ।</string>
+    <string name="show_me_paused_until">मुझे दिखाएँ %1$s (IST) पर फिर चालू होगा। तब तक कार्ड पर दिए कदम अपनाएँ।</string>
+    <string name="show_me_consent_needed">स्क्रीन शेयर करने की अनुमति नहीं मिली। फिर से कोशिश करने के लिए मुझे दिखाएँ टैप करें, या कार्ड पर दिए कदम अपनाएँ।</string>
+    <string name="show_me_capture_failed">RideMate स्क्रीन नहीं देख सका। फिर से मुझे दिखाएँ टैप करें, या कार्ड पर दिए कदम अपनाएँ।</string>
+    <string name="show_me_blocked">%1$s अपनी स्क्रीन छिपाता है, इसलिए RideMate तीर नहीं दिखा सकता। कार्ड पर दिए कदम अपनाएँ।</string>
+    <string name="show_me_timed_out">बहुत समय लगा। फिर से मुझे दिखाएँ टैप करें, या कार्ड पर दिए कदम अपनाएँ।</string>
+    <string name="show_me_pointer_description">%1$s में टैप करने वाले बटन के पास तीर</string>
 </resources>

@@ -29,6 +29,9 @@ enum class ManualReason {
 
     /** No fare parser for this app in any config layer: Channel B can't check a price. */
     READER_UNAVAILABLE,
+
+    /** A shared screenshot came out blank: the app blocks screenshots too (FLAG_SECURE), so only typing is left. */
+    SCREENSHOT_BLANK,
     AI_PAUSED,
     AUTH_NEEDED,
     GOOGLE_REQUIRED,
