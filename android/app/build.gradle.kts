@@ -134,6 +134,7 @@ dependencies {
     implementation(libs.credentials.play.services)
     implementation(libs.googleid)
 
+    implementation(libs.play.services.location)
     implementation(libs.mlkit.text.latin)
     implementation(libs.mlkit.text.devanagari)
 

@@ -19,6 +19,7 @@ crashlyticsPlugin = "3.0.6"
 credentials = "1.5.0"
 googleid = "1.1.1"
 mlkitText = "16.0.1"
+playLocation = "21.3.0"
 junit = "4.13.2"
 robolectric = "4.14.1"
 androidxTestCore = "1.6.1"
@@ -70,6 +71,7 @@ credentials = { module = "androidx.credentials:credentials", version.ref = "cred
 credentials-play-services = { module = "androidx.credentials:credentials-play-services-auth", version.ref = "credentials" }
 googleid = { module = "com.google.android.libraries.identity.googleid:googleid", version.ref = "googleid" }
 mlkit-text-latin = { module = "com.google.mlkit:text-recognition", version.ref = "mlkitText" }
+play-services-location = { module = "com.google.android.gms:play-services-location", version.ref = "playLocation" }
 mlkit-text-devanagari = { module = "com.google.mlkit:text-recognition-devanagari", version.ref = "mlkitText" }
 
 junit = { module = "junit:junit", version.ref = "junit" }
