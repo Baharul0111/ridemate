@@ -91,6 +91,11 @@ KEYS: tuple[KeySpec, ...] = (
     KeySpec("reader_enabled_rapido", "BOOLEAN", "Per-app reader kill switch: Rapido."),
     KeySpec("ondc_enabled", "BOOLEAN", "ONDC flow on/off (hackathon build: mock seller)."),
     KeySpec("demo_enabled", "BOOLEAN", "Try the demo on/off."),
+    KeySpec(
+        "point_supported",
+        "BOOLEAN",
+        "Whether /v1/point grounding is served (\"Show me\"); set by the day-1 spike, false until then.",
+    ),
     KeySpec("model_route", "JSON", "Which provider route serves each AI task."),
     KeySpec("latest_version", "JSON", "Newest released app version for the update prompt."),
     KeySpec("min_supported_version", "NUMBER", "Oldest app versionCode still served."),

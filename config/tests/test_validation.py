@@ -16,6 +16,7 @@ def test_contract_scalar_defaults() -> None:
     assert default_value("ai_reader_enabled") is True
     assert default_value("ondc_enabled") is True
     assert default_value("demo_enabled") is True
+    assert default_value("point_supported") is True  # day-1 spike (docs/spikes.md): grounding hit 3/3 cancel screens
     assert default_value("min_supported_version") == 1
     assert default_value("cap_profile") == "normal"
     assert default_value("credit_expiry_date") == "unknown"
@@ -65,6 +66,22 @@ def test_schema_rejects_unknown_event_and_extra_field() -> None:
     payload["apps"]["demo.pepper"][0]["templates"][0]["event"] = "PICKED_UP"
     payload["apps"]["demo.pepper"][0]["extra"] = 1
     assert len(validate_key(key, payload)) >= 2
+
+
+def test_redacted_rules_accept_the_optional_structural_fields() -> None:
+    # contracts §2.1: id, tag, notification_id and id_changed are optional extra conditions on a redacted rule.
+    key = KEYS_BY_NAME["notification_templates"]
+    payload = copy.deepcopy(load_default(key))
+    entry = payload["apps"]["demo.pepper"][0]
+    base = {"event": "ASSIGNED", "channel_id": "ride_status", "ongoing": True, "category": None}
+    entry["redacted"] = [
+        {**base, "id": "pepper.redacted.assigned", "tag": "ride", "notification_id": 7, "id_changed": True},
+        {**base, "tag": None, "notification_id": None, "id_changed": None},
+    ]
+    assert validate_key(key, payload) == []
+    for bad in ({"notification_id": "7"}, {"id_changed": "yes"}, {"id": "Not An Id"}, {"tag": ""}, {"ids": "x"}):
+        entry["redacted"] = [{**base, **bad}]
+        assert validate_key(key, payload), bad
 
 
 def test_schema_major_mismatch_is_rejected() -> None:

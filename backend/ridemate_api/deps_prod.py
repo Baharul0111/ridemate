@@ -5,6 +5,9 @@ The platform pieces (hot store, keyring, auth, limits, spend meter) are built he
 each import is guarded: a missing or broken module degrades that feature (no Firestore → AI keeps working on
 Dict quotas; no router → AI reports unavailable) instead of stopping the server. A missing HMAC key is the
 exception: quotas can't be keyed without it, so startup fails loudly.
+
+Feature labels in the degradation logs are single words (`remote_config`, `ondc`, ...): the log scrubber keeps
+only token-like %-arguments, so a label with a space would be logged as "[dropped]".
 """
 
 from __future__ import annotations
@@ -75,7 +78,7 @@ def build_production_deps(
     metrics = _optional("metrics", lambda: _metrics(store, clock)) or NullMetrics()
     firestore = _optional("firestore", lambda: _firestore(settings, store, clock, metrics))
     remote_config = (
-        _optional("remote config", lambda: _remote_config(settings, clock)) or DefaultRemoteConfig()
+        _optional("remote_config", lambda: _remote_config(settings, clock)) or DefaultRemoteConfig()
     )
 
     quotas = QuotaManager(store, clock, firestore=firestore)
@@ -102,9 +105,11 @@ def build_production_deps(
         remote_config=remote_config,
         metrics=metrics,
     )
-    deps.router = _optional("model router", lambda: _router(settings, spend, remote_config, metrics, clock))
-    deps.demo_cache = _optional("demo cache", lambda: _demo_cache(store, metrics))
-    deps.ondc = _optional("ondc buyer", lambda: _ondc(settings, firestore, auth, clock, metrics, store))
+    deps.router = _optional("router", lambda: _router(settings, spend, remote_config, metrics, clock))
+    deps.demo_cache = _optional("demo_cache", lambda: _demo_cache(store, metrics))
+    deps.ondc = _optional("ondc", lambda: _ondc(settings, firestore, auth, clock, metrics, store))
+    if firestore is not None:  # without Firestore an audit record could never be written, so none is kept
+        deps.audit = _optional("audit", lambda: _audit(store, clock, firestore, metrics))
     return deps
 
 
@@ -143,6 +148,12 @@ def _demo_cache(store: HotStore, metrics: Metrics) -> Any:
     from .demo_cache import DemoCache
 
     return DemoCache.from_manifest(store=store, metrics=metrics)
+
+
+def _audit(store: HotStore, clock: Clock, firestore: Firestore, metrics: Metrics) -> Any:
+    from .audit import AuditTrail
+
+    return AuditTrail(store=store, clock=clock, firestore=firestore, metrics=metrics)
 
 
 def _ondc(

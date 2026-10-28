@@ -14,6 +14,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from ..deps import Deps, get_deps
 from ..interfaces import ApiError
+from ..offload import off_loop
 from ..ondc.bap import CALLBACK_ACTIONS, OndcBuyer
 from ..ondc.payloads import GeoPoint, nack
 from ..settings import MAX_JSON_BYTES, Settings
@@ -84,7 +85,8 @@ def _buyer(deps: Deps) -> OndcBuyer:
 
 
 async def _user(request: Request, deps: Deps) -> tuple[OndcBuyer, Any]:
-    deps.ip_limiter.check(request)
+    # The bucket lives in the Modal Dict: never on the event loop.
+    await off_loop(deps.ip_limiter.check, request)
     buyer = _buyer(deps)
     principal = await deps.auth.verify(request, require_google=True)
     return buyer, principal

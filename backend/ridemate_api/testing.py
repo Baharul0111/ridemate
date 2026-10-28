@@ -2,7 +2,8 @@
 
 - `FakeAuth` issues opaque tokens for Principals it builds (HMACs from the real keyring, so quota keys match).
 - `FakeFirestore`, `FakeRemoteConfig`, `FakeMetrics`, `FakeRouter`: in-memory versions of the interfaces.
-- `make_test_deps()` builds a Deps with MemoryStore + FakeClock + the REAL limiter, quota manager and spend meter.
+- `make_test_deps()` builds a Deps with MemoryStore + FakeClock + the REAL limiter, quota manager, spend meter and
+  (with Firestore) audit trail.
 - `FirebaseTokenMinter` signs real RS256 Firebase-shaped tokens and serves its certificate (and an optional
   Identity Toolkit lookup) through an httpx.MockTransport, for testing auth.FirebaseAuth without the network.
 """
@@ -27,6 +28,7 @@ from cryptography.hazmat.primitives.asymmetric import padding, rsa
 from cryptography.x509.oid import NameOID
 from fastapi import Request
 
+from .audit import AuditTrail
 from .clock import FakeClock
 from .crypto import HmacKeyring
 from .deps import Deps
@@ -284,8 +286,9 @@ def make_test_deps(
     shard: str = "test-shard",
     **overrides: Any,
 ) -> Deps:
-    """A Deps over in-memory state with the real IpLimiter, QuotaManager and SpendMeter. Pass `firestore=None`
-    for a deployment without Firestore; any Deps field can be overridden by keyword."""
+    """A Deps over in-memory state with the real IpLimiter, QuotaManager, SpendMeter and (when there is Firestore)
+    AuditTrail. Pass `firestore=None` for a deployment without Firestore; any Deps field can be overridden by
+    keyword."""
     settings = settings or make_settings()
     clock = clock or FakeClock()
     store = store if store is not None else MemoryStore()
@@ -317,6 +320,8 @@ def make_test_deps(
         "metrics": FakeMetrics(),
     }
     values.update(overrides)
+    if "audit" not in values and fs is not None:
+        values["audit"] = AuditTrail(store=store, clock=clock, firestore=fs, metrics=values["metrics"])
     return Deps(**values)
 
 

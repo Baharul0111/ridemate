@@ -14,6 +14,7 @@ from ridemate_api.app import create_app
 from ridemate_api.demo_cache import DemoCache
 from ridemate_api.deps import Deps
 from ridemate_api.interfaces import Purpose
+from ridemate_api.model_gateway import ModelTimeout
 from ridemate_api.ondc.bap import OndcBuyer, build_buyer
 from ridemate_api.router import ProviderRouter
 from ridemate_api.settings import MAX_IMAGE_BYTES, PINNED_MODEL_ID
@@ -109,6 +110,55 @@ async def test_a_replayed_request_id_is_counted_once_and_runs_at_most_twice(rig:
     assert statuses == [200, 200, 422, 422]
     assert rig.provider.calls == 2
     assert rig.reads_left(token) == before - 1  # the real QuotaManager counted the id once
+
+
+async def test_a_failed_replay_never_gives_back_the_unit_its_answered_first_run_used(rig: Rig) -> None:
+    # Otherwise every answer could be had for free: get it, then replay its id into a failure (a timeout, a
+    # dropped connection) and the refund returns the unit the answer was counted on.
+    token = rig.auth.google("alice")
+    before = rig.reads_left(token)
+    rig.provider.script("read", READ, ModelTimeout("slow"))
+    first = await rig.read(token, **{"X-Request-Id": RID})
+    replay = await rig.read(token, **{"X-Request-Id": RID})
+    assert (first.status_code, replay.status_code) == (200, 504)
+    assert rig.provider.calls == 2
+    assert rig.reads_left(token) == before - 1
+
+
+async def test_a_failed_first_run_is_given_back_and_its_retry_is_counted_again(rig: Rig) -> None:
+    token = rig.auth.google("alice")
+    before = rig.reads_left(token)
+    rig.provider.script("read", ModelTimeout("slow"), READ)
+    assert (await rig.read(token, **{"X-Request-Id": RID})).status_code == 504
+    assert rig.reads_left(token) == before  # the server failed to answer: the unit is given back
+    assert (await rig.read(token, **{"X-Request-Id": RID})).status_code == 200
+    assert rig.reads_left(token) == before - 1
+
+
+async def test_one_request_id_reused_across_the_read_endpoints_still_runs_at_most_twice(rig: Rig) -> None:
+    # read-screen, reread and point share the 'read' unit, so the run allowance is per quota kind, not endpoint.
+    token = rig.auth.google("alice")
+    before = rig.reads_left(token)
+    rig.deps.remote_config.set("point_supported", True)  # type: ignore[attr-defined]
+    rig.provider.default.update({"read": READ, "point": {"box_0_1000": [10, 20, 30, 40]}})
+    headers = {**bearer(token), "X-Request-Id": RID}
+    assert (await rig.read(token, **{"X-Request-Id": RID})).status_code == 200
+    point = await rig.client.post(
+        "/v1/point",
+        data={"meta": json.dumps({"app": "uber", "target": "cancel_button"})},
+        files={"image": ("s.png", PNG_BYTES, "image/png")},
+        headers=headers,
+    )
+    assert point.status_code == 200, point.text
+    reread = await rig.client.post(
+        "/v1/reread",
+        data={"meta": json.dumps({"app": "uber", "rows": [{"row_id": "r1"}]})},
+        files={"crop_r1": ("r1.png", PNG_BYTES, "image/png")},
+        headers=headers,
+    )
+    assert reread.status_code == 422 and reread.json()["error"]["code"] == "invalid"
+    assert rig.provider.calls == 2
+    assert rig.reads_left(token) == before - 1
 
 
 async def test_errors_render_the_envelope_and_never_reach_the_model(rig: Rig) -> None:

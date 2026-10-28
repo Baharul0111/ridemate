@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import builtins
+import io
+import json
 from typing import Any
 
 import httpx
@@ -11,13 +13,15 @@ from fastapi.testclient import TestClient
 
 from ridemate_api import deps_prod
 from ridemate_api.app import create_app
+from ridemate_api.audit import AuditTrail
 from ridemate_api.auth import FirebaseAuth
 from ridemate_api.clock import FakeClock
 from ridemate_api.deps_prod import DefaultRemoteConfig, NullMetrics, build_production_deps
 from ridemate_api.limits import IpLimiter, QuotaManager
+from ridemate_api.logging_setup import configure_logging
 from ridemate_api.spend import SpendMeter
 from ridemate_api.store import MemoryStore
-from ridemate_api.testing import make_settings
+from ridemate_api.testing import FakeFirestore, make_settings
 
 
 @pytest.fixture(autouse=True)
@@ -38,6 +42,7 @@ def test_builds_real_platform_components_without_cloud_credentials() -> None:
     assert deps.firestore is None  # no service-account key: AI paths keep working on Dict quotas
     assert deps.router is None  # no model endpoint configured
     assert deps.ondc is None  # ONDC_MODE=off
+    assert deps.audit is None  # nowhere to write audit records, so none are kept in the hot store
     client = TestClient(create_app(deps))
     assert client.get("/healthz").json() == {"ok": True}
     assert client.get("/readyz").json()["ok"] is True
@@ -78,6 +83,58 @@ def test_a_broken_optional_module_is_contained(monkeypatch: pytest.MonkeyPatch) 
     monkeypatch.setattr(deps_prod, "_metrics", broken)
     deps = build_production_deps(make_settings(), store=MemoryStore(), clock=FakeClock())
     assert deps.demo_cache is None and isinstance(deps.metrics, NullMetrics)
+
+
+def test_the_audit_trail_is_wired_when_firestore_is(monkeypatch: pytest.MonkeyPatch) -> None:
+    fs = FakeFirestore()
+    monkeypatch.setattr(deps_prod, "_firestore", lambda *a: fs)
+    deps = build_production_deps(make_settings(), store=MemoryStore(), clock=FakeClock())
+    assert deps.firestore is fs and isinstance(deps.audit, AuditTrail)
+
+
+def _degradation_lines(monkeypatch: pytest.MonkeyPatch, *, firestore_ok: bool) -> list[str]:
+    def broken(*args: Any, **kwargs: Any) -> Any:
+        raise RuntimeError("boom")
+
+    builders = ["_metrics", "_remote_config", "_router", "_demo_cache", "_ondc", "_audit"]
+    for name in builders:
+        monkeypatch.setattr(deps_prod, name, broken)
+    monkeypatch.setattr(deps_prod, "_firestore", (lambda *a: FakeFirestore()) if firestore_ok else broken)
+    buf = io.StringIO()
+    configure_logging(stream=buf)
+    try:
+        build_production_deps(make_settings(ondc_mode="mock"), store=MemoryStore(), clock=FakeClock())
+    finally:
+        configure_logging()
+    lines = [json.loads(line) for line in buf.getvalue().splitlines()]
+    return [line["msg"] for line in lines if line["logger"] == "ridemate_api.deps_prod"]
+
+
+def test_degradation_logs_keep_the_feature_label_through_the_scrubber(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    messages = _degradation_lines(monkeypatch, firestore_ok=False) + _degradation_lines(
+        monkeypatch, firestore_ok=True
+    )
+    labels = {m.split(" ", 1)[0] for m in messages}
+    assert labels == {"metrics", "firestore", "remote_config", "router", "demo_cache", "ondc", "audit"}
+    assert all(m.endswith("unavailable: RuntimeError") for m in messages)
+    assert not any("[dropped]" in m for m in messages)
+
+
+def test_a_missing_module_is_named_in_the_log(monkeypatch: pytest.MonkeyPatch) -> None:
+    def missing(*args: Any, **kwargs: Any) -> Any:
+        raise ModuleNotFoundError("No module named 'ridemate_api.demo_cache'", name="ridemate_api.demo_cache")
+
+    monkeypatch.setattr(deps_prod, "_demo_cache", missing)
+    buf = io.StringIO()
+    configure_logging(stream=buf)
+    try:
+        build_production_deps(make_settings(), store=MemoryStore(), clock=FakeClock())
+    finally:
+        configure_logging()
+    messages = [json.loads(line)["msg"] for line in buf.getvalue().splitlines()]
+    assert "demo_cache unavailable: module ridemate_api.demo_cache missing" in messages
 
 
 def test_router_is_built_when_the_model_endpoint_is_configured() -> None:

@@ -209,6 +209,33 @@ def test_retried_request_id_is_not_counted_twice() -> None:
     assert qm.remaining(p)["reads_left"] == 5
 
 
+def test_consume_says_whether_it_counted_the_unit() -> None:
+    qm, _, clock = setup()
+    p = google()
+    seasoned(qm, clock, p)
+    assert qm.consume(p, "read", "req-00000001") is True
+    assert qm.consume(p, "read", "req-00000001") is False  # a retry runs on the unit already counted
+    qm.refund(p, "read", "req-00000001")
+    assert qm.consume(p, "read", "req-00000001") is True  # given back, so the next run counts it again
+
+
+def test_a_request_id_still_being_counted_elsewhere_is_refused_not_run_for_free() -> None:
+    # Two simultaneous requests with one id: the second must not run on a unit the first may never get
+    # (an exhausted quota would otherwise be bypassed by sending every request twice at once).
+    qm, store, clock = setup()
+    p = google()
+    seasoned(qm, clock, p)
+    for i in range(6):
+        qm.consume(p, "read", f"x-{i:06d}")
+    rid_key = next(k for k in store.keys_with_prefix("quota:") if k.endswith(":read:rid:x-000000"))
+    in_progress = rid_key.replace("x-000000", "x-000099")
+    store.put(in_progress, -1)  # the first request is between its claim and its slot
+    with pytest.raises(ApiError) as err:
+        qm.consume(p, "read", "x-000099")
+    assert (err.value.status, err.value.code) == (422, "invalid")
+    assert qm.remaining(p)["reads_left"] == 0
+
+
 def test_refund_returns_the_unit_and_is_safe_to_repeat() -> None:
     qm, _, clock = setup()
     p = google()

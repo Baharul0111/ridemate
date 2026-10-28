@@ -91,10 +91,11 @@ class FakeQuotas:
         self.refunded: list[tuple[str, QuotaKind, str]] = []
         self.exhausted = False
 
-    def consume(self, principal: Principal, kind: QuotaKind, request_id: str) -> None:
+    def consume(self, principal: Principal, kind: QuotaKind, request_id: str) -> bool:
         if self.exhausted:
             raise ApiError(429, "quota_exhausted")
         self.consumed.append((principal.uid, kind, request_id))
+        return True
 
     def refund(self, principal: Principal, kind: QuotaKind, request_id: str) -> None:
         self.refunded.append((principal.uid, kind, request_id))

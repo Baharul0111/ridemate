@@ -19,7 +19,7 @@ from ridemate_api.spend import (
     token_cost_usd,
     usd_to_nano,
 )
-from ridemate_api.store import MemoryStore
+from ridemate_api.store import MemoryStore, StoreUnavailable
 from ridemate_api.testing import FakeFirestore, FakeRemoteConfig, make_settings
 
 DAY1 = "2026-10-28"  # FakeClock starts 2026-10-28 06:00 UTC = 11:30 IST
@@ -682,3 +682,69 @@ def test_day_charges_follow_the_reservation_day_across_midnight() -> None:
     m.keep(res)
     assert int(store.get("spend:s1:ai:2026-10-28")) == usd_to_nano(0.01)
     assert store.get("spend:s1:ai:2026-10-29") is None
+
+
+# ---- billing reconciliation inputs -------------------------------------------------------------------------
+
+
+def test_day_total_counts_ai_and_compute_of_that_day_across_shards_and_the_rollup() -> None:
+    store, clock = MemoryStore(), FakeClock()
+    a, b = make(store, clock, shard="a"), make(store, clock, shard="b")
+    spend_app(a, 0.10)
+    b.keep(b.reserve(purpose=Purpose.EVAL, max_usd=0.05, principal=None, request_id="eval-run:r1:1"))
+    a.record_compute(cpu_cores=1.0, memory_mib=1024, seconds=1000, source="web")
+    compute_usd = compute_cost_usd(1.0, 1024, 1000)
+    b.reserve(purpose=Purpose.READ, max_usd=0.02, principal=user(), request_id="inflight")  # never settled
+    # An outstanding reservation counts, as compaction would count it.
+    expected = 0.10 + 0.05 + compute_usd + 0.02
+
+    observer = make(store, clock, shard="dispatcher")
+    assert observer.day_total_usd(DAY1) == pytest.approx(expected)
+    clock.advance(2 * 3600)
+    observer.compact(idle_s=3600)  # a and b fold into the rollup: the day's total is unchanged
+    assert store.get(ROLLUP_KEY)["frozen"] == ["a", "b"]
+    assert make(store, clock, shard="later").day_total_usd(DAY1) == pytest.approx(expected)
+    # A writer starting after the compaction adds to the same day; another day is untouched.
+    spend_app(make(store, clock, shard="c"), 0.30)
+    assert observer.day_total_usd(DAY1) == pytest.approx(expected + 0.30)
+    assert observer.day_total_usd("2026-10-27") == 0.0
+
+
+def test_day_total_keeps_days_apart() -> None:
+    store = MemoryStore()
+    clock = FakeClock(datetime(2026, 10, 28, 18, 0, tzinfo=UTC))  # 23:30 IST on the 28th
+    m = make(store, clock)
+    spend_app(m, 0.10)
+    clock.advance(3600)  # 00:30 IST on the 29th
+    spend_app(m, 0.25)
+    assert m.day_total_usd("2026-10-28") == pytest.approx(0.10)
+    assert m.day_total_usd("2026-10-29") == pytest.approx(0.25)
+
+
+@pytest.mark.parametrize("day", ["20261028", "2026-10-28:x", "yesterday", "2026-13-01"])
+def test_day_total_rejects_anything_but_an_ist_date(day: str) -> None:
+    with pytest.raises(ValueError):
+        make().day_total_usd(day)
+
+
+def test_day_total_fails_when_the_meter_is_unreadable() -> None:
+    store = MemoryStore()
+    m = make(store)
+    store.fail = True
+    with pytest.raises(StoreUnavailable):
+        m.day_total_usd(DAY1)
+
+
+def test_drift_factor_is_read_fresh_and_set_through_the_meter() -> None:
+    store = MemoryStore()
+    reader = SpendMeter(
+        store=store,
+        clock=FakeClock(),
+        settings=make_settings(),
+        remote_config=FakeRemoteConfig(),
+        shard="reader",
+        index_ttl_s=3600.0,  # a long index cache must not hide a new factor from reconciliation
+    )
+    assert reader.drift_factor() == 1.0
+    assert make(store, shard="dispatcher").set_drift_factor(1.4) == pytest.approx(1.4)
+    assert reader.drift_factor() == pytest.approx(1.4)

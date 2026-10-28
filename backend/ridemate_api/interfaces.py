@@ -107,8 +107,9 @@ QuotaKind = Literal["read", "parse"]
 
 
 class QuotaManager(Protocol):
-    def consume(self, principal: Principal, kind: QuotaKind, request_id: str) -> None:
-        """Count one unit, idempotent on request_id. Raise ApiError(429, 'quota_exhausted', resume_at=…)."""
+    def consume(self, principal: Principal, kind: QuotaKind, request_id: str) -> bool:
+        """Count one unit, idempotent on request_id: True when this call counted it, False when the id was already
+        counted. Raise ApiError(429, 'quota_exhausted', resume_at=…)."""
 
     def refund(self, principal: Principal, kind: QuotaKind, request_id: str) -> None:
         """Undo a consume when the server failed before producing a result (timeout, breaker)."""

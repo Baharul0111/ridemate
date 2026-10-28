@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import threading
 from pathlib import Path
 from typing import Any
 
@@ -159,6 +160,8 @@ async def test_full_mock_ride_search_to_confirmed_cancel() -> None:
     events = rig.fs.collection("ondc_event")
     assert len(events) == len(actions)
     assert all(e["applied"] and e["payload_hash"] and e["txnId"] == txn_id for e in events.values())
+    # firestore.rules lets a phone read an ondc_event only when its `uid` is the caller's: the owner's, here.
+    assert {e["uid"] for e in events.values()} == {"alice"}
 
 
 async def test_soft_cancel_before_a_driver_is_assigned_is_free() -> None:
@@ -214,6 +217,41 @@ async def test_event_stored_but_not_applied_is_applied_on_redelivery() -> None:
     status, _ = await rig.buyer.handle_callback("on_search", body, header)
     assert status == 200
     assert len(rig.txn(txn_id)["quotes"]) == 3
+    (event,) = [e for e in rig.fs.collection("ondc_event").values() if e["txnId"] == txn_id]
+    assert event["applied"] and event["uid"] == "alice"
+
+
+def test_drain_returns_when_a_finished_callback_is_still_waiting_for_its_done_callback() -> None:
+    # The task finished in the same loop turn drain started in, so it is still in the set: drain used to gather it
+    # again and again, and a gather of finished tasks never yields, so the loop spun at 100% CPU forever.
+    seller = Rig().seller
+    finished = threading.Event()
+
+    async def scenario() -> None:
+        done: asyncio.Future[None] = asyncio.get_running_loop().create_future()
+        done.set_result(None)
+        seller._tasks.add(done)  # type: ignore[arg-type]  # its discard callback has not run yet
+        await seller.drain()
+        finished.set()
+
+    # In its own thread: a regression spins without yielding, so no timeout on this loop could fire.
+    threading.Thread(target=asyncio.run, args=(scenario(),), daemon=True).start()
+    assert finished.wait(5), "MockBpp.drain() spun on a finished task"
+
+
+async def test_an_event_stored_by_an_older_server_gets_its_owner_uid_when_applied() -> None:
+    rig = Rig()
+    txn_id = await rig.buyer.search(ALICE, session_id="s1", pickup=PICKUP, drop=DROP)
+    rig.seller.attach(lambda *a: asyncio.sleep(0, result=(200, {})))
+    await rig.seller.drain()
+    body, header = await _signed_on_search(rig, txn_id)
+    status, _ = await rig.buyer.handle_callback("on_search", body, header)
+    assert status == 200
+    (path,) = rig.fs.collection("ondc_event")
+    stale = {k: v for k, v in rig.fs.docs[path].items() if k != "uid"}
+    rig.fs.docs[path] = {**stale, "applied": False}  # stored before events carried a uid, never applied
+    status, _ = await rig.buyer.handle_callback("on_search", body, header)
+    assert status == 200 and rig.fs.docs[path]["uid"] == "alice" and rig.fs.docs[path]["applied"]
 
 
 async def _signed_on_search(rig: Rig, txn_id: str, key: SubscriberKey | None = None) -> tuple[bytes, str]:
@@ -293,6 +331,17 @@ async def test_unsolicited_replies_and_unknown_transactions_are_nacked() -> None
         authorization_header(ghost, rig.seller._key, created=int(rig.clock.now_utc().timestamp())),
     )
     assert status == 400 and reply["error"]["code"] == "unknown_transaction"
+    # Events of an unknown transaction have no owner, so no phone can read them.
+    (orphan,) = [
+        e
+        for e in rig.fs.collection("ondc_event").values()
+        if e["txnId"] == "00000000-0000-4000-8000-000000000000"
+    ]
+    assert orphan["uid"] is None and orphan["apply_error"] == "unknown_transaction"
+    unsolicited = [
+        e for e in rig.fs.collection("ondc_event").values() if e.get("apply_error") == "unsolicited"
+    ]
+    assert unsolicited and all(e["uid"] == "alice" for e in unsolicited)
 
 
 async def test_garbage_payload_is_stored_with_a_parse_error_and_nacked() -> None:
@@ -303,6 +352,7 @@ async def test_garbage_payload_is_stored_with_a_parse_error_and_nacked() -> None
     assert status == 400 and reply["error"]["code"] == "invalid_payload"
     (event,) = rig.fs.collection("ondc_event").values()
     assert event["parse_error"] == "invalid_payload"
+    assert "uid" in event and event["uid"] is None  # unreadable by any phone (owner-only rule)
     status, _ = await rig.buyer.handle_callback("on_teleport", body, header)
     assert status == 404
 

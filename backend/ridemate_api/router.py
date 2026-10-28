@@ -6,6 +6,10 @@ breaker, reserves the worst-case cost in the spend meter, sends the request unde
 the reservation with the real usage (kept in full on a timeout, released when nothing was sent). A read is
 retried once only when the first attempt failed without timing out and at least 6 s of the phone's 20 s tap
 budget remain.
+
+The spend meter reads and writes the Modal Dict, so every meter call runs in the worker-thread pool, shielded
+from cancellation (offload.py): a reservation is always settled, kept or released, and one made for a request
+that was cancelled meanwhile is released as soon as it exists.
 """
 
 from __future__ import annotations
@@ -36,6 +40,7 @@ from .model_gateway import (
     StructuredMode,
     parse_mode,
 )
+from .offload import off_loop_shielded
 from .settings import (
     DEADLINE_PARSE_S,
     DEADLINE_PLACE_S,
@@ -289,28 +294,38 @@ class ProviderRouter:
                 raise ApiError(503, "ai_unavailable", reason="breaker", retry_after_s=breaker.retry_after_s())
 
             try:
-                reservation = self._spend.reserve(
+                reservation = await off_loop_shielded(
+                    self._spend.reserve,
                     purpose=purpose,
                     max_usd=max_cost_usd(request),
                     principal=principal,
                     request_id=f"{request_id}:{task.value}:{attempt}",
+                    undo=self._spend.release,
                 )
             except BaseException:
                 breaker.abandon()
                 raise
 
+            # The reservation is a hot-store round trip and may itself have been slow: what is left of the deadline
+            # is measured from now, and with nothing left the call isn't sent (and costs nothing).
             sent_at = self._clock.monotonic()
+            timeout_s -= sent_at - now
+            if timeout_s <= 0:
+                breaker.abandon()
+                await off_loop_shielded(self._spend.release, reservation)
+                self._metrics.incr("ai_call", task=task.value, outcome="no_budget")
+                raise ApiError(504, "model_timeout")
             try:
                 async with asyncio.timeout(timeout_s):
                     result = await provider.complete(request, mode=mode)
             except (TimeoutError, ModelTimeout):
-                self._spend.keep(reservation)
                 breaker.record_failure()
+                await off_loop_shielded(self._spend.keep, reservation)
                 self._metrics.incr("ai_call", task=task.value, outcome="timeout")
                 raise ApiError(504, "model_timeout") from None
             except ModelError as e:
-                self._settle_failure(reservation, e)
                 breaker.record_failure()
+                await off_loop_shielded(self._settle_failure, reservation, e)
                 if e.status == 404:
                     # The pinned id may have been withdrawn since it was confirmed: look again on the next call,
                     # so AI switches off with reason model_missing (and the alert fires) instead of failing on.
@@ -330,12 +345,12 @@ class ProviderRouter:
                 raise ApiError(503, "ai_unavailable") from None
             except BaseException:
                 # Cancelled mid-flight (client went away): the request may have been processed.
-                self._spend.keep(reservation)
                 breaker.abandon()
+                await off_loop_shielded(self._spend.keep, reservation)
                 raise
 
-            cost = self._settle_success(reservation, result)
             breaker.record_success()
+            cost = await off_loop_shielded(self._settle_success, reservation, result)
             latency_ms = int((self._clock.monotonic() - sent_at) * 1000)
             self._metrics.incr("ai_call", task=task.value, outcome="ok", mode=result.mode.value)
             self._metrics.observe_ms("ai_model_latency_ms", latency_ms, task=task.value)

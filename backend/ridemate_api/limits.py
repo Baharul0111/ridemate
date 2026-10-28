@@ -180,7 +180,7 @@ class QuotaManager:
 
     # ---- the QuotaManager protocol -------------------------------------------------------------------------
 
-    def consume(self, principal: Principal, kind: QuotaKind, request_id: str) -> None:
+    def consume(self, principal: Principal, kind: QuotaKind, request_id: str) -> bool:
         if not principal.is_google:
             raise ApiError(403, "google_required")
         now = self._clock.now_utc()
@@ -191,7 +191,13 @@ class QuotaManager:
             base = self._base(principal, ist_day(now))
             rid_key = f"{base}:{kind}:rid:{rid}"
             if not self._store.put_if_absent(rid_key, -1):
-                return  # this request id was already counted (or is being counted right now)
+                counted = self._store.get(rid_key)
+                if isinstance(counted, int) and not isinstance(counted, bool) and counted >= 0:
+                    return False  # this request id was already counted: a retry runs on that unit
+                # A concurrent request with the same id is counting it right now (-1), or gave up meanwhile. Its
+                # outcome (a unit, or quota_exhausted) is unknown here, so this one must not run on it: otherwise
+                # pairs of simultaneous requests would get model calls past an exhausted quota.
+                raise ApiError(422, "invalid")
             claimed.append(rid_key)
             summary = self._summary(base)
             hint = min(max(int(summary.get(kind, 0)), 0), limit)
@@ -201,7 +207,7 @@ class QuotaManager:
                     claimed.append(slot)
                     self._store.put(rid_key, n)
                     self._bump(base, kind, +1)
-                    return
+                    return True
             self._store.delete(rid_key)
         except StoreUnavailable:
             # The request fails with 503, so undo its claims: a half-made claim would let a retry of this id

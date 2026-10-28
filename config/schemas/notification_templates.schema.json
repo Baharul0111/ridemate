@@ -60,7 +60,11 @@
         "event": {"$ref": "#/$defs/event"},
         "channel_id": {"type": ["string", "null"], "minLength": 1},
         "ongoing": {"type": ["boolean", "null"]},
-        "category": {"type": ["string", "null"], "minLength": 1}
+        "category": {"type": ["string", "null"], "minLength": 1},
+        "id": {"type": "string", "pattern": "^[a-z0-9_]+(\\.[a-z0-9_]+)+$"},
+        "tag": {"type": ["string", "null"], "minLength": 1},
+        "notification_id": {"type": ["integer", "null"], "minimum": -2147483648, "maximum": 2147483647},
+        "id_changed": {"type": ["boolean", "null"]}
       }
     }
   }

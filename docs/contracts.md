@@ -13,29 +13,50 @@ Base URL: delivered to the phone by Remote Config key `api_base_url` (never hard
 | Header | Required | Meaning |
 |---|---|---|
 | `Authorization: Bearer <Firebase ID token>` | all `/v1/*` | Google-provider token for AI endpoints; anonymous allowed only where noted |
-| `X-Request-Id` | all `/v1/*` | UUIDv4 from the phone. Quota/spend counting is idempotent on it (a retried request id is not counted twice) |
-| `X-Session-Id` | AI + event | Phone session id (UUID) |
+| `X-Request-Id` | all `/v1/*` | UUIDv4 from the phone. **Quota** counting is idempotent on it (a retried request id is not counted twice). **Spend is not**: see below |
+| `X-Session-Id` | AI + event | Phone session id (UUID). Also groups the request's metadata audit record: one `audit` document per session |
 | `X-App-Version` | all | Android versionCode (int) |
+| `X-Tap-Deadline-Ms` | read-screen, reread (optional) | Milliseconds left of the phone's 20 s tap budget when the request is sent (§4.12). The server clamps it to 0–20000; absent or not an integer means 20000. The model call, and the decision to retry a read once (≥ 6 s must remain), are bounded by it |
+
+Retries and money. The spend meter is **not** idempotent on `X-Request-Id`: every model call the server makes is
+metered, because a timed-out or repeated call was still paid for. To keep a replayed id from buying unlimited calls
+for one quota unit, each (user, quota kind, `X-Request-Id`) gets at most **2 model-backed runs per IST day** (the
+first try and the phone's one retry, §4.12; a read run may include the server's own single retry). The quota kinds
+are *read* (read-screen, reread and point share it) and *parse* (parse-notification, place-pick). A third request
+with the same id is refused with 422 `invalid` and makes no model call, and so is a request sent while another one
+with the same id is still being counted. A unit is given back only when the run that counted it fails (timeout,
+provider error, cancelled) and no later run of its id has started; a replay of an answered id that fails keeps the
+unit. A retry therefore reuses the request id; a new user action sends a new one.
 
 ### 1.2 Error envelope (every non-2xx)
 ```json
-{"error": {"code": "ai_paused", "resume_at_ist": "13:30", "retry_after_s": 3600, "request_id": "…"}}
+{"error": {"code": "ai_paused", "resume_at_ist": "13:30", "retry_after_s": 3600, "reason": "day_cap",
+           "request_id": "…"}}
 ```
+Every field except `code` may be `null`. `Retry-After` (seconds) is also sent as a header whenever
+`retry_after_s` is set. `reason` is an **additive** field that says why, when the code alone doesn't:
+`ai_paused` → `budget|day_cap|tier_pause`; `ai_unavailable` → `kill_switch|breaker|model_missing` (or `null`
+for a provider error); `meter_unavailable` → `meter`; `ondc_unavailable` → `timeout|nack` (or `null`). The phone
+may show or log it but must tolerate `null` and values it doesn't know; it never changes the phone behaviour below.
 | HTTP | `code` | Phone behaviour |
 |---|---|---|
 | 401 | `auth_required`, `auth_invalid` | refresh token once, else manual mode |
 | 403 | `google_required` | offer Google sign-in; manual mode |
 | 403 | `blocked` | manual mode |
-| 403 | `forbidden` | (ONDC object not owned by caller) |
+| 403 | `forbidden` | (ONDC object not owned by caller; owner-only endpoint) |
 | 404 | `not_found` | |
+| 405 | `method_not_allowed` | wrong HTTP method (a client bug; not retried) |
 | 413 | `too_large` | image > 1 MB or JSON > 64 KB |
 | 415 | `bad_media` | magic bytes not JPEG/PNG |
-| 422 | `invalid` | |
-| 429 | `rate_limited` | per-IP bucket; `retry_after_s` |
+| 422 | `invalid` | also a request id replayed past its 2 model-backed runs, or sent again while it is still being counted (§1.1) |
+| 429 | `rate_limited` | per-IP bucket (`retry_after_s`), and the per-user daily caps on endpoints that write Firestore: `/v1/erase` (10 a day, `resume_at_ist`; the outbox retries after it). `/v1/event` past its cap (30 a day) answers 202 and stores nothing |
 | 429 | `quota_exhausted` | per-user daily fair share; `resume_at_ist` |
 | 429 | `ai_paused` | credit budget / daily pacing cap / tier pause; `resume_at_ist` |
+| 500 | `internal` | unexpected server error; no detail is ever returned. AI endpoints: manual mode; others: retry later |
 | 503 | `ai_unavailable` | kill switch, breaker open, model id missing |
+| 503 | `auth_unavailable` | Google's token certificates or the revocation lookup couldn't be reached: the token wasn't judged. Retry once after a few seconds (don't refresh the token); AI → manual mode |
 | 503 | `meter_unavailable` | spend meter unreadable → fail closed for AI |
+| 503 | `storage_unavailable` | the hot store or Firestore couldn't take a non-AI write (`/v1/erase`, `/v1/owner/fcm-token`): retry later (erase stays in the outbox) |
 | 503 | `ondc_unavailable` | ONDC off or Firestore quota exhausted |
 | 504 | `model_timeout` | model call exceeded its deadline |
 
@@ -70,8 +91,8 @@ hash). multipart: `meta` = `{"app": "...", "rows": [{"row_id": "r1"}]}`, files `
 "eta_min": 3}], "source": "live|cache|recorded", "request_id": "…"}`
 
 **`POST /v1/point`** — "Show me" grounding. Google token. multipart `meta` = `{"app": "...", "target": "cancel_button"}`,
-`image`. 200: `{"supported": true, "box_0_1000": [x0,y0,x1,y1] | null}` (`supported=false` when the day-1
-spike pinned grounding as unsupported; the phone then hides Show me).
+`image`. 200: `{"supported": true, "box_0_1000": [x0,y0,x1,y1] | null}` (`supported=false`, with no model call
+and no quota used, whenever Remote Config `point_supported` (§2.7) is false; the phone then hides Show me).
 
 **`POST /v1/parse-notification`** — rule-miss classifier. Google token. JSON:
 ```json
@@ -90,7 +111,10 @@ propose SEARCHING/ASSIGNED — never CANCEL_CONFIRMED, never to end a leg.
 `{"session_id": "…", "app": "uber", "version_code": 1234, "outcome": "confirmed_all|dismissed|abandoned|demo",
 "time_to_confirm_bucket": "lt_1m|1_3m|3_10m|gt_10m|none", "android_version": 34,
 "reads": 4, "verified_rows": 9, "unreadable_rows": 1, "rule_hits": 6, "rule_misses": 1, "misses_unclassified": 0,
-"demo": false}` → 202. The counters feed the VERIFIED-rate and rule-miss alerts (metadata only, no text).
+"demo": false}` → 202. The counters feed the VERIFIED-rate and rule-miss alerts (metadata only, no text). The
+event also closes the session's metadata audit record: the AI requests sent with this `X-Session-Id` become one
+Firestore `audit` document (endpoint, outcome, latency bucket, cost, app, versionCode, uid hash; never text or
+images). Sessions that never send an event are closed by the server after 30 idle minutes.
 
 **`POST /v1/erase`** — Google token. Deletes the caller's server data (ONDC docs, events by uid hash, owner
 device registration); marks the usage counter `erased_at` (deleted by cleanup after 48 h). → `{"erased": true}`.
@@ -168,7 +192,16 @@ Packages are keyed by Android package name; demo providers use `demo.kestrel`, `
 - `channel_id` / `ongoing`: optional extra conditions (null = any).
 - The newest entry whose `min_version_code` ≤ the installed versionCode is used; an unknown versionCode falls back
   to the newest entry ≤ it (`template=fallback` logged).
-- `redacted`: structural matches for redacted/empty posts (Android 15 OTP redaction).
+- **First match in list order wins**, for `templates` and for `redacted` alike: list specific events first
+  (driver-cancelled before cancelled, arriving before assigned).
+- `redacted`: structural matches for redacted/empty posts (Android 15 OTP redaction). `event`, `channel_id`,
+  `ongoing` and `category` are required (null = any). Optional, additive fields, each an extra condition when
+  present and not null:
+  - `id`: the rule's name for logs, like a template `id` (default `<package>.redacted.<index>`);
+  - `tag`: the post's notification tag must equal it;
+  - `notification_id`: the post's notification id (int) must equal it;
+  - `id_changed`: `true` matches only when the post's (notification id, tag) differs from the previous post seen
+    from the same package (a new notification, not an update of the last one).
 
 ### 2.2 `fare_parsers`
 ```json
@@ -222,7 +255,9 @@ is known: `per_km_min·d − base_allowance ≤ p ≤ per_km_max·d + base_allow
  "com.olacabs.customer": {"mode": "launch_paste"},
  "com.rapido.passenger": {"mode": "launch_paste"}}}
 ```
-Placeholders are URL-encoded by the phone.
+Placeholders are URL-encoded by the phone. Only the three real apps have entries: there are **no demo entries**
+(`demo.*`) in `launch_templates`, because DemoSource shows the bundled demo screens itself (§5) and the phone
+rejects the whole payload on an unknown launch mode.
 
 ### 2.7 Scalar keys
 | Key | Type | Default |
@@ -231,6 +266,7 @@ Placeholders are URL-encoded by the phone.
 | `reader_enabled_uber` / `_ola` / `_rapido` | bool | true |
 | `ondc_enabled` | bool | true (hackathon mock) |
 | `demo_enabled` | bool | true |
+| `point_supported` | bool | true (set by the day-1 spike, `docs/spikes.md`: grounding hit 3/3 demo cancel screens). The server reads it for `/v1/point` and reports it in `/v1/config-check`; its built-in fallback, used only without the bundled defaults, stays false |
 | `model_route` | JSON `{"schema":"1.0","read":"modal_spark_open","parse":"modal_spark_open"}` | |
 | `latest_version` | JSON `{"schema":"1.0","version_code":1,"version_name":"1.0.0-hackathon","url":"https://github.com/Baharul0111/ridemate/releases/latest","sha256":""}` | |
 | `min_supported_version` | int | 1 |
@@ -240,7 +276,11 @@ Placeholders are URL-encoded by the phone.
 | `budget_horizon_start` | `YYYY-MM-DD` | 2026-10-28 |
 | `api_base_url` | string | "" (set at deploy) |
 | `judge_allowlist` | JSON `{"schema":"1.0","sha256_emails":[…]}` (lower-cased email, SHA-256 hex) | empty |
-| `owner_emails_sha256` | JSON list of SHA-256 of owner emails (enables developer mode) | |
+| `owner_emails_sha256` | JSON list of SHA-256 of owner emails (enables developer mode) | `[]` |
+
+`owner_emails_sha256` stays a **bare JSON list** (no `"schema"` object): the phone parses it directly as a list of
+strings, without `resolveLayered`'s schema-major check, and treats a value that doesn't parse, or has any entry
+that isn't a SHA-256 hex digest, as `[]` (developer mode off).
 
 ---------------------------------------------------------------------------------------------------------------
 
@@ -254,7 +294,7 @@ Placeholders are URL-encoded by the phone.
 | `crypto.py` | versioned HMAC of Google `sub` (current + previous key, 30-day dual read) |
 | `auth.py` | `Principal`, `verify_bearer()` (Firebase ID token via google-auth certs), `check_not_revoked()` |
 | `limits.py` | `IpLimiter` (right-most trusted hop, IPv6 /64), `QuotaManager` (reads/parses per HMAC(sub)/IST day, young-account tier, judge allowlist, idempotent on request id) |
-| `spend.py` | `SpendMeter`: sharded all-spend meter, reservations, settle, budgets/sub-budgets, daily pacing cap, tiers, fail-closed, compute heartbeat |
+| `spend.py` | `SpendMeter`: sharded all-spend meter, reservations, settle, budgets/sub-budgets, daily pacing cap, tiers, fail-closed, compute heartbeat; `day_total_usd(day)` and `drift_factor()` for billing reconciliation |
 | `firestore.py` | REST Firestore client with service-account auth, 3 s deadlines, quota shedding, Increment |
 | `remote_config.py` | server-side read of the RC template (60 s cache, bundled defaults) |
 | `model_gateway.py` | `ModelGateway` over the `openai` SDK; structured-output mode detection; usage → cost |
@@ -264,8 +304,10 @@ Placeholders are URL-encoded by the phone.
 | `middleware.py` | body limits (1 MB image / 64 KB JSON before reading), magic bytes, request/session ids |
 | `logging_setup.py` | JSON logs + scrubber (drops tokens, keys, free text) |
 | `metrics.py` | counters/histograms aggregated in the Dict, snapshot helper |
+| `audit.py` | `AuditTrail`: per-request metadata records aggregated per `X-Session-Id` in the Dict, one Firestore `audit` doc per session (on `/v1/event` or by the dispatcher) |
+| `offload.py` | `off_loop` / `off_loop_shielded`: every blocking Dict/Firestore call on the request path runs in a worker thread, never on the event loop |
 | `alerts.py` | threshold evaluation, healthchecks.io pings, FCM HTTP v1 push |
-| `cron.py` | the single dispatcher (15 min): heartbeat, alerts, snapshots, golden probe, cleanup, billing reconciliation, weekly drift |
+| `cron.py` | the single dispatcher (15 min): heartbeat, alerts, snapshots, idle sessions' audit docs, golden probe, cleanup, billing reconciliation, weekly drift |
 | `api/ai.py` | `/v1/read-screen`, `/v1/reread`, `/v1/point`, `/v1/parse-notification`, `/v1/place-pick` |
 | `api/misc.py` | `/v1/event`, `/v1/erase`, `/v1/config-check`, `/v1/owner/fcm-token`, `/healthz`, `/readyz` |
 | `api/ondc.py` + `ondc/` | BAP endpoints, callbacks, Ed25519 signing, mock seller |
@@ -322,7 +364,10 @@ All images are identified by the SHA-256 (lower-case hex) of the exact bytes upl
              "struck_price": 140}],
    "driver_eta_min": null, "driver_distance_text": null, "tags": ["strikethrough", "eta"]}]}
 ```
-`eval/synthetic/ocr/<sha256>.json` — ideal OCR from the generator (exact text boxes), plus noisy variants;
+`trip_km` is the **straight-line (haversine) km** between pickup and drop, never a road distance: the gate
+applies `road_factor` (§2.3) itself, exactly as it does on the phone.
+`eval/synthetic/ocr/<sha256>.json` — ideal OCR from the generator (exact text boxes);
+`eval/synthetic/ocr_noisy/<sha256>.<variant>.json` — noisy variants of it (₹ read as R or Z, merged ETA tokens, …);
 `eval/recorded/ocr/<sha256>.json` — real ML Kit output recorded on the owner's phone. Same shape:
 ```json
 {"image_sha256": "…", "width": 1080, "height": 2400, "engine": "synthetic|mlkit-text-v2", "recorded_at": "…",

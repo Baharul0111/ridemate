@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import asyncio
+import threading
+from typing import Any
 
 import pytest
 
 from ridemate_api import prompts
-from ridemate_api.clock import FakeClock
-from ridemate_api.interfaces import ApiError, Purpose
+from ridemate_api.clock import FakeClock, ist_day
+from ridemate_api.interfaces import ApiError, Principal, Purpose, Reservation
 from ridemate_api.model_gateway import (
     ImagePart,
     ModelBadOutput,
@@ -30,6 +32,7 @@ from ridemate_api.router import (
     max_cost_usd,
 )
 from ridemate_api.settings import MAX_TOKENS_READ, PRICE_INPUT_PER_M, PRICE_OUTPUT_PER_M
+from ridemate_api.testing import make_test_deps
 
 from .test_ai_fakes import FakeMetrics, FakeProvider, FakeRemoteConfig, FakeSpend, make_settings
 
@@ -419,3 +422,102 @@ async def test_structured_mode_is_pinned_by_the_environment(monkeypatch: pytest.
     assert explicit.pinned_mode is StructuredMode.TOOL  # type: ignore[attr-defined]
     await explicit.aclose()  # type: ignore[attr-defined]
     assert build_providers(make_settings(model_token_secret="")) == {}
+
+
+# ---- the reservation and the deadline / cancellation ----------------------------------------------------------
+
+
+async def test_a_reservation_that_used_up_the_deadline_is_released_and_nothing_is_sent() -> None:
+    rig = Rig()
+    rig.provider.script("read", OK)
+    reserve = rig.spend.reserve
+
+    def slow_reserve(**kwargs: Any) -> Reservation:
+        rig.clock.advance(21)  # the hot store took longer than the whole tap budget
+        return reserve(**kwargs)
+
+    rig.spend.reserve = slow_reserve  # type: ignore[method-assign]
+    with pytest.raises(ApiError) as err:
+        await rig.read(deadline_at=rig.clock.monotonic() + 20)
+    assert (err.value.status, err.value.code) == (504, "model_timeout")
+    assert rig.provider.calls == 0
+    assert rig.spend.released == ["r1"] and not rig.spend.kept
+    assert rig.metrics.total("ai_call", outcome="no_budget") == 1
+    rig.spend.reserve = reserve  # type: ignore[method-assign]
+    assert (await rig.read()).attempts == 1  # the breaker slot was given back
+
+
+def _meter_rig() -> tuple[ProviderRouter, FakeProvider, Any, Principal]:
+    deps = make_test_deps()
+    provider = FakeProvider()
+    router = ProviderRouter(
+        providers={"modal_spark_open": provider},
+        spend=deps.spend,
+        remote_config=deps.remote_config,
+        metrics=deps.metrics,
+        clock=deps.clock,
+    )
+    principal = deps.auth.principal(deps.auth.google("u1"))  # type: ignore[attr-defined]
+    return router, provider, deps, principal
+
+
+async def test_a_request_cancelled_while_its_reservation_is_made_never_leaves_it_outstanding() -> None:
+    router, provider, deps, principal = _meter_rig()
+    provider.script("read", OK)
+    started, release, released = threading.Event(), threading.Event(), threading.Event()
+    made: list[Reservation] = []
+    reserve, real_release = deps.spend.reserve, deps.spend.release
+
+    def gated_reserve(**kwargs: Any) -> Reservation:
+        started.set()
+        release.wait(5)
+        made.append(reserve(**kwargs))
+        return made[-1]
+
+    def spy_release(reservation: Reservation) -> None:
+        real_release(reservation)
+        released.set()
+
+    deps.spend.reserve, deps.spend.release = gated_reserve, spy_release
+    task = asyncio.create_task(
+        router.call(
+            read_req(), task=TaskKind.READ, purpose=Purpose.READ, principal=principal, request_id="rid"
+        )
+    )
+    assert await asyncio.to_thread(started.wait, 5)
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    release.set()
+    assert await asyncio.to_thread(released.wait, 5)  # made after the request was gone, then given back
+    assert len(made) == 1 and provider.calls == 0
+    assert deps.spend.day_total_usd(ist_day(deps.clock.now_utc())) == 0.0
+
+
+async def test_a_request_cancelled_mid_call_keeps_its_whole_reservation_in_the_real_meter() -> None:
+    router, provider, deps, principal = _meter_rig()
+    in_flight = asyncio.Event()
+
+    async def hang(_request: object) -> dict:
+        in_flight.set()
+        await asyncio.sleep(30)
+        return OK
+
+    provider.script("read", hang)
+    task = asyncio.create_task(
+        router.call(
+            read_req(), task=TaskKind.READ, purpose=Purpose.READ, principal=principal, request_id="rid"
+        )
+    )
+    await asyncio.wait_for(in_flight.wait(), 5)
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    for _ in range(200):  # the keep runs in a worker thread, shielded from the cancellation
+        if deps.spend.day_total_usd(ist_day(deps.clock.now_utc())) > 0:
+            break
+        await asyncio.sleep(0.01)
+    # The request may have been processed, so it is paid for in full: never released.
+    assert deps.spend.day_total_usd(ist_day(deps.clock.now_utc())) == pytest.approx(
+        max_cost_usd(read_req()), rel=1e-6
+    )

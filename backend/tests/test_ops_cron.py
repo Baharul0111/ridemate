@@ -4,6 +4,7 @@ billing reconciliation, drift run, heartbeat and compute metering."""
 from __future__ import annotations
 
 import asyncio
+import inspect
 import json
 import sys
 import types
@@ -18,6 +19,7 @@ import respx
 
 from ridemate_api import cron
 from ridemate_api.alerts import DeliveryResult
+from ridemate_api.audit import AuditEntry, AuditTrail
 from ridemate_api.clock import IST, FakeClock
 from ridemate_api.cron import (
     BillingUnavailable,
@@ -29,20 +31,23 @@ from ridemate_api.cron import (
     cleanup_hot_store,
     compare_read,
     default_hooks,
+    doctor_status,
     is_ridemate_cost,
     make_golden_probe,
-    meter_day_total_usd,
     reconcile,
     run_dispatcher,
     template_doctor_drift,
 )
-from ridemate_api.interfaces import ApiError, Purpose
+from ridemate_api.interfaces import ApiError, Principal, Purpose
 from ridemate_api.settings import CRON_CPU_CORES, CRON_MEMORY_MIB, SUB_BUDGET_EVAL_RUN_USD
+from ridemate_api.spend import SpendMeter
 from ridemate_api.store import MemoryStore
-from tests.test_ops_fakes import HC_HEARTBEAT, FakeFirestore, FakeRouter, FakeSpend, make_deps
+from ridemate_api.testing import FakeRemoteConfig
+from tests.test_ops_fakes import HC_HEARTBEAT, FakeFirestore, FakeRouter, FakeSpend, make_deps, make_settings
 
 NOW = datetime(2026, 10, 28, 5, 0, tzinfo=UTC)  # Wednesday 10:30 IST
 NANO = 1_000_000_000
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 class FakeDelivery:
@@ -98,6 +103,7 @@ async def test_a_full_run_executes_every_job_meters_compute_and_pings_the_heartb
     assert statuses(report) == {
         "metrics": "ok",
         "spend_snapshot": "ok",
+        "audit": "skipped",  # no audit trail in this deployment
         "replay_buffer": "ok",
         "pending_erasures": "ok",
         "cleanup": "ok",
@@ -119,6 +125,24 @@ async def test_a_full_run_executes_every_job_meters_compute_and_pings_the_heartb
     ]
     assert h.delivery.ok_pings == 1  # nothing firing
     assert json.loads(json.dumps(report.as_dict()))["outcomes"][0]["name"] == "metrics"
+
+
+async def test_every_run_writes_the_audit_documents_of_sessions_that_went_idle(heartbeat):
+    fs = Replayable()
+    deps = make_deps(clock=FakeClock(NOW), firestore=fs)
+    deps.audit = AuditTrail(store=deps.store, clock=deps.clock, firestore=fs, metrics=deps.metrics)
+    user = Principal(uid="u1", provider="google.com", sub_hmac="h" * 64)
+    deps.audit.record(user, "6f1d2c3b-4a5e-4f60-8172-93a4b5c6d7e8", AuditEntry("read_screen", "ok", 1200))
+    h = hooks(billing_report=lambda s, e: [])
+    first = await run_dispatcher(deps, NOW, hooks=h)
+    assert first.outcome("audit").detail == {"sessions": 0, "late": 0, "docs": 0, "open": 1}  # still active
+    deps.clock.advance(31 * 60)
+    second = await run_dispatcher(deps, NOW + timedelta(minutes=31), hooks=h)
+    assert second.outcome("audit").status == "ok"
+    assert second.outcome("audit").detail == {"sessions": 1, "late": 0, "docs": 1, "open": 0}
+    (doc,) = [d for p, d in fs.docs.items() if p.startswith("audit/")]
+    assert doc["uid_hash"] == user.uid_hash and doc["count"] == 1
+    assert fs.replays == 2  # the replay job runs after it, for documents parked while the quota was gone
 
 
 async def test_daily_and_weekly_jobs_run_once_per_period(heartbeat):
@@ -492,6 +516,23 @@ def meter_store(ai_usd: float, compute_usd: float = 0.0) -> MemoryStore:
     return store
 
 
+def real_meter(store: MemoryStore) -> SpendMeter:
+    return SpendMeter(
+        store=store,
+        clock=FakeClock(NOW),
+        settings=make_settings(),
+        remote_config=FakeRemoteConfig(),
+        shard="dispatcher",
+    )
+
+
+def fake_meter(day_total_usd: float, factor: float = 1.0) -> FakeSpend:
+    spend = FakeSpend()
+    spend.day_totals["2026-10-27"] = day_total_usd
+    spend.factor = factor
+    return spend
+
+
 def rows(*costs: tuple[str, float]) -> list[dict]:
     return [
         {"description": d, "object_id": "ap-1", "environment_name": "main", "cost": c, "tags": {}}
@@ -512,12 +553,29 @@ def test_billing_rows_for_ridemate_and_the_shared_endpoint_are_counted():
     assert not is_ridemate_cost({"description": "someone-elses-notebook"})
 
 
-def test_the_meter_total_for_yesterday_reads_live_shards_and_the_rollup():
-    assert meter_day_total_usd(meter_store(2.0, 0.5), "2026-10-27") == pytest.approx(2.5)
+def test_reconciliation_reads_yesterday_through_the_meter_not_the_store_layout():
+    store = meter_store(2.0, 0.5)
+    meter = real_meter(store)
+    assert meter.day_total_usd("2026-10-27") == pytest.approx(
+        2.5
+    )  # live shard + rollup; frozen shard ignored
+    record = reconcile(store, meter, NOW, lambda s, e: rows(("ridemate-api", 2.5)))
+    assert record["meter_usd"] == pytest.approx(2.5) and record["drift"] == 0.0
+    assert record["factor"] == 1.0 and meter.drift_factor() == 1.0
+
+
+def test_reconciliation_tightens_the_real_meter_through_its_api():
+    store = meter_store(2.0, 0.0)
+    meter = real_meter(store)
+    record = reconcile(store, meter, NOW, lambda s, e: rows(("ridemate-api", 3.0)))
+    assert record["factor"] == pytest.approx(1.5)
+    assert meter.drift_factor() == pytest.approx(1.5)
+    # The new factor is what the meter now charges with, whichever process reads it next.
+    assert real_meter(store).drift_factor() == pytest.approx(1.5)
 
 
 def test_reconciliation_within_10_percent_changes_nothing():
-    store, spend = meter_store(2.0, 0.5), FakeSpend()
+    store, spend = MemoryStore(), fake_meter(2.5)
     record = reconcile(
         store,
         spend,
@@ -532,8 +590,7 @@ def test_reconciliation_within_10_percent_changes_nothing():
 
 
 def test_drift_over_10_percent_tightens_the_meter():
-    store, spend = meter_store(2.0, 0.0), FakeSpend()
-    store.put("spend:drift_factor", 1.1)
+    store, spend = MemoryStore(), fake_meter(2.0, factor=1.1)
     record = reconcile(store, spend, NOW, lambda s, e: rows(("ridemate-api", 3.0)))
     assert record["drift"] == pytest.approx(1 / 3, abs=1e-4)
     assert spend.drift_factors == [pytest.approx(1.1 * 1.5)]
@@ -541,27 +598,36 @@ def test_drift_over_10_percent_tightens_the_meter():
 
 
 def test_a_low_bill_alerts_but_never_loosens_the_meter():
-    store, spend = meter_store(2.0, 0.0), FakeSpend()
-    store.put("spend:drift_factor", 1.5)
+    store, spend = MemoryStore(), fake_meter(2.0, factor=1.5)
     # The matcher may have missed the endpoint's rows: a bill under the meter must not lower the factor.
     record = reconcile(store, spend, NOW, lambda s, e: rows(("ridemate-api", 1.0)))
     assert record["drift"] == pytest.approx(0.5)
     assert record["factor"] == 1.5 and spend.drift_factors == []
-    assert store.get("spend:drift_factor") == 1.5
+    assert spend.drift_factor() == 1.5
 
 
 def test_a_factor_set_above_the_cap_by_hand_is_never_lowered():
-    store, spend = meter_store(2.0, 0.0), FakeSpend()
-    store.put("spend:drift_factor", 5.0)
+    store, spend = MemoryStore(), fake_meter(2.0, factor=5.0)
     record = reconcile(store, spend, NOW, lambda s, e: rows(("ridemate-api", 4.0)))
     assert record["factor"] == 5.0 and spend.drift_factors == []
 
 
-def test_drift_factor_falls_back_to_the_store_and_is_capped():
-    store = meter_store(0.0)
-    record = reconcile(store, object(), NOW, lambda s, e: rows(("ridemate-api", 4.0)))
+def test_a_meter_that_counted_nothing_gets_the_capped_factor():
+    store, spend = MemoryStore(), fake_meter(0.0)
+    record = reconcile(store, spend, NOW, lambda s, e: rows(("ridemate-api", 4.0)))
     assert record["factor"] == cron.MAX_DRIFT_FACTOR
-    assert store.get("spend:drift_factor") == cron.MAX_DRIFT_FACTOR
+    assert spend.drift_factors == [cron.MAX_DRIFT_FACTOR]
+
+
+async def test_an_unreadable_meter_fails_the_reconciliation_job(heartbeat):
+    spend = FakeSpend()
+    spend.day_total_error = cron.StoreUnavailable("down")
+    deps = make_deps(clock=FakeClock(NOW), spend=spend)
+    h = hooks(billing_report=lambda s, e: rows(("ridemate-api", 1.0)))
+    report = await run_dispatcher(deps, NOW, hooks=h)
+    assert report.outcome("reconcile").status == "failed"
+    assert report.outcome("reconcile").detail == {"error_type": "StoreUnavailable"}
+    assert deps.store.get(cron.DRIFT_KEY) is None
 
 
 async def test_unavailable_billing_alerts_once_and_the_run_continues(heartbeat):
@@ -655,6 +721,83 @@ async def test_drift_run_passes_deps_when_the_doctor_accepts_them(monkeypatch):
     result = await template_doctor_drift(deps)
     assert calls == [{"deps": deps, "max_usd": SUB_BUDGET_EVAL_RUN_USD}]
     assert result == {"status": "skipped", "reason": "template_doctor_skipped", "model_calls": 0}
+
+
+@pytest.mark.parametrize(
+    ("raw", "kept"),
+    [
+        ("proposed", "proposed"),
+        ("no_misses", "no_misses"),
+        ("No-Misses", "no_misses"),
+        ("dry-run", "dry_run"),
+        ("dry run", "other"),
+        ("rejected_98765", "other"),
+        ("rejected: regression failed on 3 screens", "other"),
+        ("captain Ravi 98765 43210", "other"),
+        ("a" * 41, "other"),
+        ("", "other"),
+        (None, "none"),
+    ],
+)
+def test_the_doctor_status_is_kept_only_as_a_short_enum_like_token(raw, kept):
+    assert doctor_status(raw) == kept
+
+
+async def test_the_doctor_status_reaches_the_job_report(monkeypatch, heartbeat):
+    async def run_report(**kwargs):
+        return {"status": "proposed", "proposals_accepted": 1, "stop_reason": "free text never reported"}
+
+    module = types.ModuleType("template_doctor")
+    module.run_report = run_report
+    monkeypatch.setitem(sys.modules, "tools.template_doctor", None)
+    monkeypatch.setitem(sys.modules, "template_doctor", module)
+    monday = datetime(2026, 11, 2, 4, 30, tzinfo=IST).astimezone(UTC)  # the weekly drift run is due
+    deps = make_deps(clock=FakeClock(monday), router=FakeRouter())
+    report = await run_dispatcher(
+        deps, monday, hooks=hooks(billing_report=lambda s, e: [], drift=template_doctor_drift)
+    )
+    drift = report.outcome("drift")
+    assert drift.status == "ok"  # the dispatcher's outcome; the Doctor's own result sits beside it
+    assert drift.detail == {"proposals_accepted": 1, "doctor_status": "proposed"}
+    assert json.loads(json.dumps(report.as_dict()))  # still plain JSON for Modal's function result
+
+
+@pytest.fixture
+def repo_doctor(monkeypatch):
+    """`tools.template_doctor` importable from the repo root, as in the dispatcher image (REMOTE_ROOT on the path);
+    every module the import pulls in is dropped again afterwards."""
+    before = set(sys.modules)
+    monkeypatch.syspath_prepend(str(REPO_ROOT))
+    for name in ("tools", "tools.template_doctor", "template_doctor"):
+        monkeypatch.delitem(sys.modules, name, raising=False)
+    yield
+    for name in set(sys.modules) - before:
+        sys.modules.pop(name, None)
+
+
+def test_the_real_template_doctor_imports_from_the_repo_root(repo_doctor):
+    module = cron._import_doctor()
+    assert module is not None and module.__name__ == "tools.template_doctor"
+    signature = inspect.signature(module.run_report)
+    signature.bind(object(), SUB_BUDGET_EVAL_RUN_USD)  # run_report(deps, budget_usd)
+    # ... and the keyword form template_doctor_drift uses, deps included because the signature names it.
+    assert "deps" in signature.parameters
+    signature.bind(
+        router=object(),
+        spend=object(),
+        max_usd=SUB_BUDGET_EVAL_RUN_USD,
+        purpose=Purpose.DOCTOR,
+        deps=object(),
+    )
+
+
+async def test_the_real_template_doctor_skips_cleanly_without_a_golden_set(
+    repo_doctor, tmp_path, monkeypatch
+):
+    monkeypatch.setenv("TEMPLATE_DOCTOR_GOLDEN_DIR", str(tmp_path))  # empty: no labels, no Recorder exports
+    monkeypatch.setenv("TEMPLATE_DOCTOR_OUT_DIR", str(tmp_path / "out"))
+    result = await template_doctor_drift(make_deps(router=FakeRouter()))
+    assert result == {"status": "skipped", "reason": "template_doctor_skipped"}
 
 
 async def test_a_doctor_that_is_present_but_cannot_import_fails_loudly(tmp_path, monkeypatch, heartbeat):

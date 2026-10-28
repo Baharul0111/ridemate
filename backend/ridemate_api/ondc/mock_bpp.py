@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import Any
 
 from ..clock import Clock
+from ..offload import off_loop
 from ..store import HotStore, StoreUnavailable
 from .payloads import (
     CONFIRM_CANCEL,
@@ -197,9 +198,11 @@ class MockBpp:
         self._deliver = deliver
 
     async def drain(self) -> None:
-        """Wait until every scheduled callback has been delivered (tests, graceful shutdown)."""
-        while self._tasks:
-            await asyncio.gather(*list(self._tasks), return_exceptions=True)
+        """Wait until every scheduled callback has been delivered (tests, graceful shutdown). Only unfinished tasks
+        are awaited: a finished one stays in the set until its done-callback runs on the loop, and awaiting a gather
+        of finished tasks returns without ever yielding, so looping on the set itself could spin forever."""
+        while pending := [task for task in self._tasks if not task.done()]:
+            await asyncio.gather(*pending, return_exceptions=True)
 
     async def receive(
         self, action: str, body: bytes, authorization: str | None
@@ -223,7 +226,8 @@ class MockBpp:
         if action != "search" and ctx.get("bpp_id") != self.bpp_id:
             return 400, nack("wrong_bpp")
         try:
-            reply = self._handle(action, str(ctx.get("transaction_id", "")), message)
+            # Order state lives in the Modal Dict: the blocking reads/writes run off the event loop.
+            reply = await off_loop(self._handle, action, str(ctx.get("transaction_id", "")), message)
         except _Reject as e:
             return 400, nack(e.code)
         except StoreUnavailable:

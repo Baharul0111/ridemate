@@ -66,7 +66,8 @@ class MemoryStore:
 
 
 class ModalDictStore:
-    """Thin wrapper over modal.Dict that converts every failure into StoreUnavailable."""
+    """Thin wrapper over modal.Dict that converts every failure into StoreUnavailable: any Modal error (network,
+    auth, server) means "unreadable", so each method catches Exception and re-raises it as StoreUnavailable."""
 
     def __init__(self, name: str, environment_name: str | None = None) -> None:
         import modal  # imported lazily so unit tests never need Modal credentials
@@ -76,19 +77,19 @@ class ModalDictStore:
     def get(self, key: str, default: Any = None) -> Any:
         try:
             return self._d.get(key, default)
-        except Exception as e:  # noqa: BLE001 - any Modal error means "unreadable"
+        except Exception as e:
             raise StoreUnavailable(str(type(e).__name__)) from e
 
     def put(self, key: str, value: Any) -> None:
         try:
             self._d.put(key, value)
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             raise StoreUnavailable(str(type(e).__name__)) from e
 
     def put_if_absent(self, key: str, value: Any) -> bool:
         try:
             return bool(self._d.put(key, value, skip_if_exists=True))
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             raise StoreUnavailable(str(type(e).__name__)) from e
 
     def delete(self, key: str) -> None:
@@ -96,11 +97,12 @@ class ModalDictStore:
             self._d.pop(key)
         except KeyError:
             return
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             raise StoreUnavailable(str(type(e).__name__)) from e
 
     def keys_with_prefix(self, prefix: str) -> list[str]:
         try:
-            return [k for k in self._d.keys() if isinstance(k, str) and k.startswith(prefix)]
-        except Exception as e:  # noqa: BLE001
+            # SIM118 is wrong here: modal.Dict is not a dict. It has no __iter__; keys() streams from the server.
+            return [k for k in self._d.keys() if isinstance(k, str) and k.startswith(prefix)]  # noqa: SIM118
+        except Exception as e:
             raise StoreUnavailable(str(type(e).__name__)) from e

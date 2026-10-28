@@ -6,7 +6,7 @@ without an app update (goal item 22, architecture §4.2 "Config").
 
 | Path | What it is |
 |---|---|
-| `remote_config/<key>.json` | The default value of every key (22 keys) |
+| `remote_config/<key>.json` | The default value of every key (23 keys) |
 | `schemas/<key>.schema.json` | JSON Schema (draft 2020-12) for that file. Strings marked `"x-re2"` are RE2 patterns |
 | `ridemate_config/keys.py` | The key registry: value type, description, bundled override |
 | `validate.py` | Checks every default against its schema, compiles every regex with RE2, and checks that the bundled copies are current |

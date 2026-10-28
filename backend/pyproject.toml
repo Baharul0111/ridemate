@@ -25,6 +25,10 @@ dev = [
     "bandit>=1.7",
     "ruff>=0.7",
     "uvicorn>=0.32",
+    # The Template Doctor's own runtime dependencies (requirements-doctor.lock, installed in the dispatcher's
+    # image): tests import tools.template_doctor from the repo root the way the weekly drift run does.
+    "google-re2>=1.1",
+    "jsonschema>=4.23",
 ]
 
 [tool.pytest.ini_options]

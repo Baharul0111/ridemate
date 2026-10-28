@@ -49,22 +49,23 @@ JUDGING_DAY_CAP_USD = 3.0
 MAX_IMAGE_BYTES = 1_000_000
 MAX_JSON_BYTES = 64 * 1024
 
-# Server deadlines in seconds (E4).
+# Server deadlines in seconds (E4), re-pinned by the day-1 spike: text calls take 5–8 s at the lowest reasoning effort.
 DEADLINE_READ_S = 12.0
-DEADLINE_PARSE_S = 6.0
-DEADLINE_PLACE_S = 6.0
-DEADLINE_POINT_S = 9.0
+DEADLINE_PARSE_S = 10.0
+DEADLINE_PLACE_S = 10.0
+DEADLINE_POINT_S = 12.0
 DEADLINE_ONDC_OUTBOUND_S = 5.0
 DEADLINE_FIRESTORE_S = 3.0
 TAP_BUDGET_S = 20.0
 RETRY_MIN_REMAINING_S = 6.0
 
-# Output-token ceilings (L4).
-MAX_TOKENS_READ = 800
-MAX_TOKENS_REREAD = 600
-MAX_TOKENS_POINT = 200
-MAX_TOKENS_PARSE = 150
-MAX_TOKENS_PLACE = 50
+# Output-token ceilings (L4). Reasoning tokens count against them and the endpoint cannot switch reasoning off
+# (day-1 spike, docs/spikes.md), so each ceiling leaves room for ~400–650 reasoning tokens before the answer.
+MAX_TOKENS_READ = 2000
+MAX_TOKENS_REREAD = 1600
+MAX_TOKENS_POINT = 700
+MAX_TOKENS_PARSE = 700
+MAX_TOKENS_PLACE = 600
 
 # Container shape used by the compute meter (architecture.md §4.13).
 WEB_CPU_CORES = 0.25
@@ -114,7 +115,7 @@ class Settings:
         return bool(self.model_base_url and self.model_token_id and self.model_token_secret)
 
     @classmethod
-    def from_env(cls) -> "Settings":
+    def from_env(cls) -> Settings:
         hmac_keys = tuple(k for k in (_env("RIDEMATE_HMAC_KEY"), _env("RIDEMATE_HMAC_KEY_PREVIOUS")) if k)
         return cls(
             model_base_url=_env("MODAL_SPARK_OPEN_URL").rstrip("/"),

@@ -670,6 +670,11 @@ class SpendMeter:
         self._index_cache = None
         return value
 
+    def drift_factor(self) -> float:
+        """The factor billing reconciliation last set (1.0 until then), read fresh from the store."""
+        self._index_cache = None
+        return self._index().drift
+
     def totals_usd(self) -> dict[str, float]:
         """Lifetime AI and compute spend for billing reconciliation."""
         view = self._view({f"{AI}:{LIFETIME}", f"{COMPUTE}:{LIFETIME}"})
@@ -677,6 +682,16 @@ class SpendMeter:
             "ai": view.used(f"{AI}:{LIFETIME}") / NANO,
             "compute": view.used(f"{COMPUTE}:{LIFETIME}") / NANO,
         }
+
+    def day_total_usd(self, day: str) -> float:
+        """Everything the meter counted for one IST day (`YYYY-MM-DD`), AI and compute together, for billing
+        reconciliation: live shards, the rollup of compacted shards, and reservations still outstanding for that
+        day (counted as spent, as compaction would). Raises StoreUnavailable when the meter is unreadable."""
+        if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", day) or _date(day) is None:
+            raise ValueError("day must be an IST date YYYY-MM-DD")
+        self._index_cache = None  # the dispatcher runs this once a day: read the current shard list
+        view = self._view({f"{AI}:{day}", f"{COMPUTE}:{day}"})
+        return (view.used(f"{AI}:{day}") + view.used(f"{COMPUTE}:{day}")) / NANO
 
     def compact(self, idle_s: float = 3600.0) -> list[str]:
         """Fold shards idle for `idle_s` into the rollup. Safe to run while writers are live (see module doc)."""

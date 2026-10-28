@@ -2,8 +2,9 @@
 
 Modal's Starter plan allows 5 crons; RideMate uses exactly one, deployed only in the `main` environment, every
 15 minutes. Each run:
-- every time: metrics snapshot + hourly rollups, spend meter compaction + snapshot, replay of audit/events parked
-  while the Firestore quota was gone, erasures Firestore refused at request time, alert evaluation;
+- every time: metrics snapshot + hourly rollups, spend meter compaction + snapshot, metadata audit records of
+  sessions that went idle (audit.py), replay of audit/events parked while the Firestore quota was gone, erasures
+  Firestore refused at request time, alert evaluation;
 - once per IST day (from a set hour): Firestore/hot-store cleanup (Spark has no TTL), the synthetic golden probe
   (one demo image read through the internal router as Purpose.PROBE, never over HTTP), billing reconciliation;
 - once per week: the drift run (Template Doctor in report mode, within the evals sub-budget);
@@ -11,7 +12,7 @@ Modal's Starter plan allows 5 crons; RideMate uses exactly one, deployed only in
 
 Every job is isolated (a failure or timeout never stops the others) and time-limited; the whole run stays inside
 the function's 600 s timeout. Daily/weekly jobs are gated by `cron:last:{job}` in the hot store and retried at
-most 3 times per period.
+most 3 times per period. Hot-store and Firestore calls run in worker threads, so a job's timeout can always fire.
 """
 
 from __future__ import annotations
@@ -52,7 +53,6 @@ LAST_PREFIX = "cron:last:"
 FAIL_PREFIX = "cron:fail:"
 PROBE_KEY = "cron:probe:last"
 DRIFT_KEY = "billing:drift"  # the last reconciliation (read by alerts.py)
-DRIFT_FACTOR_KEY = "spend:drift_factor"
 RECON_UNAVAILABLE_FLAG = "alert:once:reconciliation_unavailable"
 
 Every = Literal["run", "daily", "weekly"]
@@ -71,6 +71,7 @@ class JobSpec:
 JOBS: tuple[JobSpec, ...] = (
     JobSpec("metrics", "run", 60),
     JobSpec("spend_snapshot", "run", 45),
+    JobSpec("audit", "run", 60),  # before the replay: its documents may be parked when the quota is gone
     JobSpec("replay_buffer", "run", 60),
     JobSpec("pending_erasures", "run", 45),
     JobSpec("cleanup", "daily", 150, time(3, 0)),
@@ -166,7 +167,9 @@ async def run_dispatcher(
         for spec in JOBS:
             report.outcomes.append(await _run_job(run, spec, deadline))
     finally:
-        report.compute_usd = _record_compute(deps, clock.monotonic() - started + IDLE_AFTER_RUN_S)
+        report.compute_usd = await asyncio.to_thread(
+            _record_compute, deps, clock.monotonic() - started + IDLE_AFTER_RUN_S
+        )
         report.heartbeat = await asyncio.to_thread(
             _ping_heartbeat, deps.settings.healthchecks_heartbeat_url, hooks
         )
@@ -176,7 +179,7 @@ async def run_dispatcher(
 async def _run_job(run: _Run, spec: JobSpec, deadline: float) -> JobOutcome:
     clock = run.deps.clock
     period = period_id(spec, run.now)
-    if period is not None and not _due(run.deps.store, spec, period, run.now):
+    if period is not None and not await asyncio.to_thread(_due, run.deps.store, spec, period, run.now):
         return JobOutcome(spec.name, "not_due")
     timeout = min(spec.timeout_s, deadline - clock.monotonic() - RESERVE_S)
     if timeout <= 0:
@@ -199,7 +202,7 @@ async def _run_job(run: _Run, spec: JobSpec, deadline: float) -> JobOutcome:
     if outcome.status in ("failed", "timeout"):
         run.extra_alerts.append(Alert(f"cron_job_failed_{spec.name}"))
     if period is not None:
-        _settle_period(run.deps.store, spec, period, outcome.status)
+        await asyncio.to_thread(_settle_period, run.deps.store, spec, period, outcome.status)
     log.info(
         "cron job", extra={"job": spec.name, "outcome": outcome.status, "duration_ms": outcome.duration_ms}
     )
@@ -293,6 +296,14 @@ async def _job_spend_snapshot(run: _Run) -> dict[str, Any]:
         return {"status": "skipped", "reason": "no_firestore", **detail}
     detail["written"] = await asyncio.to_thread(snapshot, run.deps.firestore)
     return detail
+
+
+async def _job_audit(run: _Run) -> dict[str, Any]:
+    """Write the audit document of every session idle for 30 minutes (≤ 1 write per session, audit.py)."""
+    trail = getattr(run.deps, "audit", None)
+    if trail is None:
+        return {"status": "skipped", "reason": "no_audit"}
+    return dict(await asyncio.to_thread(trail.flush_idle, stop=run.should_stop))
 
 
 async def _job_replay(run: _Run) -> dict[str, Any]:
@@ -474,7 +485,7 @@ async def _job_probe(run: _Run) -> dict[str, Any]:
     result = await run.hooks.probe(run.deps)
     record = {**asdict(result), "at": run.now.isoformat()}
     try:
-        run.deps.store.put(PROBE_KEY, record)
+        await asyncio.to_thread(run.deps.store.put, PROBE_KEY, record)
     except StoreUnavailable:
         log.warning("probe: result not recorded")
     if result.status == "fail":
@@ -597,27 +608,6 @@ def is_ridemate_cost(row: Mapping[str, Any]) -> bool:
     return any(marker in text for marker in BILLING_MATCH)
 
 
-def meter_day_total_usd(store: HotStore, day: str) -> float:
-    """Yesterday's AI + compute spend from the meter's hot-store layout (spend.py): live shards' charged keys
-    `spend:{shard}:{ai|compute}:{day}` plus the rollup totals of frozen shards."""
-    from . import spend
-
-    rollup = store.get(spend.ROLLUP_KEY) or {}
-    frozen = set(rollup.get("frozen", [])) if isinstance(rollup, Mapping) else set()
-    totals = rollup.get("totals", {}) if isinstance(rollup, Mapping) else {}
-    nano = sum(int(totals.get(f"{b}:{day}", 0) or 0) for b in (spend.AI, spend.COMPUTE))
-    for key in store.keys_with_prefix(spend.PREFIX):
-        parts = key.split(":")
-        if (
-            len(parts) == 4
-            and parts[3] == day
-            and parts[2] in (spend.AI, spend.COMPUTE)
-            and parts[1] not in frozen
-        ):
-            nano += int(store.get(key, 0) or 0)
-    return nano / spend.NANO
-
-
 def modal_billing_report(start: datetime, end: datetime) -> list[dict[str, Any]]:
     """Hourly cost rows from Modal's billing API (needs a Modal client context: inside a Modal container)."""
     import modal
@@ -643,6 +633,8 @@ def modal_billing_report(start: datetime, end: datetime) -> list[dict[str, Any]]
 
 
 def reconcile(store: HotStore, spend: Any, now: datetime, report: BillingReportFn) -> dict[str, Any]:
+    """Compare yesterday's Modal bill with what the spend meter counted (`spend.day_total_usd`: AI + compute) and,
+    above 10% drift, tighten the meter's drift factor. The result is recorded under `billing:drift` for alerts."""
     day = ist_day(now - timedelta(days=1))
     start, end = billing_window(day)
     try:
@@ -652,10 +644,10 @@ def reconcile(store: HotStore, spend: Any, now: datetime, report: BillingReportF
     except Exception as e:  # noqa: BLE001
         raise BillingUnavailable(type(e).__name__) from None
     billing = round(sum(float(r.get("cost", 0) or 0) for r in rows if is_ridemate_cost(r)), 6)
-    meter = round(meter_day_total_usd(store, day), 6)
+    meter = round(float(spend.day_total_usd(day)), 6)
     high = max(billing, meter)
     drift = abs(billing - meter) / high if high >= DRIFT_NOISE_FLOOR_USD else 0.0
-    current = float(store.get(DRIFT_FACTOR_KEY, 1.0) or 1.0)
+    current = float(spend.drift_factor())
     factor = current
     if drift > DRIFT_ALERT:
         # The meter already charges at the current factor; scale it so the meter matches the bill again. Only
@@ -664,11 +656,7 @@ def reconcile(store: HotStore, spend: Any, now: datetime, report: BillingReportF
         target = current * billing / meter if meter > 0 else MAX_DRIFT_FACTOR
         factor = max(current, min(MAX_DRIFT_FACTOR, target))
         if factor > current:
-            setter = getattr(spend, "set_drift_factor", None)
-            if callable(setter):
-                factor = float(setter(factor))
-            else:
-                store.put(DRIFT_FACTOR_KEY, factor)
+            factor = float(spend.set_drift_factor(factor))
     record = {
         "day": day,
         "billing_usd": billing,
@@ -689,10 +677,10 @@ async def _job_reconcile(run: _Run) -> dict[str, Any]:
     try:
         record = await asyncio.to_thread(reconcile, deps.store, deps.spend, run.now, report)
     except BillingUnavailable as e:
-        if deps.store.put_if_absent(RECON_UNAVAILABLE_FLAG, run.now.isoformat()):
+        if await asyncio.to_thread(deps.store.put_if_absent, RECON_UNAVAILABLE_FLAG, run.now.isoformat()):
             run.extra_alerts.append(Alert("reconciliation_unavailable"))
         return {"status": "skipped", "reason": "billing_unavailable", "error_type": str(e)}
-    deps.store.delete(RECON_UNAVAILABLE_FLAG)
+    await asyncio.to_thread(deps.store.delete, RECON_UNAVAILABLE_FLAG)
     return {"drift": record["drift"], "factor": record["factor"]}
 
 
@@ -700,6 +688,9 @@ async def _job_reconcile(run: _Run) -> dict[str, Any]:
 
 
 DOCTOR_MODULES: tuple[str, ...] = ("tools.template_doctor", "template_doctor")
+DOCTOR_STATUS_MAX = 40
+_DOCTOR_STATUS = re.compile(r"^[a-z][a-z0-9_]*$")
+_LONG_NUMBER = re.compile(r"\d{5,}")
 
 
 def _import_doctor() -> Any:
@@ -743,7 +734,21 @@ async def template_doctor_drift(deps: Any) -> Mapping[str, Any]:
     if summary.get("status") == "skipped":
         # e.g. no golden set on the Volume yet; the Doctor's own reason may be free text, so it isn't passed on
         return {"status": "skipped", "reason": "template_doctor_skipped", **numbers}
+    # The Doctor's own result (no_misses, proposed, rejected, ...) under its own key: the job's `status` is the
+    # dispatcher's ok/failed/... outcome.
+    if "status" in summary:
+        return {**numbers, "doctor_status": doctor_status(summary["status"])}
     return numbers
+
+
+def doctor_status(raw: Any) -> str:
+    """The Template Doctor's run status as an enum-like token (a lower-case letter, then letters, digits and '_';
+    ≤ 40 chars; '-' read as '_'), so the job report and the log scrubber keep it. Anything else becomes 'other':
+    free text (it has spaces), and long digit runs that could be a phone number or a price."""
+    text = str(raw).strip().lower().replace("-", "_")
+    if len(text) <= DOCTOR_STATUS_MAX and _DOCTOR_STATUS.match(text) and not _LONG_NUMBER.search(text):
+        return text
+    return "other"
 
 
 async def _job_drift(run: _Run) -> dict[str, Any]:
@@ -755,6 +760,7 @@ async def _job_drift(run: _Run) -> dict[str, Any]:
 _JOB_FUNCS: Mapping[str, Callable[[_Run], Awaitable[Mapping[str, Any] | None]]] = {
     "metrics": _job_metrics,
     "spend_snapshot": _job_spend_snapshot,
+    "audit": _job_audit,
     "replay_buffer": _job_replay,
     "pending_erasures": _job_pending_erasures,
     "cleanup": _job_cleanup,
@@ -793,8 +799,8 @@ __all__ = [
     "cleanup_hot_store",
     "compare_read",
     "default_hooks",
+    "doctor_status",
     "make_golden_probe",
-    "meter_day_total_usd",
     "reconcile",
     "run_dispatcher",
 ]

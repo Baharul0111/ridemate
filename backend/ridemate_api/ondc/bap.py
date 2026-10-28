@@ -2,9 +2,11 @@
 
 Every user action is a signed TRV10 request sent under a 5 s deadline; the seller's `on_*` callbacks are verified,
 stored in `ondc_event` before they are acknowledged (idempotent per transaction, action, seller and message id),
-and folded into `ondc_txn/{txnId}`, which the phone listens to. Each transaction belongs to the uid that started
-it; confirm and cancel also need an unrevoked token and record the user's tap id (I1). Pickup and drop are kept
-only while the ride can still need them and are cleared once the transaction ends.
+and folded into `ondc_txn/{txnId}`, which the phone listens to. Each `ondc_event` carries the transaction owner's
+`uid` (None when the transaction is unknown), the field firestore.rules matches for owner-only reads. Each
+transaction belongs to the uid that started it; confirm and cancel also need an unrevoked token and record the
+user's tap id (I1). Pickup and drop are kept only while the ride can still need them and are cleared once the
+transaction ends.
 """
 
 from __future__ import annotations
@@ -316,6 +318,7 @@ class OndcBuyer:
             await self._set(
                 f"ondc_event/{payload_hash[:40]}",
                 {
+                    "uid": None,  # no transaction, so no owner: unreadable by any phone
                     "txnId": None,
                     "action": action,
                     "message_id": None,
@@ -338,10 +341,14 @@ class OndcBuyer:
             self._metrics.incr("ondc_callback", action=action, outcome="duplicate")
             error = existing.get("apply_error")
             return (400, nack(error)) if error else (200, ack())
+        txn = await self._txn_or_none(txn_id)
+        # The owner's uid on the event is what firestore.rules checks before a phone may read it.
+        uid = txn.get("uid") if txn is not None else None
         if existing is None:
             await self._set(
                 event_path,
                 {
+                    "uid": uid,
                     "txnId": txn_id,
                     "action": action,
                     "message_id": message_id,
@@ -351,20 +358,30 @@ class OndcBuyer:
                     "applied": False,
                 },
             )
-        error = await self._apply(action, txn_id, ctx, message, payload.get("error"))
-        await self._set(event_path, {"applied": True, "apply_error": error}, merge=True)
+        error = await self._apply(action, txn_id, txn, ctx, message, payload.get("error"))
+        await self._set(event_path, {"uid": uid, "applied": True, "apply_error": error}, merge=True)
         self._metrics.incr("ondc_callback", action=action, outcome=error or "ok")
         return (400, nack(error)) if error else (200, ack())
 
-    async def _apply(
-        self, action: str, txn_id: str, ctx: dict[str, Any], message: dict[str, Any], error: Any
-    ) -> str | None:
-        """Folds one verified callback into the transaction. Returns a NACK code, or None when accepted."""
+    async def _txn_or_none(self, txn_id: str) -> dict[str, Any] | None:
+        """The transaction a callback names, or None when the id is malformed or unknown."""
         try:
             txn_path = _txn_path(txn_id)
         except ApiError:
-            return "unknown_transaction"
-        txn = await self._get(txn_path)
+            return None
+        return await self._get(txn_path)
+
+    async def _apply(
+        self,
+        action: str,
+        txn_id: str,
+        txn: dict[str, Any] | None,
+        ctx: dict[str, Any],
+        message: dict[str, Any],
+        error: Any,
+    ) -> str | None:
+        """Folds one verified callback into `txn` (read just before the event was stored). Returns a NACK code, or
+        None when accepted."""
         if txn is None:
             return "unknown_transaction"
         bpp_id = str(ctx.get("bpp_id"))

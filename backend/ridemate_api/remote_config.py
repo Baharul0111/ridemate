@@ -40,6 +40,7 @@ BUILTIN_DEFAULTS: Mapping[str, Any] = {
     "reader_enabled_rapido": True,
     "ondc_enabled": True,
     "demo_enabled": True,
+    "point_supported": False,  # the day-1 spike decides whether /v1/point grounding is served
     "model_route": {"schema": "1.0", "read": "modal_spark_open", "parse": "modal_spark_open"},
     "latest_version": {
         "schema": "1.0",

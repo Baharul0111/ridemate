@@ -302,14 +302,16 @@ class FirebaseAuth:
         email = claims.get("email")
         email = email.strip().lower() if isinstance(email, str) and email.strip() else None
         verified = bool(claims.get("email_verified")) and email is not None
-        is_judge = False
-        if verified and email is not None:
-            is_judge = await asyncio.to_thread(self._is_judge, email)
+        # The previous key's grace window is recorded in the hot store and the judge list is Remote Config:
+        # both may block, so they are looked up off the event loop.
+        sub_hmac_previous, is_judge = await asyncio.to_thread(
+            self._lookups, sub, purpose, email if verified else None
+        )
         return Principal(
             uid=uid,
             provider=provider,
             sub_hmac=self._keyring.digest(sub, purpose),
-            sub_hmac_previous=self._keyring.previous_digest(sub, purpose),
+            sub_hmac_previous=sub_hmac_previous,
             email=email,
             email_verified=verified,
             auth_time=datetime.fromtimestamp(float(claims["auth_time"]), UTC),
@@ -318,6 +320,10 @@ class FirebaseAuth:
             is_judge=is_judge,
             raw_token=token,
         )
+
+    def _lookups(self, sub: str, purpose: str, verified_email: str | None) -> tuple[str | None, bool]:
+        previous = self._keyring.previous_digest(sub, purpose)
+        return previous, verified_email is not None and self._is_judge(verified_email)
 
     def _is_judge(self, email: str) -> bool:
         allowlist = self._rc.get_json("judge_allowlist", {})

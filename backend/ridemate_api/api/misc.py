@@ -7,7 +7,9 @@ Events hold enums and counters only. Erase deletes the caller's server data; the
 an HMAC key rotation a user's data may sit under either key, so erase covers both (§4.18 H5).
 
 Event writes and erases cost no model money but spend the free Firestore quota that ONDC and every other user
-share, so each has a per-user daily cap (limits.allow_daily) on top of the per-IP limit.
+share, so each has a per-user daily cap (limits.allow_daily) on top of the per-IP limit. An event also closes the
+session's metadata audit record (audit.py): its one `audit` document is written now instead of by the dispatcher.
+Audit records are kept a year (DPDP Rules), so erase leaves them.
 """
 
 from __future__ import annotations
@@ -88,6 +90,12 @@ async def post_event(
 
 
 def _record_event(deps: Deps, principal: Principal, body: EventIn) -> None:
+    _store_event(deps, principal, body)
+    if deps.audit is not None:
+        deps.audit.flush_session(principal, body.session_id)  # never raises
+
+
+def _store_event(deps: Deps, principal: Principal, body: EventIn) -> None:
     doc_id = hashlib.sha256(f"{principal.sub_hmac}:{body.session_id}".encode()).hexdigest()[:32]
     now = deps.clock.now_utc()
     try:

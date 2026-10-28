@@ -31,6 +31,7 @@ class Deps:
     router: Any = None  # router.ProviderRouter
     demo_cache: Any = None  # demo_cache.DemoCache
     ondc: Any = None  # ondc.bap.OndcBuyer
+    audit: Any = None  # audit.AuditTrail; None without Firestore (nothing could ever be flushed)
 
 
 def get_deps(request: Request) -> Deps:

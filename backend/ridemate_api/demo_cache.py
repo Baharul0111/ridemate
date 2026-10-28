@@ -4,7 +4,8 @@ The allowlist is the SHA-256 of every bundled demo image (`demo_manifest.json`, 
 scripts/build_demo_manifest.py). A demo read is answered from the hot-store cache, else by one live model call
 charged to the demo sub-budget (then cached), else — whenever AI is unavailable, paused, switched off or out of
 budget — by the recorded Muse Spark Open output bundled under `recorded/`. Rereads and pointing on demo crops are
-cached the same way, without a recorded fallback.
+cached the same way, without a recorded fallback. Cache reads and writes (Modal Dict) and the recorded-file read
+run in the worker-thread pool, never on the event loop.
 """
 
 from __future__ import annotations
@@ -18,6 +19,7 @@ from pathlib import Path
 from typing import Any
 
 from .interfaces import ApiError, Metrics
+from .offload import off_loop
 from .prompts import validate_read
 from .store import HotStore, StoreUnavailable
 
@@ -97,7 +99,7 @@ class DemoCache:
     async def read(self, sha256: str, live: LiveCall | None) -> DemoAnswer:
         """cache → live (then cached) → recorded. `live` is None when AI is switched off for this request."""
         key = f"{KEY_PREFIX}read:{sha256}"
-        cached = self._get(key)
+        cached = await off_loop(self._get, key)
         if cached is not None:
             return self._hit("read", cached)
         failure: ApiError | None = None
@@ -111,10 +113,10 @@ class DemoCache:
                 self._metrics.incr("demo_live_unavailable", kind="read", code=e.code)
             else:
                 if payload.get("screen_type") not in (None, "unreadable"):
-                    self._put(key, payload, model)
+                    await off_loop(self._put, key, payload, model)
                 self._metrics.incr("demo_answer", kind="read", source="live")
                 return DemoAnswer(payload, "live", model)
-        recorded = self.recorded(sha256)
+        recorded = await off_loop(self.recorded, sha256)
         if recorded is None:
             raise failure or ApiError(503, "ai_unavailable", reason="kill_switch")
         self._metrics.incr("demo_answer", kind="read", source="recorded")
@@ -123,13 +125,13 @@ class DemoCache:
     async def cached_call(self, kind: str, key_hash: str, live: LiveCall | None) -> DemoAnswer:
         """Rereads and pointing on demo crops: cache → live (then cached). No recorded fallback."""
         key = f"{KEY_PREFIX}{kind}:{key_hash}"
-        cached = self._get(key)
+        cached = await off_loop(self._get, key)
         if cached is not None:
             return self._hit(kind, cached)
         if live is None:
             raise ApiError(503, "ai_unavailable", reason="kill_switch")
         payload, model = await live()
-        self._put(key, payload, model)
+        await off_loop(self._put, key, payload, model)
         self._metrics.incr("demo_answer", kind=kind, source="live")
         return DemoAnswer(payload, "live", model)
 

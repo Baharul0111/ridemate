@@ -43,6 +43,7 @@ def test_value_types_match_contract_table() -> None:
         "reader_enabled_uber": "BOOLEAN",
         "ondc_enabled": "BOOLEAN",
         "demo_enabled": "BOOLEAN",
+        "point_supported": "BOOLEAN",
         "min_supported_version": "NUMBER",
         "budget_horizon_days": "NUMBER",
         "cap_profile": "STRING",

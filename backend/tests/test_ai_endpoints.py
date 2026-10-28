@@ -507,7 +507,7 @@ def test_a_replayed_request_id_gets_one_retry_and_no_more_model_calls(env: Env) 
     assert isinstance(metrics, FakeMetrics)
     assert metrics.total("api_ai_replay_refused", endpoint="read_screen") == 1
 
-    # The allowance is per user and per endpoint: the same id elsewhere is a different request.
+    # The allowance is per user and per quota kind (reads, parses): the same id there is a different request.
     assert env.read(headers=google_headers("u2", **{"X-Request-Id": RID})).status_code == 200
     env.provider.default["parse"] = {"label": "searching", "evidence_span": "Looking for"}
     parse = env.client.post(

@@ -174,6 +174,14 @@ def test_the_repository_defaults_load():
     assert json.loads(values["model_route"])["schema"].startswith("1.")
     assert isinstance(json.loads(values["owner_emails_sha256"]), list)
     assert values["cap_profile"] in ("normal", "judging")  # scalar files unwrap {"value": ...}
+    # The day-1 spike decides this default (docs/spikes.md); either way the bool file unwraps to "true"/"false".
+    spiked = json.loads((REPO_DEFAULTS / "point_supported.json").read_text(encoding="utf-8"))["value"]
+    assert isinstance(spiked, bool) and values["point_supported"] == str(spiked).lower()
+
+
+def test_point_supported_defaults_to_false_even_without_the_bundled_files():
+    rc = RemoteConfigRest(project_id="", tokens=None, clock=FakeClock(), defaults_dir=None)
+    assert rc.get_bool("point_supported", True) is False  # the built-in default wins over a caller's guess
 
 
 def test_other_default_file_shapes(tmp_path):
