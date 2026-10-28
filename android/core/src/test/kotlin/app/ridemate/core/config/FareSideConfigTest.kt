@@ -93,4 +93,29 @@ class FareSideConfigTest {
             parseLaunchTemplates("""{"schema": "1.0", "apps": {"com.ubercab": {"mode": "uri"}}}""")
         }
     }
+
+    @Test
+    fun `an unknown launch mode leaves only that app out`() {
+        // The bundled defaults add "demo" entries; a newer MINOR mode must not take Uber's deep link down with it.
+        val withNewModes = launchJson.replace(
+            "\"com.olacabs.customer\": {\"mode\": \"launch_paste\"}",
+            "\"com.olacabs.customer\": {\"mode\": \"launch_paste\", \"fallback\": \"intent_v2\"}, " +
+                "\"demo.kestrel\": {\"mode\": \"demo\", \"asset_dir\": \"demo/kestrel\"}",
+        )
+        val templates = parseLaunchTemplates(withNewModes)
+        assertEquals(setOf("com.ubercab", "com.olacabs.customer", "com.rapido.passenger"), templates.apps.keys)
+        assertNull(templates.templateFor("demo.kestrel"))
+        assertEquals(LaunchTemplate(LaunchMode.LAUNCH_PASTE), templates.templateFor("com.olacabs.customer"))
+        assertEquals(LaunchMode.URI, templates.templateFor("com.ubercab")!!.mode)
+        // Known modes are still validated, and a missing or non-string mode still rejects the payload.
+        assertThrows(IllegalArgumentException::class.java) {
+            parseLaunchTemplates(withNewModes.replace("https://m.uber", "http://m.uber"))
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            parseLaunchTemplates("""{"schema": "1.0", "apps": {"com.ubercab": {"uri": "https://m.uber.com"}}}""")
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            parseLaunchTemplates("""{"schema": "1.0", "apps": {"com.ubercab": {"mode": 1}}}""")
+        }
+    }
 }

@@ -6,12 +6,13 @@ import app.ridemate.core.config.parseFareParsers
 import app.ridemate.core.config.parseSanityBands
 import app.ridemate.core.fare.FareParser
 import app.ridemate.core.fare.TestConfigs
+import app.ridemate.core.format.Digits
 import app.ridemate.core.format.DistanceText
 import app.ridemate.core.gate.ChannelARead
 import app.ridemate.core.gate.GateResult
+import app.ridemate.core.gate.GatedRow
 import app.ridemate.core.gate.SanityBands
 import app.ridemate.core.gate.VerificationGate
-import app.ridemate.core.gate.labelTextsMatch
 import app.ridemate.core.model.Provider
 import app.ridemate.core.model.QuoteStatus
 import app.ridemate.core.model.VehicleClass
@@ -19,6 +20,7 @@ import app.ridemate.core.ocr.OcrFrame
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.intOrNull
@@ -33,8 +35,9 @@ import java.io.File
 
 /**
  * Runs Channel B + the gate over the labelled eval screens (contracts §6) against every recorded and synthetic
- * Channel A read, including the adversarial variants, and requires ZERO wrong-shown values: a VERIFIED price, ETA or
- * driver value that differs from the label. It prints only counts and rates, never fare values (L6).
+ * Channel A read, including the adversarial variants and the prompt-injection screens, and requires ZERO wrong-shown
+ * values: a VERIFIED price, ETA or driver value that differs from the label. Rows a fixture's `expect.rows` marks
+ * UNREADABLE (an attacked row) must not be VERIFIED either. It prints only counts and rates, never fare values (L6).
  *
  * Without fixtures the test is skipped, unless `-PrequireFixtures=true` (system property ridemate.requireFixtures).
  */
@@ -54,62 +57,122 @@ class AccuracyTest {
         val driverMeters: Int?,
     )
 
-    private data class Tally(var screens: Int = 0, var labelRows: Int = 0, var verified: Int = 0, var wrong: Int = 0) {
+    /** One fixture file and the label rows it says must not be VERIFIED (`expect.rows[i] == "UNREADABLE"`). */
+    private data class Fixture<T>(val file: File, val value: T, val mustNotVerify: Set<Int>)
+
+    /**
+     * A labels file and where its OCR and Channel A fixtures live. Reads under [attackDirs] are adversarial: they
+     * count towards the zero-wrong-shown check but not towards the VERIFIED rate.
+     */
+    private data class Suite(
+        val name: String,
+        val labels: String,
+        val ocrDirs: List<String>,
+        val honestDirs: List<String>,
+        val attackDirs: List<String>,
+    )
+
+    private data class Tally(var pairs: Int = 0, var labelRows: Int = 0, var verified: Int = 0, var wrong: Int = 0) {
         val rate: Double get() = if (labelRows == 0) 0.0 else verified.toDouble() / labelRows
     }
 
+    private val suites = listOf(
+        Suite(
+            name = "demo",
+            labels = "eval/demo_labels.json",
+            // Noisy OCR variants (₹ read as R/Z/%, split prices, merged ETAs) sit in ocr/ or ocr_noisy/.
+            ocrDirs = listOf("eval/synthetic/ocr", "eval/synthetic/ocr_noisy", "eval/recorded/ocr"),
+            honestDirs = listOf("eval/synthetic/channel_a", "eval/recorded/channel_a"),
+            attackDirs = listOf("eval/synthetic/channel_a_adversarial"),
+        ),
+        Suite(
+            name = "injection",
+            labels = "eval/injection/labels.json",
+            ocrDirs = listOf("eval/injection/ocr"),
+            honestDirs = emptyList(),
+            // Every read of an injection screen is under attack: the screen text itself carries the instructions.
+            attackDirs = listOf("eval/injection/channel_a"),
+        ),
+    )
+
     @Test
     fun `zero wrong-shown values on the eval set`() {
-        val labelsFile = File(repoRoot, "eval/demo_labels.json")
+        val labelsFile = File(repoRoot, suites.first().labels)
         requireOrSkip(labelsFile.isFile, "no ${labelsFile.path}")
-        val screens = loadScreens(labelsFile)
         val parsers = loadParsers()
         val bands = SanityBands(loadBands())
         val honest = Tally()
-        val adversarial = Tally()
+        val attacked = Tally()
         val problems = mutableListOf<String>()
 
-        for (screen in screens) {
-            val parser = FareParser.forApp(parsers, screen.app, null) ?: continue
-            val frames = fixtures(screen.sha, "eval/synthetic/ocr", "eval/recorded/ocr").mapNotNull { file ->
-                runCatching { OcrFrame.fromJson(file.readText()) }.getOrNull()?.let { file to it }
-            }
-            val honestReads = fixtures(screen.sha, "eval/synthetic/channel_a", "eval/recorded/channel_a").mapNotNull(::readOf)
-            val attacks = fixtures(screen.sha, "eval/synthetic/channel_a_adversarial").mapNotNull(::readOf)
-            for ((ocrFile, frame) in frames) {
-                for ((aFile, read) in honestReads + attacks) {
-                    val tally = if (aFile in attacks.map { it.first }) adversarial else honest
-                    val result = VerificationGate.verify(screen.app, read, frame, frame, parser, bands, screen.tripKm, NOW)
-                    tally.screens++
-                    tally.labelRows += screen.rows.size
-                    tally.verified += result.verifiedCount
-                    val wrong = wrongShown(screen, result)
-                    tally.wrong += wrong
-                    if (wrong > 0) problems += "${ocrFile.name} × ${aFile.name}: $wrong wrong-shown"
+        for (suite in suites) {
+            val file = File(repoRoot, suite.labels)
+            if (!file.isFile) continue
+            for (screen in loadScreens(file)) {
+                val parser = FareParser.forApp(parsers, screen.app, null)
+                if (parser == null) {
+                    problems += "${suite.name}: no fare parser for ${screen.app.packageName}"
+                    continue
+                }
+                val frames = fixtures(screen.sha, suite.ocrDirs).mapNotNull { f ->
+                    runCatching { OcrFrame.fromJson(f.readText()) }.getOrNull()?.let { Fixture(f, it, mustNotVerify(f)) }
+                }
+                val reads = fixtures(screen.sha, suite.honestDirs).mapNotNull(::readOf).map { it to honest } +
+                    fixtures(screen.sha, suite.attackDirs).mapNotNull(::readOf).map { it to attacked }
+                for (frame in frames) {
+                    for ((read, tally) in reads) {
+                        val result = VerificationGate.verify(screen.app, read.value, frame.value, frame.value, parser, bands, screen.tripKm, NOW)
+                        tally.pairs++
+                        tally.labelRows += screen.rows.size
+                        tally.verified += result.verifiedCount
+                        val wrong = wrongShown(screen, result, read.mustNotVerify + frame.mustNotVerify)
+                        tally.wrong += wrong
+                        if (wrong > 0) problems += "${frame.file.name} × ${read.file.name}: $wrong wrong-shown"
+                    }
                 }
             }
         }
-        val evaluated = honest.screens + adversarial.screens
-        requireOrSkip(evaluated > 0, "no OCR + Channel A fixture pairs under eval/")
+        requireOrSkip(honest.pairs + attacked.pairs > 0, "no OCR + Channel A fixture pairs under eval/")
         println(
-            "AccuracyTest: ${honest.screens} honest pairs, VERIFIED rate %.1f%% (%d/%d rows); %d adversarial pairs, %d verified; wrong-shown %d"
-                .format(100 * honest.rate, honest.verified, honest.labelRows, adversarial.screens, adversarial.verified, honest.wrong + adversarial.wrong),
+            "AccuracyTest: %d honest pairs, VERIFIED rate %.1f%% (%d/%d rows); %d adversarial/injection pairs, %d rows verified; wrong-shown %d"
+                .format(
+                    honest.pairs, 100 * honest.rate, honest.verified, honest.labelRows, attacked.pairs, attacked.verified,
+                    honest.wrong + attacked.wrong,
+                ),
         )
-        assertEquals(problems.joinToString("\n"), 0, honest.wrong + adversarial.wrong)
+        assertTrue(problems.joinToString("\n"), problems.isEmpty())
+        assertEquals(0, honest.wrong + attacked.wrong)
     }
 
-    /** Values the gate let through that the label contradicts. */
-    private fun wrongShown(screen: Screen, result: GateResult): Int {
+    /**
+     * Values the gate let through that the label contradicts, plus VERIFIED rows on label rows the fixture marks as
+     * attacked. A gated row belongs to a label row of its class whose label contains its OCR label as whole words.
+     */
+    private fun wrongShown(screen: Screen, result: GateResult, mustNotVerify: Set<Int>): Int {
         var wrong = 0
         for (row in result.rows.filter { it.status == QuoteStatus.VERIFIED }) {
-            val candidates = screen.rows.filter { it.vehicleClass == row.vehicleClass && labelTextsMatch(it.label, row.displayLabel) }
-            val match = candidates.firstOrNull { it.price == row.price }
-            if (match == null) wrong++ else if (row.eta != null && row.eta != match.eta) wrong++
+            val candidates = screen.rows.indices.filter { belongsTo(screen.rows[it], row) }
+            val match = candidates.firstOrNull { screen.rows[it].price == row.price }
+            when {
+                match == null -> wrong++
+                match in mustNotVerify -> wrong++
+                row.eta != null && row.eta != screen.rows[match].eta -> wrong++
+            }
         }
         if (result.driver.etaMin != null && result.driver.etaMin != screen.driverEta) wrong++
         if (result.driver.distanceMeters != null && result.driver.distanceMeters != screen.driverMeters) wrong++
         return wrong
     }
+
+    private fun belongsTo(label: LabelRow, row: GatedRow): Boolean {
+        if (label.vehicleClass != row.vehicleClass) return false
+        val full = words(label.label ?: return false)
+        val shown = words(row.displayLabel)
+        return shown.isNotEmpty() && " ${full.joinToString(" ")} ".contains(" ${shown.joinToString(" ")} ")
+    }
+
+    private fun words(text: String): List<String> =
+        Digits.toAscii(text).lowercase().split(NON_WORD).filter { it.isNotEmpty() }
 
     private fun loadScreens(file: File): List<Screen> {
         val root = json.parseToJsonElement(file.readText()).jsonObject
@@ -149,26 +212,35 @@ class AccuracyTest {
     ).map { File(repoRoot, it) }.firstOrNull { it.isFile }?.let { parseSanityBands(it.readText()) } ?: SanityBandsConfig.DEFAULT
 
     /** `<dir>/<sha>.json` plus variants named `<sha>.<variant>.json` or `<sha>_<variant>.json`. */
-    private fun fixtures(sha: String, vararg dirs: String): List<File> = dirs.flatMap { dir ->
+    private fun fixtures(sha: String, dirs: List<String>): List<File> = dirs.flatMap { dir ->
         File(repoRoot, dir).listFiles { f -> f.isFile && f.name.endsWith(".json") && f.name.lowercase().startsWith(sha) }
             .orEmpty().sortedBy { it.name }
     }
 
-    private fun readOf(file: File): Pair<File, ChannelARead>? {
+    private fun readOf(file: File): Fixture<ChannelARead>? {
         val obj = runCatching { json.parseToJsonElement(file.readText()).jsonObject }.getOrNull() ?: return null
         val read = obj["read"]?.let { ChannelARead.fromJsonOrNull(it.toString()) } ?: return null
-        return file to read
+        return Fixture(file, read, mustNotVerify(obj))
+    }
+
+    private fun mustNotVerify(file: File): Set<Int> =
+        runCatching { json.parseToJsonElement(file.readText()).jsonObject }.getOrNull()?.let(::mustNotVerify).orEmpty()
+
+    private fun mustNotVerify(fixture: JsonObject): Set<Int> {
+        val rows = (fixture["expect"] as? JsonObject)?.get("rows") as? JsonArray ?: return emptySet()
+        return rows.indices.filterTo(mutableSetOf()) { (rows[it] as? JsonPrimitive)?.contentOrNull == "UNREADABLE" }
     }
 
     private fun requireOrSkip(condition: Boolean, why: String) {
         if (requireFixtures) assertTrue("fixtures required: $why", condition) else assumeTrue(why, condition)
     }
 
-    private fun JsonObject.string(key: String): String? = (this[key] as? kotlinx.serialization.json.JsonPrimitive)?.contentOrNull
+    private fun JsonObject.string(key: String): String? = (this[key] as? JsonPrimitive)?.contentOrNull
 
-    private fun JsonObject.int(key: String): Int? = (this[key] as? kotlinx.serialization.json.JsonPrimitive)?.intOrNull
+    private fun JsonObject.int(key: String): Int? = (this[key] as? JsonPrimitive)?.intOrNull
 
     private companion object {
         const val NOW = 1_793_000_000_000L
+        val NON_WORD = Regex("[^\\p{L}\\p{M}\\p{Nd}]+")
     }
 }

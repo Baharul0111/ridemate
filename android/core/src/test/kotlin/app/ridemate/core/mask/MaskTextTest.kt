@@ -76,6 +76,31 @@ class MaskTextTest {
     }
 
     @Test
+    fun `masks driver names before trailing phrases`() {
+        assertMasked("Ramesh is on the way", "<m> is on the way")
+        assertMasked("Ramesh Kumar is arriving in 4 min", "<m> is arriving in 4 min")
+        assertMasked("Mohd. Irfan K. has arrived", "<m> has arrived")
+        assertMasked("Your ride: Priya is your driver", "Your ride: <m> is your driver")
+        assertMasked("Driver Ramesh is on the way", "Driver <m> is on the way")
+        assertMasked("रमेश आ रहे हैं", "<m> आ रहे हैं")
+        assertMasked("कैप्टन रमेश पहुंच गए", "कैप्टन <m> पहुंच गए")
+        // Brands, vehicles, roles and lowercase words before the phrase are not names.
+        assertMasked("Your Uber is arriving", "Your Uber is arriving")
+        assertMasked("Your ride is on the way", "Your ride is on the way")
+        assertMasked("Rapido Captain is on the way", "Rapido Captain is on the way")
+        assertMasked("Your Auto has arrived", "Your Auto has arrived")
+        assertMasked("आपके कैप्टन आ रहे हैं", "आपके कैप्टन आ रहे हैं")
+        assertMasked("is on the way", "is on the way")
+    }
+
+    @Test
+    fun `empty anchor lists find nothing instead of everything`() {
+        val cfg = MaskConfig(nameAnchors = emptyList(), trailingNameAnchors = emptyList(), otpAnchors = listOf(" "))
+        assertEquals("Captain Ramesh · 4821 · Auto ₹110", maskText("Captain Ramesh · 4821 · Auto ₹110", cfg))
+        assertEquals("Call <m>", maskText("Call 9876543210", cfg))
+    }
+
+    @Test
     fun `masks emails and combinations`() {
         assertMasked("Write to help.me@example.co.in", "Write to <m>")
         assertMasked(

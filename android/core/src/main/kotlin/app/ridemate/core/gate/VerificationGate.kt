@@ -54,29 +54,35 @@ object VerificationGate {
 
     /**
      * Which rows to re-read in one `/v1/reread` call: rows where the two channels disagree in a way another look
-     * can settle (price, label, position, missing option, or only the ETA). Null when there is nothing to re-read,
-     * a re-read already happened, the first call timed out, A read another app, or under 6 s of the 20 s tap
-     * budget remain.
+     * can settle (price, label, position, missing option, or only the ETA), at most [MAX_REREAD_CROPS] of them, top
+     * first, so a screen full of rows can't make one paid call arbitrarily large. Null when there is nothing to
+     * re-read, a re-read already happened, the first call timed out, A read another app, or under 6 s of the 20 s
+     * tap budget remain.
      */
     fun planReread(result: GateResult, tapAtMs: Long, nowMs: Long, firstCallTimedOut: Boolean): RereadPlan? {
         val ctx = result.context
         if (result.rereadApplied || firstCallTimedOut || ctx.read == null || !ctx.appOk) return null
         if (TAP_BUDGET_MS - (nowMs - tapAtMs) < MIN_REMAINING_FOR_REREAD_MS) return null
-        val crops = result.evaluations.filter { ctx.rereadable(it) }.map { ctx.cropOf(it.row!!) }
+        val crops = rereadRows(result).map { ctx.cropOf(it.row!!) }
         return if (crops.isEmpty()) null else RereadPlan(ctx.app, crops)
     }
 
+    /** The same cap as Channel A's options (contracts §1.3): rows beyond it stay "Couldn't read". */
+    const val MAX_REREAD_CROPS: Int = ChannelARead.MAX_OPTIONS
+
     /**
      * Re-evaluates the re-read rows with the re-read values; rows still disagreeing (or missing from [response])
-     * end UNREADABLE with no number. A row whose price was already VERIFIED can only gain its ETA here.
+     * end UNREADABLE with no number. A row whose price was already VERIFIED can only gain its ETA here. Answers for
+     * rows [planReread] didn't send a crop for are ignored.
      */
     fun applyReread(result: GateResult, response: RereadResponse): GateResult {
         check(!result.rereadApplied) { "one re-read per tap" }
         val ctx = result.context
+        val planned = rereadRows(result).mapTo(HashSet()) { it.rowId }
         val counts = response.rows.groupingBy { it.rowId }.eachCount()
         val byId = response.rows.filter { counts[it.rowId] == 1 }.associateBy { it.rowId }
         val updated = result.evaluations.map { e ->
-            if (!ctx.rereadable(e)) return@map e
+            if (e.rowId !in planned) return@map e
             val reread = byId[e.rowId] ?: return@map e
             val row = e.row!!
             val option = OptionView(
@@ -86,6 +92,9 @@ object VerificationGate {
         }
         return ctx.result(updated, rereadApplied = true)
     }
+
+    private fun rereadRows(result: GateResult): List<Evaluation> =
+        result.evaluations.filter { result.context.rereadable(it) }.take(MAX_REREAD_CROPS)
 }
 
 /** The outcome of one tap: rows for the comparison list, the driver reading, and what's needed for a re-read. */

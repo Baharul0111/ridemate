@@ -218,6 +218,22 @@ class FareParserTest {
         assertEquals(ScreenType.CANCELLED, typeOf("Your ride was cancelled"))
         assertEquals(ScreenType.DRIVER_ASSIGNED, typeOf("Captain is arriving", "Share OTP"))
         assertEquals(ScreenType.OTHER, typeOf("Where to?"))
+        // "booking" does not contain the keyword "book", so a cancelled booking is not also a fare screen.
+        assertEquals(ScreenType.OTHER, typeOf("Your booking history"))
+    }
+
+    @Test
+    fun `keywords match whole words in any script`() {
+        assertTrue(FareParser.containsWord("choose a ride", "choose a ride"))
+        assertTrue(FareParser.containsWord("ride cancelled.", "cancelled"))
+        assertTrue(FareParser.containsWord("otp4821", "otp"))
+        assertTrue(FareParser.containsWord("राइड रद्द कर दी गई", "रद्द"))
+        assertFalse(FareParser.containsWord("go shopping", "pin"))
+        assertFalse(FareParser.containsWord("booking", "book"))
+        assertFalse(FareParser.containsWord("giveaway", "away"))
+        // A trailing vowel sign belongs to the word, so रद्दी (scrap paper) is not रद्द (cancelled).
+        assertFalse(FareParser.containsWord("रद्दी", "रद्द"))
+        assertFalse(FareParser.containsWord("anything", ""))
     }
 
     @Test
@@ -227,6 +243,10 @@ class FareParserTest {
         assertTrue(parser.looksLikeFareScreen(FrameBuilder().line(100, 300, 40, "Finding", "your", "ride").build()))
         assertFalse(parser.looksLikeFareScreen(FrameBuilder().line(100, 300, 40, "Where", "to?").line(100, 400, 40, "2110").build()))
         assertFalse(parser.looksLikeFareScreen(OcrFrame(1080, 2400, emptyList())))
+        // Keywords count only as whole words: "book" inside Facebook or Notebook is not a status keyword.
+        assertFalse(parser.looksLikeFareScreen(FrameBuilder().line(100, 300, 40, "Share", "on", "Facebook", "Notebook").build()))
+        assertTrue(parser.looksLikeFareScreen(FrameBuilder().line(100, 300, 40, "Book", "now").build()))
+        assertTrue(parser.looksLikeFareScreen(FrameBuilder().line(100, 300, 40, "OTP:", "<m>").build()))
 
         val noApps = FareParsersConfig("1.0", emptyMap())
         assertTrue(looksLikeFareScreen(fareScreen(listOf(RowSpec("Auto", "₹110"))), Provider.UBER, noApps, 1))

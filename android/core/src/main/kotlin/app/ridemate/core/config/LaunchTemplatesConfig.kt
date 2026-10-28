@@ -3,6 +3,8 @@ package app.ridemate.core.config
 import app.ridemate.core.model.Place
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import java.net.URLEncoder
 import java.util.Locale
 
@@ -65,6 +67,30 @@ private fun coordinate(value: Double): String = String.format(Locale.ROOT, "%.6f
 // The charset-name overload: URLEncoder.encode(String, Charset) needs Android API 33.
 private fun encode(value: String): String = URLEncoder.encode(value, "UTF-8").replace("+", "%20")
 
-/** Parses and validates `launch_templates`; throws on a wrong schema major or a malformed template. */
-fun parseLaunchTemplates(raw: String): LaunchTemplatesConfig =
-    decodeFareSidePayload(raw, LaunchTemplatesConfig.serializer()).also { cfg -> cfg.apps.forEach { (app, t) -> t.validate(app) } }
+/**
+ * Parses and validates `launch_templates`; throws on a wrong schema major or a malformed template.
+ *
+ * A `mode` this build doesn't know (an additive MINOR value such as the bundled defaults' `"demo"`) leaves only that
+ * app out, so AppLauncher plain-opens it, instead of rejecting every app's template; an unknown `fallback` is dropped
+ * the same way. Everything else about an entry is still validated strictly.
+ */
+fun parseLaunchTemplates(raw: String): LaunchTemplatesConfig {
+    val payload = fareSidePayload(raw)
+    val apps = payload["apps"] as? JsonObject
+    val known = if (apps == null) payload else JsonObject(payload + ("apps" to knownModesOnly(apps)))
+    return ConfigJson.decodeFromJsonElement(LaunchTemplatesConfig.serializer(), known)
+        .also { cfg -> cfg.apps.forEach { (app, t) -> t.validate(app) } }
+}
+
+private val MODE_NAMES: Set<String> = LaunchMode.serializer().descriptor.let { d -> (0 until d.elementsCount).map(d::getElementName).toSet() }
+
+private fun knownModesOnly(apps: JsonObject): JsonObject = JsonObject(
+    apps.mapNotNull { (app, entry) ->
+        val template = entry as? JsonObject ?: return@mapNotNull app to entry
+        if (template.modeName("mode")?.let { it !in MODE_NAMES } == true) return@mapNotNull null
+        val fallbackUnknown = template.modeName("fallback")?.let { it !in MODE_NAMES } == true
+        app to if (fallbackUnknown) JsonObject(template - "fallback") else template
+    }.toMap(),
+)
+
+private fun JsonObject.modeName(key: String): String? = (this[key] as? JsonPrimitive)?.takeIf { it.isString }?.content
