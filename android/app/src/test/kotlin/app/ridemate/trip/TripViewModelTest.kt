@@ -14,11 +14,14 @@ import app.ridemate.precheck.PreSessionCheck
 import app.ridemate.precheck.PreSessionCheckTest
 import app.ridemate.precheck.PrecheckKind
 import app.ridemate.testing.FakeClock
+import app.ridemate.util.Clock
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
@@ -326,6 +329,81 @@ class TripViewModelTest {
     }
 
     @Test
+    fun `a drop picked while voice is still matching is never replaced by the late voice result`() = runTest(dispatcher) {
+        val modelAnswer = CompletableDeferred<ApiResult<PlacePickResponse>>()
+        api.answer = { modelAnswer.await() }
+        val (vm, _) = viewModel()
+        vm.startVoice()
+        runCurrent()
+        assertEquals(VoicePhase.MATCHING, vm.state.value.voice.phase)
+
+        // The user doesn't wait: types another place and picks a suggestion.
+        searchDrop(vm, "market")
+        val market = (vm.state.value.dropSearch as PlaceSearchState.Results).suggestions.first()
+        vm.selectSuggestion(market)
+        assertEquals(VoicePhase.IDLE, vm.state.value.voice.phase)
+
+        modelAnswer.complete(ApiResult.Ok(PlacePickResponse("c2"))) // the voice lookup would have picked "airport"
+        advanceUntilIdle()
+        assertEquals(PendingDrop(market.toTripPlace(), DropSource.SEARCH), vm.state.value.pending)
+        assertTrue(vm.state.value.choices.isEmpty())
+        vm.confirmDrop()
+        assertEquals("market place 1", vm.state.value.drop?.label)
+    }
+
+    @Test
+    fun `a recent place tapped while voice is matching stays the one to confirm`() = runTest(dispatcher) {
+        val (vm, _) = viewModel()
+        confirmFirstSuggestion(vm, "fancy bazaar")
+        vm.changeDrop()
+        val modelAnswer = CompletableDeferred<ApiResult<PlacePickResponse>>()
+        api.answer = { modelAnswer.await() }
+        vm.startVoice()
+        runCurrent()
+        assertEquals(VoicePhase.MATCHING, vm.state.value.voice.phase)
+
+        val recentPlace = vm.state.value.recent.single()
+        vm.selectRecent(recentPlace)
+        modelAnswer.complete(ApiResult.Ok(PlacePickResponse("c1")))
+        advanceUntilIdle()
+
+        assertEquals(PendingDrop(recentPlace, DropSource.RECENT), vm.state.value.pending)
+        assertEquals(VoicePhase.IDLE, vm.state.value.voice.phase)
+    }
+
+    @Test
+    fun `typing while listening stops the microphone and keeps what was typed`() = runTest(dispatcher) {
+        var stopped = false
+        speech.script = { flow<SpeechEvent> { emit(SpeechEvent.Ready); awaitCancellation() }.onCompletion { stopped = true } }
+        val (vm, _) = viewModel()
+        vm.startVoice()
+        runCurrent()
+        assertEquals(VoicePhase.LISTENING, vm.state.value.voice.phase)
+
+        vm.onDropQuery("mark")
+        runCurrent()
+        assertTrue(stopped)
+        assertEquals(VoicePhase.IDLE, vm.state.value.voice.phase)
+        advanceUntilIdle()
+        assertEquals("mark", vm.state.value.dropQuery)
+        assertNull(vm.state.value.notice) // stopping is the user's choice, not an error
+    }
+
+    @Test
+    fun `leaving the screen never leaves the microphone listening`() = runTest(dispatcher) {
+        var stopped = false
+        speech.script = { flow<SpeechEvent> { emit(SpeechEvent.Ready); awaitCancellation() }.onCompletion { stopped = true } }
+        val (vm, _) = viewModel()
+        vm.onPause() // idle: nothing to stop
+        vm.startVoice()
+        runCurrent()
+        vm.onPause()
+        runCurrent()
+        assertTrue(stopped)
+        assertEquals(VoicePhase.IDLE, vm.state.value.voice.phase)
+    }
+
+    @Test
     fun `a denied microphone and a missing recognizer fall back to typing`() = runTest(dispatcher) {
         val (vm, _) = viewModel()
         vm.onMicPermissionDenied()
@@ -509,6 +587,40 @@ class TripViewModelTest {
         vm.onFix(FixAction.REQUEST_LOCATION)
         advanceUntilIdle()
         assertEquals(TripEvent.RequestLocationPermission, events.single())
+    }
+
+    @Test
+    fun `a check that ends early never leaves compare disabled`() = runTest(dispatcher) {
+        val failingClock = object : Clock {
+            override fun elapsedRealtimeMs(): Long = 0
+            override fun wallMs(): Long = throw IllegalStateException("clock unavailable")
+        }
+        val vm = TripViewModel(
+            TripDeps(
+                geocoder = geocoder,
+                location = location,
+                speech = speech,
+                placePicker = VoicePlacePicker(geocoder, api),
+                recentPlaces = recent,
+                installedApps = apps,
+                ondcEnabled = ondc,
+                precheck = PreSessionCheck(probes, { null }, failingClock, io = dispatcher),
+                currentLocationLabel = "Current location",
+                defaultVoiceLanguage = VoiceLanguage.ENGLISH,
+                io = dispatcher,
+            ),
+        )
+        val events = mutableListOf<TripEvent>()
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { vm.events.collect { events += it } }
+        advanceUntilIdle()
+        confirmFirstSuggestion(vm)
+
+        vm.compare()
+        advanceUntilIdle()
+
+        assertFalse(vm.state.value.checking)
+        assertTrue(vm.state.value.canCompare)
+        assertTrue(events.isEmpty()) // nothing starts without a finished check
     }
 
     @Test

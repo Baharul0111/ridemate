@@ -37,6 +37,8 @@ class AndroidLaunchNotifier(private val context: Context) : LaunchNotifier {
             return false
         }
         ensureChannel()
+        // The user can switch off just this channel: the post would then be silent, so report it as not shown.
+        if (channelBlocked()) return false
         val app = request.provider.displayName
         val tap = PendingIntent.getActivity(
             context,
@@ -68,6 +70,11 @@ class AndroidLaunchNotifier(private val context: Context) : LaunchNotifier {
     override fun cancel(provider: Provider) {
         NotificationManagerCompat.from(context).cancel(notificationId(provider))
     }
+
+    private fun channelBlocked(): Boolean =
+        context.getSystemService(NotificationManager::class.java)
+            ?.getNotificationChannel(CHANNEL_ID)
+            ?.importance == NotificationManager.IMPORTANCE_NONE
 
     private fun ensureChannel() {
         val manager = context.getSystemService(NotificationManager::class.java) ?: return

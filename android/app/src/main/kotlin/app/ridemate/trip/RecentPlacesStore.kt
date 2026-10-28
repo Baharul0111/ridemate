@@ -40,12 +40,12 @@ class RecentPlacesStore(
         write((listOf(entry) + kept).take(maxEntries))
     }
 
-    /** Drops expired entries; returns how many were removed. */
+    /** Drops expired entries (run with the 24 h ride-data purge at start-up); returns how many were removed. */
     @Synchronized
     fun purgeExpired(): Int {
         val all = read()
         val fresh = fresh(all)
-        write(fresh)
+        write(fresh) // also drops a value that no longer decodes
         return all.size - fresh.size
     }
 

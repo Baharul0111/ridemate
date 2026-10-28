@@ -3,15 +3,21 @@ package app.ridemate.precheck
 import app.ridemate.core.model.Provider
 import app.ridemate.testing.FakeClock
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.currentTime
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 
 /** Every distinct pre-session result (architecture §4.2) from fake probes. */
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -101,6 +107,30 @@ class PreSessionCheckTest {
         val report = run(dispatcherScope = this)
         assertEquals(listOf(PrecheckKind.LISTENER_NOT_RESPONDING), report.kinds())
         assertEquals(PreSessionCheck.PING_TIMEOUT_MS, currentTime - start)
+    }
+
+    @Test
+    fun `a ping stuck in blocking code still ends at the time limit`() = runBlocking {
+        val release = CountDownLatch(1)
+        rideWatch.answer = { release.await(10, TimeUnit.SECONDS) } // blocks its thread, ignores cancellation
+        val started = System.nanoTime()
+        try {
+            val report = PreSessionCheck(probes, { bound }, clock, pingTimeoutMs = 200, io = Dispatchers.IO)
+                .run(PrecheckRequest(allApps))
+            val elapsedMs = (System.nanoTime() - started) / 1_000_000
+            assertEquals(listOf(PrecheckKind.LISTENER_NOT_RESPONDING), report.kinds())
+            assertTrue("took $elapsedMs ms", elapsedMs < 3_000)
+        } finally {
+            release.countDown()
+        }
+    }
+
+    @Test
+    fun `a ping that gives up with its own time limit is no answer, not the end of the check`() = runTest {
+        rideWatch.answer = { withTimeout(100) { awaitCancellation() } }
+        val report = run(dispatcherScope = this)
+        assertEquals(listOf(PrecheckKind.LISTENER_NOT_RESPONDING), report.kinds())
+        assertFalse(report.canProceed)
     }
 
     @Test

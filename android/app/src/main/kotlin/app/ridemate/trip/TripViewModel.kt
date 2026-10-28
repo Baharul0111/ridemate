@@ -15,6 +15,7 @@ import app.ridemate.precheck.FixAction
 import app.ridemate.precheck.PreSessionCheck
 import app.ridemate.precheck.PrecheckReport
 import app.ridemate.precheck.PrecheckRequest
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -286,6 +287,7 @@ class TripViewModel(private val deps: TripDeps) : ViewModel() {
     // ---------------------------------------------------------------------------------------------------------
 
     fun onDropQuery(text: String) {
+        stopVoice()
         _state.update { it.copy(dropQuery = text, choices = emptyList(), notice = null) }
         dropSearch.onQueryChange(text)
     }
@@ -294,23 +296,27 @@ class TripViewModel(private val deps: TripDeps) : ViewModel() {
 
     /** A suggestion (typed search or voice candidate) was tapped: ask for confirmation. */
     fun selectSuggestion(suggestion: PlaceSuggestion) {
+        stopVoice()
         val source = if (suggestion in _state.value.choices) DropSource.VOICE else DropSource.SEARCH
         _state.update { it.copy(pending = PendingDrop(suggestion.toTripPlace(), source), notice = null) }
     }
 
     fun selectRecent(place: TripPlace) {
+        stopVoice()
         _state.update { it.copy(pending = PendingDrop(place, DropSource.RECENT), notice = null) }
     }
 
     /** No Geocoder, no match or lookup failed: the typed text itself, confirmed like any other address. */
     fun useDropAsTyped() {
         val text = _state.value.dropQuery.trim().takeIf { it.isNotEmpty() } ?: return
+        stopVoice()
         _state.update { it.copy(pending = PendingDrop(TripPlace(text, null), DropSource.TYPED), notice = null) }
     }
 
     /** The user confirmed the address text (goal 1): only now is it the drop. */
     fun confirmDrop() {
         val pending = _state.value.pending ?: return
+        stopVoice()
         dropSearch.clear()
         _state.update {
             it.copy(
@@ -337,6 +343,7 @@ class TripViewModel(private val deps: TripDeps) : ViewModel() {
     }
 
     fun changeDrop() {
+        stopVoice()
         _state.update { it.copy(drop = null, pending = null, report = null) }
     }
 
@@ -400,6 +407,17 @@ class TripViewModel(private val deps: TripDeps) : ViewModel() {
 
     fun cancelVoice() {
         voiceJob?.cancel()
+        _state.update { it.copy(voice = it.voice.copy(phase = VoicePhase.IDLE)) }
+    }
+
+    /**
+     * Any other choice on the drop (typing, a suggestion, a recent place, the typed text, confirming) supersedes a
+     * voice lookup still running, so its late result can never replace the address the user is looking at.
+     */
+    private fun stopVoice() {
+        if (voiceJob?.isActive != true) return
+        voiceJob?.cancel()
+        voiceJob = null
         _state.update { it.copy(voice = it.voice.copy(phase = VoicePhase.IDLE)) }
     }
 
@@ -516,6 +534,11 @@ class TripViewModel(private val deps: TripDeps) : ViewModel() {
         _events.trySend(TripEvent.TryDemo)
     }
 
+    /** Off screen: the microphone is never left listening in the background. A lookup already running may finish. */
+    fun onPause() {
+        if (_state.value.voice.phase == VoicePhase.LISTENING) cancelVoice()
+    }
+
     /** Back on screen (maybe from a settings page): refresh apps, location and any shown check. */
     fun onResume() {
         refreshApps()
@@ -530,10 +553,19 @@ class TripViewModel(private val deps: TripDeps) : ViewModel() {
         if (checkJob?.isActive == true) return
         _state.update { it.copy(checking = true) }
         checkJob = viewModelScope.launch {
-            val report = deps.precheck.run(PrecheckRequest(plan.apps.toSet(), plan.includeOndc))
-            val clean = !report.needsAttention
-            _state.update { it.copy(checking = false, report = if (clean) null else report) }
-            if (clean && startWhenClean) _events.trySend(TripEvent.StartComparison(plan))
+            try {
+                val report = deps.precheck.run(PrecheckRequest(plan.apps.toSet(), plan.includeOndc))
+                val clean = !report.needsAttention
+                _state.update { it.copy(checking = false, report = if (clean) null else report) }
+                if (clean && startWhenClean) _events.trySend(TripEvent.StartComparison(plan))
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // Nothing starts without a finished check; Compare stays available to try again.
+            } finally {
+                // Never leave Compare disabled behind a check that ended early (goal 21: nothing hangs).
+                _state.update { it.copy(checking = false) }
+            }
         }
     }
 

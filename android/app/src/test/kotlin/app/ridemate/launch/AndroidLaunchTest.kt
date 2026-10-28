@@ -30,6 +30,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Robolectric
 import org.robolectric.Shadows.shadowOf
+import org.robolectric.shadows.ShadowToast
 
 /** The Android-facing launch pieces with real framework objects (Robolectric). */
 @RunWith(AndroidJUnit4::class)
@@ -139,6 +140,17 @@ class AndroidLaunchTest {
     }
 
     @Test
+    fun `no heads-up when the user switched off the open-app channel`() {
+        shadowOf(context as Application).grantPermissions(Manifest.permission.POST_NOTIFICATIONS)
+        val manager = context.getSystemService(NotificationManager::class.java)
+        manager.createNotificationChannel(
+            android.app.NotificationChannel(AndroidLaunchNotifier.CHANNEL_ID, "Open ride apps", NotificationManager.IMPORTANCE_NONE),
+        )
+        assertFalse(AndroidLaunchNotifier(context).postOpenApp(LaunchRequest(Provider.OLA, pickup, drop)))
+        assertNull(shadowOf(manager).getNotification(AndroidLaunchNotifier.notificationId(Provider.OLA)))
+    }
+
+    @Test
     fun `no heads-up without the notification permission`() {
         shadowOf(context as Application).denyPermissions(Manifest.permission.POST_NOTIFICATIONS)
         assertFalse(AndroidLaunchNotifier(context).postOpenApp(LaunchRequest(Provider.OLA, pickup, drop)))
@@ -167,6 +179,37 @@ class AndroidLaunchTest {
         assertEquals(Provider.OLA.packageName, started.`package`)
         assertEquals("LGBI Airport, Guwahati", context.getSystemService(ClipboardManager::class.java).primaryClip!!.getItemAt(0).text)
         assertEquals(Provider.OLA, app.graph.appLauncher.pasteDrop.value?.provider)
+        assertTrue(controller.get().isFinishing)
+        // It tells the user what to do next in Ola: paste the drop.
+        assertEquals(
+            "Your drop address is copied. In Ola, long-press the drop box and tap Paste.",
+            ShadowToast.getTextOfLatestToast(),
+        )
+    }
+
+    @Test
+    fun `tapping the heads-up for an app that was uninstalled says so instead of a generic failure`() {
+        val request = LaunchRequest(Provider.RAPIDO, pickup, drop, null)
+        val controller = Robolectric.buildActivity(OpenRideAppActivity::class.java, OpenRideAppActivity.intent(context, request)).setup()
+        shadowOf(Looper.getMainLooper()).idle()
+
+        assertNull(shadowOf(context as Application).nextStartedActivity)
+        assertEquals(
+            "Rapido isn't installed on this phone. Pick another app, or try the demo.",
+            ShadowToast.getTextOfLatestToast(),
+        )
+        assertTrue(controller.get().isFinishing)
+    }
+
+    @Test
+    fun `a re-created launch activity does not open the app a second time`() {
+        installRideApp(Provider.OLA)
+        val request = LaunchRequest(Provider.OLA, pickup, drop, null)
+        val controller = Robolectric.buildActivity(OpenRideAppActivity::class.java, OpenRideAppActivity.intent(context, request))
+        controller.create(android.os.Bundle())
+        shadowOf(Looper.getMainLooper()).idle()
+
+        assertNull(shadowOf(context as Application).nextStartedActivity)
         assertTrue(controller.get().isFinishing)
     }
 

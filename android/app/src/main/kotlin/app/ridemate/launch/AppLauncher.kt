@@ -7,6 +7,7 @@ import androidx.core.net.toUri
 import app.ridemate.core.model.Provider
 import app.ridemate.trip.TripPlace
 import app.ridemate.util.Clock
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -57,6 +58,8 @@ data class LaunchResult(
     val method: LaunchMethod? = null,
     /** The drop address was put on the clipboard for the "Paste drop" chip. */
     val dropCopied: Boolean = false,
+    /** The request's leg was recorded as OPENED (false without a leg id, or when recording failed). */
+    val legRecorded: Boolean = false,
 )
 
 /** Starts an activity; returns false if Android refused. */
@@ -100,6 +103,8 @@ class AppLauncher(
     private val foreground: AppForeground,
     private val legOpened: LegOpenedSink,
     private val clock: Clock,
+    /** Told when recording a leg as OPENED failed (the app was opened anyway); the graph reports it, sanitized. */
+    private val onRecordFailure: (Throwable) -> Unit = {},
 ) {
     private val _pasteDrop = MutableStateFlow<PasteDropChip?>(null)
 
@@ -161,7 +166,17 @@ class AppLauncher(
             is LaunchPlan.Launch -> plainLaunch(provider, plan.pasteDrop, LaunchMethod.PLAIN)
         }
         if (result.outcome == LaunchOutcome.OPENED && request.legId != null) {
-            legOpened.legOpened(request.legId, provider, clock.wallMs())
+            // The app is already open: a failed write (storage full, …) must not turn that into an error or a crash.
+            // The guardian still moves the leg forward from the app's own notifications.
+            try {
+                legOpened.legOpened(request.legId, provider, clock.wallMs())
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                onRecordFailure(e)
+                return result.copy(legRecorded = false)
+            }
+            return result.copy(legRecorded = true)
         }
         return result
     }

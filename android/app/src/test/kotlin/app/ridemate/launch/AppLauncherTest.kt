@@ -47,7 +47,7 @@ class AppLauncherTest {
     fun `uber opens the universal link inside uber, without client_id, and records OPENED`() = runBlocking {
         val result = launcher.open(request(Provider.UBER))
 
-        assertEquals(LaunchResult(Provider.UBER, LaunchOutcome.OPENED, LaunchMethod.DEEP_LINK, dropCopied = false), result)
+        assertEquals(LaunchResult(Provider.UBER, LaunchOutcome.OPENED, LaunchMethod.DEEP_LINK, dropCopied = false, legRecorded = true), result)
         val intent = starter.started.single()
         assertEquals(Intent.ACTION_VIEW, intent.action)
         assertEquals("com.ubercab", intent.`package`)
@@ -95,7 +95,7 @@ class AppLauncherTest {
     fun `ola opens its launcher and puts the drop on the clipboard for the paste chip`() = runBlocking {
         val result = launcher.open(request(Provider.OLA))
 
-        assertEquals(LaunchResult(Provider.OLA, LaunchOutcome.OPENED, LaunchMethod.PLAIN, dropCopied = true), result)
+        assertEquals(LaunchResult(Provider.OLA, LaunchOutcome.OPENED, LaunchMethod.PLAIN, dropCopied = true, legRecorded = true), result)
         assertEquals(listOf("LGBI Airport, Guwahati"), clipboard.copies)
         assertEquals("com.olacabs.customer", starter.started.single().`package`)
         assertEquals(PasteDropChip(Provider.OLA, "LGBI Airport, Guwahati", clock.wall), launcher.pasteDrop.value)
@@ -183,8 +183,35 @@ class AppLauncherTest {
 
     @Test
     fun `without a leg id nothing is recorded`() = runBlocking {
-        launcher.open(request(Provider.OLA, legId = null))
+        val result = launcher.open(request(Provider.OLA, legId = null))
         assertTrue(legs.opened.isEmpty())
+        assertFalse(result.legRecorded)
+    }
+
+    @Test
+    fun `a failed OPENED write still reports the app as opened and is passed on, not thrown`() = runBlocking {
+        val failures = mutableListOf<Throwable>()
+        val failing = AppLauncher(
+            templates = { LaunchPlanner.DEFAULT_TEMPLATES },
+            apps = apps,
+            starter = starter,
+            notifier = notifier,
+            clipboard = clipboard,
+            bubble = bubble,
+            foreground = foreground,
+            legOpened = { _, _, _ -> throw IllegalStateException("disk full") },
+            clock = clock,
+            onRecordFailure = { failures += it },
+        )
+
+        val result = failing.open(request(Provider.OLA))
+
+        assertEquals(LaunchOutcome.OPENED, result.outcome)
+        assertTrue(result.dropCopied)
+        assertFalse(result.legRecorded)
+        assertEquals("disk full", failures.single().message)
+        assertEquals("com.olacabs.customer", starter.started.single().`package`)
+        assertEquals(Provider.OLA, failing.pasteDrop.value?.provider)
     }
 
     @Test

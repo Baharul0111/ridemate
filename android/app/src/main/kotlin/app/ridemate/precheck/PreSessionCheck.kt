@@ -1,6 +1,7 @@
 package app.ridemate.precheck
 
 import app.ridemate.core.model.Provider
+import app.ridemate.trip.awaitDetached
 import app.ridemate.util.Clock
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
@@ -179,17 +180,24 @@ class PreSessionCheck(
     private suspend fun listenerIssue(enabled: Boolean): PrecheckIssue? {
         if (!enabled) return blind(PrecheckKind.LISTENER_OFF)
         val status = rideWatch() ?: return null // no RideWatch binding: the enabled list is all that can be read
-        val answered = withTimeoutOrNull(pingTimeoutMs) {
+        return if (answersPing(status)) null else blind(PrecheckKind.LISTENER_NOT_RESPONDING)
+    }
+
+    /**
+     * True only when RideWatch says it is connected within [pingTimeoutMs]. The ping runs detached, so even one that
+     * blocks its thread can't hold Compare past the limit; a ping that fails, or gives up with its own internal time
+     * limit (a CancellationException of its own), counts as no answer instead of ending the check.
+     */
+    private suspend fun answersPing(status: RideWatchStatus): Boolean =
+        withTimeoutOrNull(pingTimeoutMs) {
             try {
-                status.ping()
+                awaitDetached(io) { status.ping() }
             } catch (e: CancellationException) {
-                throw e
+                throw e // our own time limit
             } catch (e: Exception) {
                 false
             }
         } ?: false
-        return if (answered) null else blind(PrecheckKind.LISTENER_NOT_RESPONDING)
-    }
 
     private fun blind(kind: PrecheckKind) =
         PrecheckIssue(kind, IssueSeverity.BLOCKING, listOf(FixAction.OPEN_NOTIFICATION_ACCESS))

@@ -9,7 +9,6 @@ import app.ridemate.core.model.Place
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
-import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import java.io.IOException
 import java.util.Locale
@@ -99,7 +98,8 @@ class AndroidPlaceGeocoder(
                 }
             }
         } else {
-            withContext(io) {
+            // Detached: the blocking call ignores cancellation, and the caller's time limit must still hold.
+            awaitDetached(io) {
                 try {
                     @Suppress("DEPRECATION")
                     if (box == null) {
@@ -134,7 +134,7 @@ class AndroidPlaceGeocoder(
                 }
             }
         } else {
-            withContext(io) {
+            awaitDetached(io) {
                 try {
                     @Suppress("DEPRECATION")
                     geocoder.getFromLocation(point.lat, point.lng, 1)

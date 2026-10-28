@@ -191,6 +191,7 @@ class AppGraph(
             foreground = ProcessForeground(),
             legOpened = LegOpenedSink { legId, provider, at -> (legOpenedSink ?: roomSink).legOpened(legId, provider, at) },
             clock = clock,
+            onRecordFailure = { e -> crashReporter.recordNonFatal(e, CrashSite.OTHER) },
         )
     }
 
@@ -247,6 +248,11 @@ class AppGraph(
         appScope.launch(dispatchers.io) {
             try {
                 retentionPurger.purge()
+            } catch (e: Exception) {
+                crashReporter.recordNonFatal(e, CrashSite.PURGE)
+            }
+            try {
+                recentPlaces.purgeExpired() // recent destinations follow ride data's 24 h retention
             } catch (e: Exception) {
                 crashReporter.recordNonFatal(e, CrashSite.PURGE)
             }

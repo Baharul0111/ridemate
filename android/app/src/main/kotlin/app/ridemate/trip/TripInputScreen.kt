@@ -133,7 +133,7 @@ fun TripInputScreen(
     }
     LifecycleResumeEffect(viewModel) {
         viewModel.onResume()
-        onPauseOrDispose { }
+        onPauseOrDispose { viewModel.onPause() }
     }
 
     val onFix: (FixAction) -> Unit = { action ->

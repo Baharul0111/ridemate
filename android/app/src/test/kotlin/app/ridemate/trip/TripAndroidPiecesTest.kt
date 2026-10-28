@@ -8,12 +8,16 @@ import android.os.Bundle
 import android.speech.SpeechRecognizer
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.work.testing.WorkManagerTestInitHelper
 import app.ridemate.core.model.LatLng
 import app.ridemate.testing.FakeClock
 import app.ridemate.testing.TestRideMateApp
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -83,6 +87,23 @@ class TripAndroidPiecesTest {
         assertEquals(1, graph.recentPlaces.recent().size)
         graph.localWipers.forEach { it.wipe() }
         assertTrue(graph.recentPlaces.recent().isEmpty())
+    }
+
+    @Test
+    fun `start-up purges expired recent places with the ride data, even if the trip screen never opens`() = runBlocking {
+        WorkManagerTestInitHelper.initializeTestWorkManager(context)
+        val app = context as TestRideMateApp
+        val graph = app.graph
+        graph.recentPlaces.add(TripPlace("Old drop", LatLng(26.0, 91.0)))
+        val stored = context.getSharedPreferences(RecentPlacesStore.PREFS_NAME, Context.MODE_PRIVATE)
+        assertTrue(stored.contains("recent"))
+        app.fakes.clock.advance(RecentPlacesStore.RETENTION_MS + 1)
+
+        graph.start(foreground = null)
+
+        // Checked on the raw file: reading through the store would purge by itself.
+        withTimeout(5_000) { while (stored.contains("recent")) delay(5) }
+        assertFalse(stored.contains("recent"))
     }
 
     // ---- view on map -----------------------------------------------------------------------------------------

@@ -6,7 +6,6 @@ import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.lifecycle.lifecycleScope
-import app.ridemate.R
 import app.ridemate.RideMateApp
 import app.ridemate.core.model.LatLng
 import app.ridemate.core.model.Provider
@@ -23,19 +22,17 @@ class OpenRideAppActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val request = requestFrom(intent)
-        if (request == null) {
+        // A re-created instance (e.g. rotated mid-launch) must not open the app a second time.
+        if (request == null || savedInstanceState != null) {
             finish()
             return
         }
         val graph = RideMateApp.graph(this)
         lifecycleScope.launch {
             val result = graph.appLauncher.openFromUserTap(request)
-            if (result.outcome != LaunchOutcome.OPENED) {
-                Toast.makeText(
-                    this@OpenRideAppActivity,
-                    getString(R.string.launch_open_failed, request.provider.displayName),
-                    Toast.LENGTH_LONG,
-                ).show()
+            // What happened and what to do next: "drop copied, paste it", "not installed", "couldn't open", …
+            LaunchMessages.resultText(this@OpenRideAppActivity, result)?.let { text ->
+                Toast.makeText(applicationContext, text, Toast.LENGTH_LONG).show()
             }
             finish()
         }
