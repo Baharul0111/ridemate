@@ -144,6 +144,49 @@ def test_cli_guards(monkeypatch, tmp_path) -> None:
         rec.HttpReader("http://insecure.example", "t")
 
 
+def _private_labels(root: Path) -> Path:
+    """A golden-style labels file outside the public repo (as the private ridemate-golden clone would be)."""
+    demo = rec.load_jobs(DEMO_LABELS)[0]
+    (root / "images").mkdir(parents=True)
+    data = demo.image.read_bytes()
+    (root / "images/g0001.png").write_bytes(data)
+    screen = {
+        "file": "images/g0001.png",
+        "sha256": demo.sha256,
+        "app": demo.app,
+        "frame_w": 1080,
+        "frame_h": 2400,
+    }
+    (root / "labels.json").write_text(json.dumps({"schema": "1.0", "screens": [screen]}))
+    return root / "labels.json"
+
+
+def test_private_screens_default_to_recording_next_to_their_labels(tmp_path) -> None:
+    labels = _private_labels(tmp_path / "golden")
+    assert rec.default_out_dir(DEMO_LABELS) == rec.DEFAULT_OUT
+    assert rec.default_out_dir(labels) == (tmp_path / "golden/recorded/channel_a").resolve()
+
+
+def test_private_screens_are_never_recorded_into_the_public_repo(tmp_path, capsys) -> None:
+    """L6: a golden run must not drop real reads (fares included) where git would commit them."""
+    labels = _private_labels(tmp_path / "golden")
+    jobs = rec.load_jobs(labels)
+    with pytest.raises(SystemExit, match="L6"):
+        rec.check_out_dir(jobs, rec.DEFAULT_OUT)
+    with pytest.raises(SystemExit, match="L6"):
+        rec.main(["--labels", str(labels), "--dry-run", "--out-dir", str(rec.DEFAULT_OUT)])
+    rec.check_out_dir(jobs, tmp_path / "out")
+    rec.check_out_dir(jobs, EVAL_DIR / "private/recorded")  # gitignored
+    rec.check_out_dir(rec.load_jobs(DEMO_LABELS), rec.DEFAULT_OUT)  # public demo screens may go there
+    assert rec.main(["--labels", str(labels), "--dry-run"]) == 0
+    assert "would record 1" in capsys.readouterr().out
+
+
+def test_worst_case_covers_the_routers_one_retry() -> None:
+    one_attempt = rec.WORST_CASE_INPUT_TOKENS * 1.25e-6 + rec.WORST_CASE_OUTPUT_TOKENS * 4.25e-6
+    assert rec.WORST_CASE_USD == pytest.approx(2 * one_attempt, abs=1e-4)
+
+
 class FakeResponse(io.BytesIO):
     status = 200
 
@@ -251,7 +294,9 @@ def test_gateway_reads_through_router_call_with_eval_purpose_and_run_id() -> Non
     assert router.kwargs["task"] == "read" and router.kwargs["purpose"] == "eval"
     assert router.kwargs["principal"] is None
     # The meter's per-run eval cap keys on this prefix (backend spend.eval_run_id).
-    assert router.kwargs["request_id"].startswith("eval-run:run42:") and result.request_id.startswith("eval-run:")
+    assert router.kwargs["request_id"].startswith("eval-run:run42:") and result.request_id.startswith(
+        "eval-run:"
+    )
     assert result.read["validated"] is True and result.source == "live"
     assert result.cost_usd == 0.003 and result.run_charge == 0.003 and result.usage is None
 
@@ -305,7 +350,12 @@ def test_run_budget_counts_charges_above_the_settled_cost(tmp_path) -> None:
 
     reader = Charged(cost=0.004)
     report = rec.run(
-        rec.load_jobs(DEMO_LABELS), reader, out_dir=tmp_path, max_usd=0.05, worst_case_usd=0.0115, log=lambda *_: None
+        rec.load_jobs(DEMO_LABELS),
+        reader,
+        out_dir=tmp_path,
+        max_usd=0.05,
+        worst_case_usd=0.0115,
+        log=lambda *_: None,
     )
     assert reader.calls == 2 and report.spent_usd == pytest.approx(0.04)
 

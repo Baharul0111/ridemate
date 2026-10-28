@@ -1,4 +1,4 @@
-"""In-process Channel A reads through the backend's ProviderRouter with the production spend meter (gateway mode).
+"""In-process Channel A reads through the backend's ProviderRouter and production spend meter (gateway mode).
 
 Run it inside the backend environment (`cd backend && uv run python ../eval/harness/record_channel_a.py
 --mode gateway`). Each read sends exactly what `/v1/read-screen` sends, built by the backend's own code:
@@ -8,9 +8,9 @@ Run it inside the backend environment (`cd backend && uv run python ../eval/harn
                                      request_id="eval-run:<run id>:<uuid>")
     read    = prompts.validate_read(result.data)
 
-`Purpose.EVAL` books the call on the evals sub-budget ($5), and the `eval-run:<run id>:` request-id prefix makes
-the meter enforce its own per-run cap ($0.50, architecture §4.2) for the whole run, retries included. So the
-server-side meter bounds the run even if this script's own guard were wrong.
+`Purpose.EVAL` books the call on the evals sub-budget ($5), and the `eval-run:<run id>:` request-id prefix
+makes the meter enforce its own per-run cap ($0.50, architecture §4.2) for the whole run, retries included.
+So the server-side meter bounds the run even if this script's own guard were wrong.
 
 The meter is mandatory. No reader is built without `deps.spend`, each call is refused while `ai_status` is
 disabled, and the run aborts if `summary()["ai_spent_usd"]` did not grow by at least the call's settled cost
@@ -86,7 +86,9 @@ class GatewayReader:
         try:
             summary = self.spend.summary()
         except Exception as e:  # noqa: BLE001 - an unreadable meter must stop the run, whatever the cause
-            raise MeterBypass(f"spend meter unreadable ({type(e).__name__}); cannot prove calls are metered") from e
+            raise MeterBypass(
+                f"spend meter unreadable ({type(e).__name__}); cannot prove calls are metered"
+            ) from e
         if "ai_spent_usd" not in summary:
             raise MeterBypass("spend meter summary has no ai_spent_usd; cannot prove the call was metered")
         return float(summary["ai_spent_usd"])

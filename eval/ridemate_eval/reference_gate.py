@@ -72,7 +72,7 @@ def _norm_label(text: str | None) -> str:
 
 
 def _sanity_ok(cls: str, price: int, trip_km: float | None, bands: dict[str, Any]) -> bool:
-    """contracts §2.3, as core SanityBands applies it: `trip_km` is straight-line km, d = trip_km × road_factor."""
+    """contracts §2.3 as core SanityBands applies it: `trip_km` is straight-line km, d = km × road_factor."""
     if not bands["price_min_inr"] <= price <= bands["price_max_inr"]:
         return False
     if trip_km is None or trip_km <= 0:

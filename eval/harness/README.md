@@ -6,8 +6,11 @@ None of these scripts runs in CI against a live service. They make no model call
 ## `record_channel_a.py`: record real Channel A outputs
 
 It reads every screen in a labels file (default `eval/demo_labels.json`, or a golden `labels.json`). Each image
-is checked against its labelled SHA-256. The result goes to `eval/recorded/channel_a/<sha256>.json` in the
-contracts §6 shape, plus `source`, `request_id` and `latency_ms`.
+is checked against its labelled SHA-256. The result is written in the contracts §6 shape, plus `source`,
+`request_id` and `latency_ms`:
+- for the demo labels, into `eval/recorded/channel_a/<sha256>.json`;
+- for any other labels file, by default into `recorded/channel_a/` next to that file. The script refuses to write
+  reads of private screens (outside the repo, or gitignored) into any path git would track (L6).
 
 | Mode | How | Metering |
 |---|---|---|
@@ -17,8 +20,9 @@ contracts §6 shape, plus `source`, `request_id` and `latency_ms`.
 Guards:
 - `--max-usd` defaults to $0.50 and may not exceed it: that is the per-run eval cap (architecture §4.2). The
   $5 evals sub-budget is spread over runs; it is not a per-run allowance.
-- Before each call the script checks that spent + worst case (≈ $0.0109: 6,000 input + 800 output tokens at
-  $1.25 / $4.25 per 1M) stays under the cap. In gateway mode a call is counted at the meter's growth, so a
+- Before each call the script checks that spent + worst case (≈ $0.0218: two attempts, because the router may
+  retry once, of 6,000 input + 800 output tokens at $1.25 / $4.25 per 1M) stays under the cap. A call whose
+  cost is unknown is counted at that worst case. In gateway mode a call is counted at the meter's growth, so a
   first attempt the router retried is counted too.
 - An error envelope (`ai_paused`, `quota_exhausted`, `meter_unavailable`, auth …) stops the run. It is never
   retried.
@@ -32,12 +36,13 @@ Everything comes from the backend package itself (contracts §3), so a read is b
 `/v1/read-screen` builds it:
 
 ```python
-deps = ridemate_api.deps_prod.build_production_deps()      # real Settings, Modal Dict meter, router
+deps = ridemate_api.deps_prod.build_production_deps()  # real Settings, Modal Dict meter, router
 request = prompts.read_request(ImagePart(image, media_type))
-result = await deps.router.call(request, task=TaskKind.READ, purpose=Purpose.EVAL, principal=None,
-                                request_id=f"eval-run:{run_id}:{uuid}")
-read = prompts.validate_read(result.data)                   # ChannelARead dict (contracts §1.3)
-result.model, result.cost_usd                               # pinned model id, USD settled on the meter
+result = await deps.router.call(
+    request, task=TaskKind.READ, purpose=Purpose.EVAL, principal=None, request_id=f"eval-run:{run_id}:{uuid}"
+)
+read = prompts.validate_read(result.data)  # ChannelARead dict (contracts §1.3)
+result.model, result.cost_usd  # pinned model id, USD settled on the meter
 deps.spend.ai_status(None).enabled, deps.spend.summary()["ai_spent_usd"]
 ```
 

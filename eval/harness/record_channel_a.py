@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""Record real Channel A (Muse Spark Open) reads of labelled screens into eval/recorded/channel_a/<sha>.json.
+"""Record real Channel A (Muse Spark Open) reads of labelled screens as <out-dir>/<sha>.json.
+
+The demo labels record into eval/recorded/channel_a/; any other (private) labels file records next to itself,
+and reads of private screens are never written where the public repo's git would track them (L6).
 
 Every live call is metered by RideMate's all-spend meter, which is never bypassed:
 - http mode: calls the deployed API's POST /v1/read-screen; the server meters and caps every call.
@@ -9,9 +12,9 @@ Every live call is metered by RideMate's all-spend meter, which is never bypasse
   aborts if a call does not show up on the meter. Run it inside the backend environment:
     cd backend && uv run python ../eval/harness/record_channel_a.py --mode gateway
 
-Both modes stop at --max-usd (default and maximum $0.50, the per-run eval cap from architecture §4.2) using the
-worst-case cost of the next call. --dry-run lists what would be read and the worst-case spend, with no network and no
-token. The token is read from the environment only and never printed or written.
+Both modes stop at --max-usd (default and maximum $0.50, the per-run eval cap from architecture §4.2)
+using the worst-case cost of the next call. --dry-run lists what would be read and the worst-case spend,
+with no network and no token. The token is read from the environment only and never printed or written.
 """
 
 from __future__ import annotations
@@ -20,6 +23,7 @@ import argparse
 import hashlib
 import json
 import os
+import subprocess
 import sys
 import time
 import urllib.error
@@ -37,10 +41,14 @@ DEFAULT_OUT = EVAL_DIR / "recorded/channel_a"
 TOKEN_ENV = "RIDEMATE_ID_TOKEN"
 
 # Worst case for one read at Muse Spark Open prices (architecture §4.10: $1.25 in / $4.25 out per 1M tokens):
-# ≤ 6,000 input tokens (masked 1080×2400 screenshot + prompt) and the 800-token output ceiling (L4).
+# ≤ 6,000 input tokens (masked 1080×2400 screenshot + prompt) and the 800-token output ceiling (L4), for
+# each of the two attempts the router may make (one retry inside the tap budget, architecture §4.2).
 WORST_CASE_INPUT_TOKENS = 6000
 WORST_CASE_OUTPUT_TOKENS = 800
-WORST_CASE_USD = round(WORST_CASE_INPUT_TOKENS * 1.25e-6 + WORST_CASE_OUTPUT_TOKENS * 4.25e-6, 4)
+WORST_CASE_ATTEMPTS = 2
+WORST_CASE_USD = round(
+    WORST_CASE_ATTEMPTS * (WORST_CASE_INPUT_TOKENS * 1.25e-6 + WORST_CASE_OUTPUT_TOKENS * 4.25e-6), 4
+)
 PER_RUN_CAP_USD = 0.50
 STOP_CODES = {
     "ai_paused",
@@ -113,6 +121,38 @@ def load_jobs(labels_path: Path) -> list[Job]:
             raise SystemExit(f"image not found for {s['sha256'][:12]}: {s['file']}")
         jobs.append(Job(s["sha256"], image, s["app"], s["frame_w"], s["frame_h"]))
     return jobs
+
+
+def _tracked_in_public_repo(path: Path) -> bool:
+    """True when `path` is inside this public repo and git would not ignore it (so it could be committed)."""
+    try:
+        path.resolve().relative_to(REPO_ROOT)
+    except ValueError:
+        return False
+    ignored = subprocess.run(
+        ["git", "-C", str(REPO_ROOT), "check-ignore", "-q", str(path.resolve())], check=False
+    )
+    return ignored.returncode != 0
+
+
+def default_out_dir(labels_path: Path) -> Path:
+    """The public demo labels record into eval/recorded/channel_a. Any other labels file (a private golden
+    set) records next to itself, so its reads never land in the public repo by default."""
+    if labels_path.resolve() == DEFAULT_LABELS.resolve():
+        return DEFAULT_OUT
+    return labels_path.resolve().parent / "recorded/channel_a"
+
+
+def check_out_dir(jobs: list[Job], out_dir: Path) -> None:
+    """L6: reads of private screens (outside the repo, or gitignored) must not be written where git tracks."""
+    if not _tracked_in_public_repo(out_dir / "probe.json"):
+        return
+    private = [j for j in jobs if not _tracked_in_public_repo(j.image)]
+    if private:
+        raise SystemExit(
+            f"{len(private)} screen(s) are private (e.g. {private[0].image}); their recordings must not go "
+            f"into the public repo at {out_dir} (L6). Pass an --out-dir outside it, e.g. in the golden repo."
+        )
 
 
 def _multipart(meta: dict[str, Any], image: bytes, media_type: str) -> tuple[bytes, str]:
@@ -266,7 +306,11 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--labels", type=Path, default=DEFAULT_LABELS, help="contracts §6 labels file")
     ap.add_argument("--mode", choices=("http", "gateway"), default="http")
     ap.add_argument("--api-base-url", help="https base URL of the deployed ridemate-api (http mode)")
-    ap.add_argument("--out-dir", type=Path, default=DEFAULT_OUT)
+    ap.add_argument(
+        "--out-dir",
+        type=Path,
+        help="default: eval/recorded/channel_a for the demo labels, else next to --labels",
+    )
     ap.add_argument("--max-usd", type=float, default=PER_RUN_CAP_USD)
     ap.add_argument("--limit", type=int, help="read at most N screens")
     ap.add_argument("--force", action="store_true", help="re-read screens that already have a recording")
@@ -276,6 +320,8 @@ def main(argv: list[str] | None = None) -> int:
     if not 0 < args.max_usd <= PER_RUN_CAP_USD:
         ap.error(f"--max-usd must be in (0, {PER_RUN_CAP_USD:.2f}] (the per-run eval cap, architecture §4.2)")
     jobs = load_jobs(args.labels)[: args.limit]
+    out_dir = args.out_dir or default_out_dir(args.labels)
+    check_out_dir(jobs, out_dir)
     reader: Reader | None = None
     if not args.dry_run:
         if args.mode == "http":
@@ -290,7 +336,7 @@ def main(argv: list[str] | None = None) -> int:
             reader = GatewayReader.from_production()
     try:
         report = run(
-            jobs, reader, out_dir=args.out_dir, max_usd=args.max_usd, force=args.force, dry_run=args.dry_run
+            jobs, reader, out_dir=out_dir, max_usd=args.max_usd, force=args.force, dry_run=args.dry_run
         )
     finally:
         close = getattr(reader, "close", None)

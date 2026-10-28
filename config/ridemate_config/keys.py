@@ -67,13 +67,16 @@ PER_APP_KEYS = frozenset(
 )
 
 # launch_templates covers only the real apps. The phone's LaunchMode has no demo mode (DemoSource shows
-# assets/demo/<provider>/ itself, contracts §5), and one unknown mode makes the phone reject the whole payload.
+# assets/demo/<provider>/ itself, contracts §5), and one unknown mode makes the phone reject the whole
+# payload.
 LAUNCH_MODES: tuple[str, ...] = ("uri", "launch_paste", "launch")
 LAUNCH_PLACEHOLDERS = frozenset({"plat", "plng", "pname", "dlat", "dlng", "dname"})
 
 KEYS: tuple[KeySpec, ...] = (
     KeySpec(
-        "launch_templates", "JSON", "How each ride app is opened with the route (uri / launch_paste / launch)."
+        "launch_templates",
+        "JSON",
+        "How each ride app is opened with the route (uri / launch_paste / launch).",
     ),
     KeySpec(
         "notification_templates", "JSON", "RE2 templates turning ride-app notifications into ride events."
