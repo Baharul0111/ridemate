@@ -173,12 +173,12 @@ class OnboardingScreenTest {
         rule.onNodeWithText("Quick self-test").assertIsDisplayed()
         tap("Run the self-test")
         // Notifications were never allowed, so the check says exactly that and how to fix it.
-        rule.onNodeWithText("Notifications are off").assertIsDisplayed()
+        rule.onNodeWithText("Notifications are off").performScrollTo().assertIsDisplayed()
         A11y.assertClickablesAccessible(rule)
         tap("Continue anyway")
 
         rule.onNodeWithText("You're all set").assertIsDisplayed()
-        rule.onNodeWithText("The self-test didn't pass").assertIsDisplayed()
+        rule.onNodeWithText("The self-test didn't pass").performScrollTo().assertIsDisplayed()
         rule.onNodeWithContentDescription("Notification access: Allowed").performScrollTo().assertIsDisplayed()
         rule.onNodeWithContentDescription("Floating button: Not allowed yet").performScrollTo().assertIsDisplayed()
         A11y.assertClickablesAccessible(rule)
