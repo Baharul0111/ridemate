@@ -70,4 +70,4 @@ jobs:
 
       - name: Run rules tests on the emulator
         working-directory: firebase/tests
-        run: npx --no-install firebase emulators:exec --only firestore --project demo-ridemate "npm test"
+        run: npm test  # run.sh starts the emulator itself (firebase-tools on Java 21, the pinned jar on older JDKs)

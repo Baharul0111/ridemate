@@ -212,3 +212,25 @@ session left over after an app restart ends cleanly. Regression tests added; on-
 * **Still recommended (owner):** record a few real Uber/Rapido rides with the Recorder so real-app templates become
   verified; keep the Modal billing reply when it arrives; watch the budget panel and alerts for 48 hours.
 
+## 12. Overnight 29→30 Oct 2026 (after the owner went to sleep)
+* **GitHub CI made green on the public repo.** Causes found and fixed:
+  * `deploy.sh`: a leftover unused variable failed `shellcheck` (CI runs it); the Remote Config copy step now only
+    copies a template that was actually built, so the deploy tests are hermetic.
+  * Demo/injection fixtures: PNGs are rendered on macOS and FreeType rasterises slightly differently on Linux, so the
+    byte-for-byte *rebuild* check now runs only on macOS; every platform still checks the committed files by SHA-256,
+    schema and content.
+  * Gradle dependency verification: Linux CI resolves a few artifacts macOS doesn't. A new manual workflow
+    (`Update dependency verification`) appends them on GitHub's own runner from the committed file and proves the
+    result in strict mode; the merged file (772 components) verifies strictly on macOS and Linux.
+  * GitHub's free **dependency graph** was off, which broke "Dependency review" and the Android dependency submission;
+    it is now on (Dependabot vulnerability alerts enabled).
+* **Owner alerts test-fired once** (launch runbook): all 18 alert types reached healthchecks.io (one TEST email);
+  phone pushes 0 until the owner signs in and enables Owner alerts in Developer mode. The dispatcher pings the alert
+  check back to "up" every 15 minutes when nothing is firing, so real alerts still email.
+* **Release APK security audit** (stand-in for MobSF, which isn't installed): exported components are only the
+  launcher, the share target and the notification listener (system-bound), plus library components guarded by
+  system-only permissions; `allowBackup=false`, not debuggable, cleartext blocked; **no secrets** in the 692 packaged
+  files and no hard-coded server URL (it comes from Remote Config).
+* **Open Dependabot PRs** (6 version-bump groups) are left for the owner to review — each would need its own tested
+  release, and none is a security fix.
+
