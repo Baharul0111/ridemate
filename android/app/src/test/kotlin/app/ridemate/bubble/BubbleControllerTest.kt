@@ -171,6 +171,42 @@ class BubbleControllerTest {
     }
 
     @Test
+    fun `the head is a 56 dp round glyph with a badge, and the actions form a compact icon menu`() {
+        controller.show(BubbleState.comparing(pasteDrop = true))
+        val view = controller.bubbleView!!
+        view.measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED)
+
+        val dp56 = (56 * context.resources.displayMetrics.density).roundToInt()
+        assertEquals(dp56, view.head.measuredWidth)
+        assertEquals(dp56, view.head.measuredHeight)
+        assertEquals(View.GONE, view.badge.visibility)
+        // Icon tiles: the icon sits on top of a short word, three to a row.
+        val read = view.controlFor(BubbleAction.READ_FARES) as Button
+        val booked = view.controlFor(BubbleAction.BOOKED_HERE) as Button
+        val stop = view.controlFor(BubbleAction.STOP) as Button
+        assertTrue(read.parent === booked.parent && booked.parent === stop.parent)
+        assertNotNull(read.compoundDrawablesRelative[1])
+        assertNull(read.compoundDrawablesRelative[0])
+        // "Paste drop" stays a full-width chip of its own.
+        assertFalse(view.controlFor(BubbleAction.PASTE_DROP)!!.parent === read.parent)
+
+        // A problem shows "!" on the head; the badge is decoration (the status line speaks it).
+        controller.setReaderStatus(BubbleStatus("No prices found on this screen.", StatusKind.PROBLEM), busy = false)
+        assertEquals(View.VISIBLE, view.badge.visibility)
+        assertEquals("!", view.badge.text.toString())
+        assertEquals(View.IMPORTANT_FOR_ACCESSIBILITY_NO, view.badge.importantForAccessibility)
+    }
+
+    @Test
+    fun `a guided cancel counts its steps on the head badge`() {
+        val card = InstructionCard("Cancel in Rapido", listOf(CancelStep.parse("Tap **Cancel**"), CancelStep.parse("Pick a reason")))
+        controller.show(BubbleState.cancelGuide(card, showMe = true))
+
+        assertEquals(View.VISIBLE, controller.bubbleView!!.badge.visibility)
+        assertEquals("2", controller.bubbleView!!.badge.text.toString())
+    }
+
+    @Test
     fun `a reminder pulse puts the reminder in the spoken status line`() {
         controller.show(BubbleState.watching())
 

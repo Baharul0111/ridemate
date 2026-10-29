@@ -49,19 +49,12 @@
 
     <!-- The list. -->
     <string name="compare_title">Prices</string>
-    <string name="compare_empty">No prices yet. Open a ride app from RideMate and tap Read fares on the bubble.</string>
-    <string name="compare_refresh">Refresh the %1$s price</string>
-    <string name="compare_book">Book in %1$s</string>
+    <string name="compare_empty">No prices yet</string>
     <string name="compare_book_description">Open %1$s to book. You tap Book there yourself.</string>
     <string name="compare_booked_heading">Booked already?</string>
     <string name="compare_booked_here">Booked in %1$s</string>
     <string name="compare_booked_done">Marked as booked in %1$s. RideMate is watching that ride.</string>
     <string name="compare_booked_failed">Couldn\'t mark the booking in %1$s. Open RideMate\'s trip screen and try again.</string>
-    <string name="compare_type_price">Type a price</string>
-    <plurals name="compare_eta_minutes">
-        <item quantity="one">Pickup in %1$d min</item>
-        <item quantity="other">Pickup in %1$d min</item>
-    </plurals>
 
     <!-- Manual mode (goal 21). -->
     <string name="compare_manual_title">Type the price you see</string>
@@ -94,4 +87,13 @@
     <string name="show_me_timed_out">That took too long. Tap Show me again, or follow the steps on the card.</string>
     <!-- %1$s: ride app name. Spoken description of the arrow overlay. -->
     <string name="show_me_pointer_description">Arrow beside the button to tap in %1$s</string>
+
+    <!-- Compare redesign (bottom bar, sheets, empty state). -->
+    <string name="compare_empty_hint">Open a ride app, tap Read fares on the bubble</string>
+    <string name="compare_book_cheapest">Book in %1$s · %2$s</string>
+    <string name="compare_open_next_description">Open %1$s to read its prices with the bubble</string>
+    <string name="compare_booked_button">I booked</string>
+    <string name="compare_why_cd">How prices work</string>
+    <string name="compare_why_title">How prices work</string>
+    <string name="compare_why_body">Only prices RideMate read and checked are sorted and can be marked Cheapest. Prices you typed (You typed) and open-network quotes (Network) are shown but never marked Cheapest. A price RideMate couldn\'t read shows Check in app and no number. After one minute a price turns grey with a clock: tap it to open the app and tap Read fares again. Tapping a card opens that app; you book there yourself.</string>
 </resources>

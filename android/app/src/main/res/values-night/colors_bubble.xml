@@ -7,5 +7,12 @@
     <color name="bubble_button_background">#FF7FD6BF</color>
     <color name="bubble_button_text">#FF00382D</color>
     <color name="bubble_chip_background">#FF22332D</color>
-    <color name="bubble_pointer">#FFF2C66B</color>
+    <color name="bubble_pointer">#FFF5C25E</color>
+    <color name="bubble_pointer_outline">#FF0E1110</color>
+    <color name="bubble_head_ring">#FF181C1A</color>
+    <color name="bubble_badge">#FFF5C25E</color>
+    <color name="bubble_badge_text">#FF2B1D00</color>
+    <color name="bubble_badge_alert">#FFFF8A80</color>
+    <color name="bubble_badge_alert_text">#FF3B0000</color>
+    <color name="bubble_tile_text">#FF6FD3B8</color>
 </resources>

@@ -3,9 +3,12 @@ package app.ridemate.bubble
 import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Canvas
+import android.graphics.CornerPathEffect
 import android.graphics.Paint
 import android.graphics.Path
 import android.view.View
+import androidx.core.content.ContextCompat
+import app.ridemate.R
 import app.ridemate.core.ocr.Box
 
 /** Which side of the target the arrow sits on; it always points toward the target. */
@@ -50,9 +53,21 @@ object PointerLayout {
 /** Draws one arrow pointing from [side] toward the target. Not touchable and not focusable (window flags). */
 @SuppressLint("ViewConstructor")
 class PointerView(context: Context, val side: PointerSide, color: Int) : View(context) {
+    private val density = context.resources.displayMetrics.density
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         this.color = color
         style = Paint.Style.FILL
+        pathEffect = CornerPathEffect(3 * density)
+    }
+
+    /** A contrasting ring so the marigold arrow reads on any app's colours (light ring on light, dark on dark). */
+    private val outline = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        this.color = ContextCompat.getColor(context, R.color.bubble_pointer_outline)
+        style = Paint.Style.STROKE
+        strokeWidth = OUTLINE_DP * density
+        strokeJoin = Paint.Join.ROUND
+        strokeCap = Paint.Cap.ROUND
+        pathEffect = CornerPathEffect(3 * density)
     }
     private val path = Path()
 
@@ -72,7 +87,17 @@ class PointerView(context: Context, val side: PointerSide, color: Int) : View(co
             PointerSide.ABOVE -> arrow(w / 2, 0f, w / 2, h, w)
             PointerSide.BELOW -> arrow(w / 2, h, w / 2, 0f, w)
         }
+        // Shrink a little so the ring is not clipped at the view's edges.
+        val inset = OUTLINE_DP * density
+        canvas.save()
+        canvas.scale((w - 2 * inset) / w, (h - 2 * inset) / h, w / 2, h / 2)
+        canvas.drawPath(path, outline)
         canvas.drawPath(path, paint)
+        canvas.restore()
+    }
+
+    private companion object {
+        const val OUTLINE_DP = 2.5f
     }
 
     /** A shaft from (x0, y0) to a head at (x1, y1); [thickness] is the arrow's short side. */

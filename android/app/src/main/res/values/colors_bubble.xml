@@ -8,5 +8,12 @@
     <color name="bubble_button_background">#FF0F6E5A</color>
     <color name="bubble_button_text">#FFFFFFFF</color>
     <color name="bubble_chip_background">#FFE6F4EF</color>
-    <color name="bubble_pointer">#FFD9A441</color>
+    <color name="bubble_pointer">#FFF2B33D</color>
+    <color name="bubble_pointer_outline">#FFFFFFFF</color>
+    <color name="bubble_head_ring">#FFFFFFFF</color>
+    <color name="bubble_badge">#FFF2B33D</color>
+    <color name="bubble_badge_text">#FF2B1D00</color>
+    <color name="bubble_badge_alert">#FFC62828</color>
+    <color name="bubble_badge_alert_text">#FFFFFFFF</color>
+    <color name="bubble_tile_text">#FF0E6B57</color>
 </resources>

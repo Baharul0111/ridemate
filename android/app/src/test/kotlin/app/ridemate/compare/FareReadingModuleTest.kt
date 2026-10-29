@@ -114,7 +114,7 @@ class FareReadingModuleTest {
             compose.waitUntil(timeoutMillis = 5_000) { compose.onAllNodesWithText("Uber Auto").fetchSemanticsNodes().isNotEmpty() }
             compose.onNodeWithText("Uber Auto").assertIsDisplayed()
             compose.onNodeWithText("₹120").assertIsDisplayed()
-            compose.onNodeWithText("cheapest").assertIsDisplayed()
+            compose.onNodeWithText("Cheapest").assertIsDisplayed()
         }
     }
 

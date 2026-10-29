@@ -15,6 +15,7 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.ViewConfiguration
 import android.widget.Button
+import android.widget.FrameLayout
 import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.LinearLayout
@@ -45,6 +46,10 @@ class BubbleView(
     val head: ImageButton = ImageButton(context)
     val panel: LinearLayout = LinearLayout(context)
 
+    /** The small badge on the head: "!" when something needs a look, a count of steps in a guided cancel. */
+    val badge: TextView = TextView(context)
+    private val headFrame = FrameLayout(context)
+
     /** The actions currently shown, in order (tests and the notification mirror read it). */
     var shownActions: List<BubbleAction> = emptyList()
         private set
@@ -58,29 +63,44 @@ class BubbleView(
         setupHead()
         panel.orientation = VERTICAL
         panel.background = GradientDrawable().apply {
-            cornerRadius = dp(16).toFloat()
+            cornerRadius = dp(20).toFloat()
             setColor(ContextCompat.getColor(context, R.color.bubble_panel_background))
             setStroke(dp(1), ContextCompat.getColor(context, R.color.bubble_panel_outline))
         }
         val pad = dp(12)
         panel.setPadding(pad, pad, pad, pad)
         panel.minimumWidth = dp(PANEL_MIN_WIDTH_DP)
-        addView(head, LayoutParams(dp(HEAD_DP), dp(HEAD_DP)))
-        addView(panel, LayoutParams(dp(PANEL_WIDTH_DP), LayoutParams.WRAP_CONTENT).apply { topMargin = dp(6) })
+        panel.elevation = dp(6).toFloat()
+        setupBadge()
+        // The frame leaves room for the head's shadow and the badge, which sits on the head's top-end edge.
+        headFrame.clipChildren = false
+        headFrame.clipToPadding = false
+        headFrame.setPadding(0, dp(BADGE_OVERHANG_DP), dp(BADGE_OVERHANG_DP), 0)
+        headFrame.addView(head, FrameLayout.LayoutParams(dp(HEAD_DP), dp(HEAD_DP)))
+        headFrame.addView(badge, FrameLayout.LayoutParams(LayoutParams.WRAP_CONTENT, dp(BADGE_DP), Gravity.TOP or Gravity.END).apply {
+            topMargin = -dp(BADGE_OVERHANG_DP)
+            marginEnd = -dp(BADGE_OVERHANG_DP)
+        })
+        clipChildren = false
+        addView(headFrame, LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT))
+        addView(panel, LayoutParams(dp(PANEL_WIDTH_DP), LayoutParams.WRAP_CONTENT).apply { topMargin = dp(8) })
     }
 
     @SuppressLint("ClickableViewAccessibility")
     private fun setupHead() {
         head.id = R.id.bubble_head
-        head.setImageResource(R.drawable.ic_notification)
+        head.setImageResource(R.drawable.ic_rm_glyph)
         head.imageTintList = ColorStateList.valueOf(ContextCompat.getColor(context, R.color.rm_on_brand))
         head.background = GradientDrawable().apply {
             shape = GradientDrawable.OVAL
             setColor(ContextCompat.getColor(context, R.color.rm_brand))
+            setStroke(dp(2), ContextCompat.getColor(context, R.color.bubble_head_ring))
         }
+        head.elevation = dp(6).toFloat()
+        head.setPadding(dp(14), dp(14), dp(14), dp(14))
         head.minimumWidth = dp(HEAD_DP)
         head.minimumHeight = dp(HEAD_DP)
-        head.scaleType = ImageView.ScaleType.CENTER_INSIDE
+        head.scaleType = ImageView.ScaleType.FIT_CENTER
         head.contentDescription = context.getString(R.string.bubble_head_description)
         head.setOnClickListener { onHeadTap() }
         val slop = ViewConfiguration.get(context).scaledTouchSlop
@@ -121,6 +141,39 @@ class BubbleView(
         }
     }
 
+    private fun setupBadge() {
+        badge.id = R.id.bubble_badge
+        badge.gravity = Gravity.CENTER
+        badge.minWidth = dp(BADGE_DP)
+        badge.setPadding(dp(5), 0, dp(5), 0)
+        badge.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 12f) // fixed: it must stay inside the 20 dp dot
+        badge.setTypeface(badge.typeface, Typeface.BOLD)
+        badge.elevation = dp(8).toFloat()
+        // The head's spoken state already says the same thing in words.
+        badge.importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO
+        badge.visibility = GONE
+    }
+
+    private fun renderBadge(state: BubbleState, status: BubbleStatus?) {
+        val problem = status?.kind == StatusKind.PROBLEM || status?.kind == StatusKind.REMINDER
+        val steps = state.card?.steps?.size ?: 0
+        val text = when {
+            problem -> "!"
+            steps > 0 -> steps.toString()
+            else -> null
+        }
+        badge.visibility = if (text == null) GONE else VISIBLE
+        badge.text = text.orEmpty()
+        val fill = if (problem) R.color.bubble_badge_alert else R.color.bubble_badge
+        val ink = if (problem) R.color.bubble_badge_alert_text else R.color.bubble_badge_text
+        badge.setTextColor(ContextCompat.getColor(context, ink))
+        badge.background = GradientDrawable().apply {
+            cornerRadius = dp(BADGE_DP).toFloat()
+            setColor(ContextCompat.getColor(context, fill))
+            setStroke(dp(2), ContextCompat.getColor(context, R.color.bubble_head_ring))
+        }
+    }
+
     /** Re-renders the panel for [state]; [status]/[busy] are the merged status line. */
     fun render(state: BubbleState, status: BubbleStatus?, busy: Boolean, expanded: Boolean) {
         this.expanded = expanded
@@ -128,14 +181,30 @@ class BubbleView(
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             head.stateDescription = context.getString(if (expanded) R.string.bubble_head_open else R.string.bubble_head_closed)
         }
+        renderBadge(state, status)
         panel.removeAllViews()
         panel.visibility = if (expanded) VISIBLE else GONE
         if (status != null || busy) panel.addView(statusRow(status, busy))
         state.card?.let { addCard(it) }
         val actions = state.actions.distinct()
         if (BubbleAction.PASTE_DROP in actions) panel.addView(chip(BubbleAction.PASTE_DROP))
-        actions.filter { it != BubbleAction.PASTE_DROP }.forEach { action ->
-            panel.addView(actionButton(action, enabled = !(busy && action == BubbleAction.READ_FARES)))
+        // A compact icon menu: up to three icon tiles per row, each an icon with a short word under it.
+        actions.filter { it != BubbleAction.PASTE_DROP }.chunked(MENU_COLUMNS).forEach { rowActions ->
+            val row = LinearLayout(context).apply {
+                orientation = HORIZONTAL
+                layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT).apply { topMargin = dp(6) }
+            }
+            rowActions.forEachIndexed { i, action ->
+                row.addView(
+                    actionButton(action, enabled = !(busy && action == BubbleAction.READ_FARES)),
+                    LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f).apply { if (i > 0) marginStart = dp(6) },
+                )
+            }
+            // Keep tiles the same width in a short last row.
+            repeat(MENU_COLUMNS - rowActions.size) {
+                row.addView(View(context), LayoutParams(0, 0, 1f).apply { marginStart = dp(6) })
+            }
+            panel.addView(row)
         }
         shownActions = actions
     }
@@ -244,22 +313,34 @@ class BubbleView(
         contentDescription = context.getString(action.descriptionRes)
         isAllCaps = false
         isEnabled = enabled
-        gravity = Gravity.START or Gravity.CENTER_VERTICAL
-        minimumHeight = dp(MIN_TOUCH_DP)
-        minHeight = dp(MIN_TOUCH_DP)
+        alpha = if (enabled) 1f else 0.5f
+        gravity = Gravity.CENTER
+        textAlignment = TEXT_ALIGNMENT_CENTER
+        maxLines = 2
+        setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+        setTypeface(typeface, Typeface.BOLD)
+        minimumHeight = dp(TILE_MIN_HEIGHT_DP)
+        minHeight = dp(TILE_MIN_HEIGHT_DP)
         minimumWidth = dp(MIN_TOUCH_DP)
         minWidth = dp(MIN_TOUCH_DP)
-        setTextColor(ContextCompat.getColor(context, R.color.bubble_button_text))
+        stateListAnimator = null
+        val stop = action == BubbleAction.STOP
+        val ink = ContextCompat.getColor(context, if (stop) R.color.bubble_text_secondary else R.color.bubble_tile_text)
+        setTextColor(ink)
         background = GradientDrawable().apply {
-            cornerRadius = dp(12).toFloat()
-            setColor(ContextCompat.getColor(context, R.color.bubble_button_background))
+            cornerRadius = dp(16).toFloat()
+            if (stop) {
+                setColor(ContextCompat.getColor(context, R.color.bubble_panel_background))
+                setStroke(dp(1), ContextCompat.getColor(context, R.color.bubble_panel_outline))
+            } else {
+                setColor(ContextCompat.getColor(context, R.color.bubble_chip_background))
+            }
         }
-        setCompoundDrawablesRelativeWithIntrinsicBounds(action.iconRes, 0, 0, 0)
-        compoundDrawablePadding = dp(10)
-        TextViewCompat.setCompoundDrawableTintList(this, ColorStateList.valueOf(ContextCompat.getColor(context, R.color.bubble_button_text)))
-        setPadding(dp(12), 0, dp(12), 0)
+        setCompoundDrawablesRelativeWithIntrinsicBounds(0, action.iconRes, 0, 0)
+        compoundDrawablePadding = dp(4)
+        TextViewCompat.setCompoundDrawableTintList(this, ColorStateList.valueOf(ink))
+        setPadding(dp(4), dp(10), dp(4), dp(8))
         setOnClickListener { onAction(action) }
-        layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT).apply { topMargin = dp(6) }
     }
 
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).roundToInt()
@@ -268,6 +349,10 @@ class BubbleView(
         /** Goal 27: comfortable touch targets. */
         const val MIN_TOUCH_DP = 48
         const val HEAD_DP = 56
+        const val BADGE_DP = 20
+        const val BADGE_OVERHANG_DP = 4
+        const val MENU_COLUMNS = 3
+        const val TILE_MIN_HEIGHT_DP = 64
         const val PANEL_WIDTH_DP = 248
         const val PANEL_MIN_WIDTH_DP = 200
 
