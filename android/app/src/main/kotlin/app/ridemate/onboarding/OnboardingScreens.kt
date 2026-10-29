@@ -35,6 +35,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -101,21 +102,27 @@ private data class Progress(val position: Int, val total: Int)
 fun OnboardingScreen(state: OnboardingUiState, actions: OnboardingActions, modifier: Modifier = Modifier) {
     val progress = state.position?.let { Progress(it, state.total) }
     Box(modifier.fillMaxSize()) {
-        when (state.step) {
-            OnboardingStep.AGE_GATE -> AgeGate(progress, actions)
-            OnboardingStep.UNDER_AGE_BLOCKED -> UnderAgeBlocked(actions)
-            OnboardingStep.PRIVACY_NOTICE -> NoticeStep(progress, actions)
-            OnboardingStep.SIGN_IN -> SignInPage(progress, state.signIn, actions.signInWithGoogle, actions.continueWithoutGoogle)
-            OnboardingStep.NOTIFICATIONS,
-            OnboardingStep.NOTIFICATION_ACCESS,
-            OnboardingStep.OVERLAY,
-            OnboardingStep.LOCATION,
-            -> PermissionStep(progress, state, state.step, actions)
-            OnboardingStep.RESTRICTED_SETTINGS -> RestrictedSettingsStep(progress, state, actions)
-            OnboardingStep.BATTERY -> BatteryStep(progress, state, actions)
-            OnboardingStep.HEALTH_CHECK -> HealthCheckStep(progress, state, actions)
-            OnboardingStep.DONE -> DoneStep(state, actions)
-        }
+        // Keyed by step: each step opens scrolled to the top with its sheets closed.
+        key(state.step) { StepPage(progress, state, actions) }
+    }
+}
+
+@Composable
+private fun StepPage(progress: Progress?, state: OnboardingUiState, actions: OnboardingActions) {
+    when (state.step) {
+        OnboardingStep.AGE_GATE -> AgeGate(progress, actions)
+        OnboardingStep.UNDER_AGE_BLOCKED -> UnderAgeBlocked(actions)
+        OnboardingStep.PRIVACY_NOTICE -> NoticeStep(progress, actions)
+        OnboardingStep.SIGN_IN -> SignInPage(progress, state.signIn, actions.signInWithGoogle, actions.continueWithoutGoogle)
+        OnboardingStep.NOTIFICATIONS,
+        OnboardingStep.NOTIFICATION_ACCESS,
+        OnboardingStep.OVERLAY,
+        OnboardingStep.LOCATION,
+        -> PermissionStep(progress, state, state.step, actions)
+        OnboardingStep.RESTRICTED_SETTINGS -> RestrictedSettingsStep(progress, state, actions)
+        OnboardingStep.BATTERY -> BatteryStep(progress, state, actions)
+        OnboardingStep.HEALTH_CHECK -> HealthCheckStep(progress, state, actions)
+        OnboardingStep.DONE -> DoneStep(state, actions)
     }
 }
 
