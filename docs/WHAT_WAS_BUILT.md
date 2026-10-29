@@ -192,3 +192,23 @@ session left over after an app restart ends cleanly. Regression tests added; on-
    needed. Until then real-app reading works but falls back to "Couldn't read · type the price" and "Got a driver?"
    questions more often.
 5. Optional: Play Store listing ($25) and Android developer verification (2027) — both your decision.
+
+## 11. Public launch — 29 Oct 2026 (owner's explicit go-ahead: "Yes, switch now")
+* **Owner decision recorded:** launched **before** Modal's written billing confirmation arrived. Protection in place:
+  Modal workspace spend limit $0 (set by the owner) + RideMate's all-spend meter (pauses AI well before the credit ends).
+* **Server (live):** `ONDC_MODE=off` (demo seller routes not mounted; `/v1/ondc/*` → `ondc_unavailable`), Remote Config
+  `ondc_enabled=false`, `cap_profile=normal`, judging profile off, `min_containers=0`, fair-use caps as designed.
+* **Launch fix found by the post-deploy check:** Modal's proxy strips any client `X-Forwarded-For` and passes the
+  caller's own public address as the connection peer (verified: the peer equals this Mac's public IP; a control
+  address does not). Per-network limits (60 requests/min per network, IPv6 by /64) now use that peer, so they apply in
+  production. `/readyz` reports `client_bucketed: true` and an address-free `forwarding` shape.
+* **App `v1.1.0` (versionCode 2):** signed, verified, published at
+  https://github.com/Baharul0111/ridemate/releases/tag/v1.1.0 with `SHA256SUMS.txt`
+  (APK SHA-256 `6d900ce70b12b98baad1ee414692d577bb59b32df74e6175f8bb36523a8f2052`). Remote Config `latest_version`
+  points to it, so 1.0.0 installs show "Update available". Installed on the owner's phone (launches cleanly).
+* **Tests at launch:** Android core + app unit tests and lint green with launch settings; backend 811; config 313.
+* **For hackathon judging:** the ONDC demo seller is now off for everyone. To show it to judges temporarily:
+  `ONDC_MODE=mock ./backend/deploy.sh` and Remote Config `ondc_enabled=true`; switch back afterwards.
+* **Still recommended (owner):** record a few real Uber/Rapido rides with the Recorder so real-app templates become
+  verified; keep the Modal billing reply when it arrives; watch the budget panel and alerts for 48 hours.
+

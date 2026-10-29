@@ -7,8 +7,8 @@ forgot to cancel.**
 Meta Global AI Developer Hackathon (Indie track, theme "Build for Your World").
 
 <!-- RELEASE_INFO -->
-**Release 1.0.0-hackathon** (built 29 Oct 2026, signed locally; publishing waits for the owner's go-ahead):
-`RideMate-1.0.0-hackathon.apk` · SHA-256 `0d7aa0ba611522e1864b021bea4df9ddd304c3e887e9cc2c826172f526876e47` ·
+**Release 1.1.0 — public** (29 Oct 2026): [download from GitHub Releases](https://github.com/Baharul0111/ridemate/releases/tag/v1.1.0) ·
+`RideMate-1.1.0.apk` · SHA-256 `6d900ce70b12b98baad1ee414692d577bb59b32df74e6175f8bb36523a8f2052` ·
 signing certificate SHA-256 `94:F2:DD:5F:DB:02:AD:ED:46:31:CB:0A:09:4A:0B:EE:81:05:32:C1:C8:AE:22:23:C1:7D:1C:7A:A4:22:7A:A0`.
 
 ---

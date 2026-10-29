@@ -71,7 +71,7 @@
     </entry>
     <entry>
         <key>latest_version</key>
-        <value>{"schema":"1.0","version_code":1,"version_name":"1.0.0-hackathon","url":"https://github.com/Baharul0111/ridemate/releases/latest","sha256":""}</value>
+        <value>{"schema":"1.0","version_code":2,"version_name":"1.1.0","url":"https://github.com/Baharul0111/ridemate/releases/tag/v1.1.0","sha256":"6d900ce70b12b98baad1ee414692d577bb59b32df74e6175f8bb36523a8f2052"}</value>
     </entry>
     <entry>
         <key>min_supported_version</key>
