@@ -5,6 +5,7 @@ import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import android.os.PowerManager
 import app.ridemate.RideMateApp
 import kotlinx.coroutines.CoroutineScope
@@ -18,9 +19,13 @@ import kotlinx.coroutines.withTimeoutOrNull
  * The session service fires them from a 1 s ticker, a Handler delay that does not advance while the CPU sleeps, and a
  * foreground service does not stop the CPU from sleeping. So while I8 holds (an extra booking still to cancel, or a
  * follow-up check pending) a PARTIAL_WAKE_LOCK keeps the CPU up; it is bounded (re-acquired with a timeout, released
- * as soon as I8 clears). Independently, a while-idle alarm for the next due time wakes the guardian even if the lock
- * is ignored (Doze without the battery exemption). Exact alarms are not used (no SCHEDULE_EXACT_ALARM; the audit
- * forbids it): the wake lock does the precise timing.
+ * as soon as I8 clears). Android honours a partial wake lock in Doze for an app running a foreground service, so the
+ * service's ticker stays on time with the screen off.
+ *
+ * Independently, a while-idle alarm for the next due time wakes the guardian even if the lock is not honoured (the
+ * service was stopped, an OEM battery manager). It is exact (`setExactAndAllowWhileIdle`) wherever Android allows that
+ * without a permission (Android 10–11, or exact alarms already allowed), else `setAndAllowWhileIdle`. RideMate asks for
+ * no exact-alarm permission (SCHEDULE_EXACT_ALARM / USE_EXACT_ALARM): the wake-locked ticker does the precise timing.
  */
 class ReminderWakeKeeper(private val context: Context) {
     private val power = context.getSystemService(PowerManager::class.java)
@@ -43,7 +48,7 @@ class ReminderWakeKeeper(private val context: Context) {
         lock?.let { if (it.isHeld) runCatching { it.release() } }
         lock = null
         lockUntilElapsed = 0L
-        alarmAt?.let { runCatching { alarms?.cancel(alarmIntent()) } }
+        alarmAt?.let { runCatching { alarms?.cancel(alarmIntent(context)) } }
         alarmAt = null
     }
 
@@ -63,23 +68,47 @@ class ReminderWakeKeeper(private val context: Context) {
         if (atElapsedMs == alarmAt) return
         val manager = alarms ?: return
         runCatching {
-            if (atElapsedMs == null) {
-                manager.cancel(alarmIntent())
-            } else {
-                manager.setAndAllowWhileIdle(AlarmManager.ELAPSED_REALTIME_WAKEUP, atElapsedMs, alarmIntent())
-            }
+            if (atElapsedMs == null) manager.cancel(alarmIntent(context)) else arm(context, manager, atElapsedMs)
         }
         alarmAt = atElapsedMs
     }
 
-    private fun alarmIntent(): PendingIntent = PendingIntent.getBroadcast(
-        context,
-        REQUEST_CODE,
-        Intent(context, GuardianAlarmReceiver::class.java),
-        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-    )
-
     companion object {
+        /**
+         * Sets the backstop alarm for [atElapsedMs] (replacing any earlier one; null cancels it). The alarm receiver
+         * calls this after it ran the guardian, so the next reminder is covered even when the service is gone.
+         */
+        fun armBackstop(context: Context, atElapsedMs: Long?) {
+            val manager = context.getSystemService(AlarmManager::class.java) ?: return
+            runCatching {
+                if (atElapsedMs == null) manager.cancel(alarmIntent(context)) else arm(context, manager, atElapsedMs)
+            }
+        }
+
+        /** True when an exact while-idle alarm needs no permission here (Android 10–11, or already allowed). */
+        fun exactAllowed(manager: AlarmManager): Boolean =
+            Build.VERSION.SDK_INT < Build.VERSION_CODES.S || manager.canScheduleExactAlarms()
+
+        private fun arm(context: Context, manager: AlarmManager, atElapsedMs: Long) {
+            val intent = alarmIntent(context)
+            if (exactAllowed(manager)) {
+                try {
+                    manager.setExactAndAllowWhileIdle(AlarmManager.ELAPSED_REALTIME_WAKEUP, atElapsedMs, intent)
+                    return
+                } catch (_: SecurityException) {
+                    // Exact alarms were revoked between the check and the call: the inexact one below still fires.
+                }
+            }
+            manager.setAndAllowWhileIdle(AlarmManager.ELAPSED_REALTIME_WAKEUP, atElapsedMs, intent)
+        }
+
+        private fun alarmIntent(context: Context): PendingIntent = PendingIntent.getBroadcast(
+            context,
+            REQUEST_CODE,
+            Intent(context, GuardianAlarmReceiver::class.java),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+
         const val TAG = "RideMate:reminders"
 
         /** Each acquire is bounded; it is renewed while I8 still holds. */
@@ -97,9 +126,12 @@ class GuardianAlarmReceiver : BroadcastReceiver() {
         CoroutineScope(Dispatchers.Default).launch {
             try {
                 withTimeoutOrNull(RECEIVER_BUDGET_MS) {
-                    graph.guardianRuntime.awaitRestored()
-                    graph.guardianRuntime.tick()
-                    graph.guardianRuntime.awaitIdle()
+                    val runtime = graph.guardianRuntime
+                    runtime.awaitRestored()
+                    runtime.tick()
+                    runtime.awaitIdle()
+                    // Cover the next reminder or check too (the service, when it runs, keeps this up to date).
+                    ReminderWakeKeeper.armBackstop(context, runtime.status.value.nextDueElapsedMs)
                 }
             } finally {
                 pending.finish()

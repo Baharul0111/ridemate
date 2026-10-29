@@ -25,6 +25,7 @@
     <string name="bubble_action_refresh_price">Refresh %1$s price</string>
     <!-- %1$s: ride app name -->
     <string name="bubble_status_refresh_pending">On %1$s\'s price list, tap Refresh %1$s price to read the new price.</string>
+    <string name="bubble_status_book_which_app">Booked a ride? Tap the app you booked it in.</string>
 
     <string name="bubble_head_description">RideMate controls. Double-tap to open or close. Drag to move.</string>
     <string name="bubble_head_open">Open</string>

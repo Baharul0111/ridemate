@@ -36,21 +36,26 @@ data class BubbleState(
     fun labelFor(action: BubbleAction): String? = labels[action]
 
     companion object {
+        /** The "Booked in <app>" buttons, in order: one, or one per app when RideMate must ask which. */
+        val BOOKED_SLOTS: List<BubbleAction> = listOf(BubbleAction.BOOKED_HERE, BubbleAction.BOOKED_HERE_2, BubbleAction.BOOKED_HERE_3)
+
         /**
          * On a ride app's price screen: read, open the next selected app (goal 3), record a booking, maybe paste the
          * drop address, stop. [labels] name the apps the buttons are about; [status] says what a pending refresh is for.
+         * [bookedChoices] > 1 shows one "Booked in <app>" per app RideMate can't tell apart (it can't see the screen).
          */
         fun comparing(
             pasteDrop: Boolean = false,
             nextApp: Boolean = false,
             labels: Map<BubbleAction, String> = emptyMap(),
             status: BubbleStatus? = null,
+            bookedChoices: Int = 1,
         ): BubbleState = BubbleState(
             actions = buildList {
                 add(BubbleAction.READ_FARES)
                 if (pasteDrop) add(BubbleAction.PASTE_DROP)
                 if (nextApp) add(BubbleAction.NEXT_APP)
-                add(BubbleAction.BOOKED_HERE)
+                addAll(BOOKED_SLOTS.take(bookedChoices.coerceIn(1, BOOKED_SLOTS.size)))
                 add(BubbleAction.STOP)
             },
             labels = labels,

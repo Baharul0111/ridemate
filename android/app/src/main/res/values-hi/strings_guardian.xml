@@ -195,6 +195,9 @@
     <string name="guardian_action_booked_in">%1$s में बुक किया</string>
     <string name="guardian_booked_recorded">दर्ज हुआ: %1$s में बुक किया</string>
     <string name="guardian_booked_recorded_body">गलत ऐप? RideMate खोलें और उस बुकिंग पर हटाएँ टैप करें।</string>
+    <string name="guardian_action_booked_ask">किसमें बुक किया…</string>
+    <string name="guardian_book_pick_title">आपने किस ऐप में बुक किया?</string>
+    <string name="guardian_book_pick_body">RideMate आपकी स्क्रीन नहीं देख सकता। जिस ऐप में राइड बुक की, उसे टैप करें।</string>
     <string name="guardian_action_done">हो गया</string>
     <string name="guardian_action_stop">रोकें</string>
     <string name="guardian_action_keep_searching_on">खोजते रहें: चालू</string>

@@ -43,7 +43,8 @@ import kotlinx.serialization.json.JsonObject
  * "Read fares" (§4.2, §4.3): one user tap → a checked price list, or an honest reason why not. Never hangs: the
  * whole tap runs under its 20 s deadline ([TapBudget.TOTAL_MS]).
  *
- * 1. AI pre-check (kill switch, sign-in, parser present) → manual mode without capturing anything.
+ * 1. AI pre-check (kill switch, sign-in, parser present, and a pause the server already announced: [AiPauseMemory])
+ *    → manual mode without asking for consent, capturing or uploading anything.
  * 2. Two frames 400 ms apart; I6: discarded unless taken and processed within 2 s of the tap.
  * 3. ML Kit OCR of both frames (Channel B tokens); a black frame with no text is FLAG_SECURE → share fallback.
  * 4. K3: no ₹/Rs token and no status keyword → "This doesn't look like a fare screen", nothing uploaded.
@@ -67,6 +68,8 @@ class ReadFaresUseCase(
     private val onAllFaresRead: suspend () -> Unit = {},
     private val cpu: CoroutineDispatcher = Dispatchers.Default,
     private val deadlineMs: Long = TapBudget.TOTAL_MS,
+    /** The server's announced AI pause (config-check, an earlier read); null: every tap asks the server. */
+    private val aiPause: AiPauseMemory? = null,
 ) {
 
     /** Manual mode decided before any capture (no consent prompt, no OCR, nothing uploaded); null when AI may run. */
@@ -79,7 +82,12 @@ class ReadFaresUseCase(
                 is AuthState.Google -> null
             }
         } ?: if (parserFor(provider) == null) ManualReason.READER_UNAVAILABLE else null
-        return reason?.let { ReadFaresResult.ManualMode(provider, it) }
+        if (reason != null) return ReadFaresResult.ManualMode(provider, reason)
+        // The server already said AI reading is paused: no consent prompt, capture or upload it would only refuse.
+        // (A second tap soon after is "try anyway" and gets through: [AiPauseMemory.pauseForTap].)
+        if (provider.isDemo) return null
+        val pause = aiPause?.pauseForTap() ?: return null
+        return ReadFaresResult.ManualMode(provider, ManualReason.AI_PAUSED, resumeAtIst = pause.resumeAtIst, pausedEarlier = true)
     }
 
     /** Captures and reads the screen for [request]. */
@@ -160,6 +168,7 @@ class ReadFaresUseCase(
             ReadScreenRequest(provider, upload.imageWidth, upload.imageHeight, upload.jpeg, request.sessionId),
             budget,
         )
+        aiPause?.onAiResult(response)
         val body = (response as? ApiResult.Ok)?.body
             ?: return manual(provider, response, suggestions(parser, upload.maskedOcr))
         val read = ChannelARead.fromJsonOrNull(body.read.toString())

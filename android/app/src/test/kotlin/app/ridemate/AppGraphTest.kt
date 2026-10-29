@@ -57,8 +57,11 @@ class AppGraphTest {
     fun `the api client reads its base url from remote config`() = runBlocking {
         val graph = app.graph
         assertEquals(ApiResult.NotConfigured, graph.apiClient.configCheck())
-        // Configured but signed out: no request is made, sign-in is needed.
+        // A host outside the APK's allowlist (§4.11) counts as not configured: the ID token never goes there.
         app.fakes.remoteConfig.active["api_base_url"] = "https://ridemate.invalid"
+        assertEquals(ApiResult.NotConfigured, graph.apiClient.configCheck())
+        // Configured (RideMate's own host) but signed out: no request is made, sign-in is needed.
+        app.fakes.remoteConfig.active["api_base_url"] = "https://ws--ridemate-api.modal.run"
         assertEquals(ApiResult.AuthNeeded, graph.apiClient.configCheck())
     }
 

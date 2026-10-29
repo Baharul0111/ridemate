@@ -13,6 +13,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Shadows.shadowOf
+import org.robolectric.shadows.ShadowAlarmManager
 import org.robolectric.shadows.ShadowPowerManager
 
 /**
@@ -50,6 +51,44 @@ class ReminderWakeKeeperTest {
         assertFalse(lock.isHeld)
         assertNull(alarms.nextScheduledAlarm)
         assertFalse(keeper.isHolding)
+    }
+
+    @Test
+    fun `the backstop is an exact while-idle alarm where Android allows it without a permission, inexact otherwise`() {
+        val due = SystemClock.elapsedRealtime() + 60_000
+        try {
+            ShadowAlarmManager.setCanScheduleExactAlarms(false)
+            val keeper = ReminderWakeKeeper(context)
+            keeper.update(i8 = true, nextDueElapsedMs = due)
+            val inexact = alarms.nextScheduledAlarm!!
+            assertTrue(inexact.isAllowWhileIdle)
+            assertEquals(ShadowAlarmManager.WINDOW_HEURISTIC, inexact.windowLengthMs)
+            keeper.release()
+
+            ShadowAlarmManager.setCanScheduleExactAlarms(true)
+            val exactKeeper = ReminderWakeKeeper(context)
+            exactKeeper.update(i8 = true, nextDueElapsedMs = due)
+            val exact = alarms.nextScheduledAlarm!!
+            assertTrue("fires in Doze too", exact.isAllowWhileIdle)
+            assertEquals(ShadowAlarmManager.WINDOW_EXACT, exact.windowLengthMs)
+            assertEquals(due, exact.triggerAtMs)
+            exactKeeper.release()
+        } finally {
+            ShadowAlarmManager.setCanScheduleExactAlarms(false)
+        }
+    }
+
+    @Test
+    fun `the alarm receiver re-arms the backstop for the next due time, so a stopped service still gets woken`() {
+        val next = SystemClock.elapsedRealtime() + 120_000
+        ReminderWakeKeeper.armBackstop(context, next)
+        assertEquals(next, alarms.nextScheduledAlarm!!.triggerAtMs)
+        // One alarm, replaced rather than added.
+        ReminderWakeKeeper.armBackstop(context, next + 120_000)
+        assertEquals(1, alarms.scheduledAlarms.size)
+        assertEquals(next + 120_000, alarms.nextScheduledAlarm!!.triggerAtMs)
+        ReminderWakeKeeper.armBackstop(context, null)
+        assertNull(alarms.nextScheduledAlarm)
     }
 
     @Test

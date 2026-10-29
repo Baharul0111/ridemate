@@ -27,6 +27,8 @@
         <item quantity="other">%1$d पढ़े नहीं जा सके: उन्हें ऐप में देखें।</item>
     </plurals>
     <string name="compare_manual_switched_off">AI से पढ़ना अभी बंद है। तब तक आप दाम टाइप कर सकते हैं।</string>
+    <string name="compare_manual_ai_paused_until_try">AI से पढ़ना %1$s (IST) पर फिर शुरू होगा। दाम टाइप करें, या फिर भी आज़माने के लिए दोबारा किराया पढ़ें दबाएँ।</string>
+    <string name="compare_manual_ai_paused_try">AI से पढ़ना अभी रुका हुआ है। दाम टाइप करें, या फिर भी आज़माने के लिए दोबारा किराया पढ़ें दबाएँ।</string>
     <string name="compare_manual_reader_unavailable">RideMate अभी %1$s के दाम नहीं जाँच सकता। तब तक आप दाम टाइप कर सकते हैं।</string>
     <string name="compare_manual_screenshot_blank">यह स्क्रीनशॉट खाली है: %1$s स्क्रीनशॉट भी नहीं लेने देता। %1$s में जो दाम दिख रहा है वह टाइप करें।</string>
 

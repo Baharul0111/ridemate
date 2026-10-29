@@ -10,6 +10,7 @@ import app.ridemate.core.model.Provider
 import app.ridemate.core.model.VehicleClass
 import app.ridemate.net.ApiMessages
 import app.ridemate.net.ApiResult
+import app.ridemate.ui.UiFormat
 
 /** Wording for fare-reading outcomes (strings_compare.xml). Every problem says what to do next. */
 object FareReadingMessages {
@@ -50,6 +51,15 @@ object FareReadingMessages {
 
     /** "AI reading resumes at 1:30 pm (IST). You can type the price meanwhile." or the reason's own wording. */
     fun manualText(context: Context, result: ReadFaresResult.ManualMode): String {
+        if (result.pausedEarlier) {
+            // Nothing was captured: say when AI reading resumes, and that another tap tries anyway.
+            val resumeAt = UiFormat.resumeAtIst(result.resumeAtIst)
+            return if (resumeAt != null) {
+                context.getString(R.string.compare_manual_ai_paused_until_try, resumeAt)
+            } else {
+                context.getString(R.string.compare_manual_ai_paused_try)
+            }
+        }
         result.apiResult?.let { api -> ApiMessages.text(context, api)?.let { return it } }
         if (result.resumeAtIst != null) {
             ApiMessages.text(context, ApiResult.AiPaused("ai_paused", result.resumeAtIst, null))?.let { return it }

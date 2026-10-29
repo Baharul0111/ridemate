@@ -32,6 +32,8 @@
         <item quantity="other">%1$d couldn\'t be read: check them in the app.</item>
     </plurals>
     <string name="compare_manual_switched_off">AI reading is switched off for now. You can type the price meanwhile.</string>
+    <string name="compare_manual_ai_paused_until_try">AI reading resumes at %1$s (IST). Type the price, or tap Read fares again to try anyway.</string>
+    <string name="compare_manual_ai_paused_try">AI reading is paused for now. Type the price, or tap Read fares again to try anyway.</string>
     <string name="compare_manual_reader_unavailable">RideMate can\'t check %1$s prices right now. You can type the price meanwhile.</string>
     <!-- %1$s: ride app name -->
     <string name="compare_manual_screenshot_blank">This screenshot is blank: %1$s blocks screenshots too. Type the price you see in %1$s.</string>

@@ -10,11 +10,21 @@ import app.ridemate.RideMateApp
 import app.ridemate.crash.CrashSite
 import java.util.concurrent.TimeUnit
 
-/** Periodic 24 h retention purge (see [RetentionPurger]). Dependencies come from the app's [app.ridemate.AppGraph]. */
+/**
+ * Periodic 24 h retention purge (goal 24): ride data in Room ([RetentionPurger]) and the recent destinations kept in
+ * preferences ([app.ridemate.trip.RecentPlacesStore]), so neither outlives a day just because RideMate was not opened
+ * again. Dependencies come from the app's [app.ridemate.AppGraph].
+ */
 class PurgeWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
 
     override suspend fun doWork(): Result {
         val graph = (applicationContext as? RideMateApp)?.graph ?: return Result.failure()
+        // Recent destinations first and on their own: a Room failure must not keep typed or spoken addresses.
+        try {
+            graph.recentPlaces.purgeExpired()
+        } catch (e: Exception) {
+            graph.crashReporter.recordNonFatal(e, CrashSite.PURGE)
+        }
         return try {
             graph.retentionPurger.purge()
             Result.success()

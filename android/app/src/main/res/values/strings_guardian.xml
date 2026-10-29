@@ -217,6 +217,9 @@
     <!-- %1$s: ride app name. Confirms which app "Booked here" recorded. -->
     <string name="guardian_booked_recorded">Recorded: booked in %1$s</string>
     <string name="guardian_booked_recorded_body">Wrong app? Open RideMate and tap Dismiss on that booking.</string>
+    <string name="guardian_action_booked_ask">Booked in…</string>
+    <string name="guardian_book_pick_title">Which app did you book in?</string>
+    <string name="guardian_book_pick_body">RideMate can\'t see your screen. Tap the app you booked the ride in.</string>
     <string name="guardian_action_done">Done</string>
     <string name="guardian_action_stop">Stop</string>
     <string name="guardian_action_keep_searching_on">Keep searching: on</string>

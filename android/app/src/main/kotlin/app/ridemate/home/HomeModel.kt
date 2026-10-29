@@ -72,6 +72,8 @@ class HomeModel(
     private val api: ApiClient,
     private val gate: () -> PreSessionGate,
     private val scope: CoroutineScope,
+    /** Told what config-check said, so Read fares skips capture and upload while AI reading is paused. */
+    private val onAiCheck: (ApiResult<ConfigCheckResponse>) -> Unit = {},
 ) {
     private val check = MutableStateFlow<ApiResult<ConfigCheckResponse>?>(null)
     private val compare = MutableStateFlow<CompareCheck>(CompareCheck.Idle)
@@ -116,13 +118,15 @@ class HomeModel(
         check.value = null
         return scope.launch {
             if (!killSwitches.value.aiReaderEnabled || auth.value !is AuthState.Google) return@launch
-            check.value = try {
+            val result = try {
                 api.configCheck()
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 ApiResult.Offline
             }
+            check.value = result
+            onAiCheck(result)
         }.also { aiJob = it }
     }
 

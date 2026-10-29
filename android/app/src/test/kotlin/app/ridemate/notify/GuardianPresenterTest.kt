@@ -233,14 +233,20 @@ class GuardianPresenterTest {
 
     @Test
     fun `the ongoing notification mirrors the bubble for each phase`() {
-        val booking = en.ongoing(base.copy(legs = base.legs.map { it.copy(booked = false, state = RideState.QUOTED) }))
-        // "Booked here" names the app it records (nothing opened yet: the first unbooked app).
+        val booking = en.ongoing(base.copy(legs = base.legs.mapIndexed { i, leg -> leg.copy(booked = false, state = if (i == 0) RideState.QUOTED else RideState.SELECTED) }))
+        // "Booked here" names the app it records (only one app was opened through RideMate: that one).
         assertEquals(listOf("Read fares", "Booked in Uber", "Stop"), booking.labels())
         assertEquals(SessionOp(SessionOpKind.BOOKED_HERE, base.legs[0].legId), booking.actions[1].target)
+        // Both apps opened: RideMate can't see which one is on screen, so the button asks (no app named, no ref).
         val opened = en.ongoing(base.copy(legs = base.legs.map { it.copy(booked = false, state = RideState.QUOTED) }), openedLegId = base.legs[1].legId)
-        assertEquals("Booked in Ola", opened.actions[1].label)
-        assertEquals(SessionOp(SessionOpKind.BOOKED_HERE, base.legs[1].legId), opened.actions[1].target)
+        assertEquals("Booked in…", opened.actions[1].label)
+        assertEquals(SessionOp(SessionOpKind.BOOKED_HERE), opened.actions[1].target)
         assertEquals(SessionOp(SessionOpKind.READ_FARES), booking.actions[0].target)
+        val pick = en.bookPick(listOf(base.legs[1].legId to base.legs[1].provider, base.legs[0].legId to base.legs[0].provider))
+        assertEquals("Which app did you book in?", pick.title)
+        assertEquals(listOf("Ola", "Uber"), pick.labels())
+        assertEquals(SessionOp(SessionOpKind.BOOKED_HERE, base.legs[1].legId), pick.actions[0].target)
+        assertEquals(CardStyle.HEADS_UP, pick.style)
 
         val chain = base.copy(
             legs = listOf(

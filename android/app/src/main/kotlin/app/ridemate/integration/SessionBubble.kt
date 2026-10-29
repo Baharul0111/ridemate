@@ -18,6 +18,8 @@ import app.ridemate.core.model.Provider
 import app.ridemate.core.model.RideState
 import app.ridemate.core.state.TapId
 import app.ridemate.launch.BubbleVisibility
+import app.ridemate.notify.BookChoice
+import app.ridemate.notify.BookTargets
 import app.ridemate.notify.CancelCardItem
 import app.ridemate.notify.GuardianPresenter
 import app.ridemate.notify.GuardianUiState
@@ -145,8 +147,13 @@ class SessionBubble(
                 controller?.hidePointer()
                 deps.userAction(UserAction.ICancelledIt(it.legId, TapId(tapId)))
             }
-            // The leg the button names: what the user saw is what gets recorded.
-            BubbleAction.BOOKED_HERE -> deps.sessionOp(SessionOp(SessionOpKind.BOOKED_HERE, bookTarget(status, ui)?.legId))
+            // The leg the button names: what the user saw is what gets recorded. Without one (nothing to book here
+            // any more), the guardian decides, and asks which app when it can't tell.
+            BubbleAction.BOOKED_HERE, BubbleAction.BOOKED_HERE_2, BubbleAction.BOOKED_HERE_3 -> {
+                val slot = BubbleState.BOOKED_SLOTS.indexOf(action)
+                val legId = bookChoice(status, ui).legIds.getOrNull(slot)
+                if (legId != null || slot == 0) deps.sessionOp(SessionOp(SessionOpKind.BOOKED_HERE, legId))
+            }
             BubbleAction.NEXT_APP -> nextApp(status, ui)?.let { deps.openNextApp(it.provider, it.legId) }
             BubbleAction.DONE -> {
                 controller?.hidePointer()
@@ -180,15 +187,28 @@ class SessionBubble(
         if (kept || !booking) return BubbleState.watching()
         val text = deps.presenter().text
         val next = nextApp(status, ui)
-        val target = bookTarget(status, ui)
+        val choice = bookChoice(status, ui)
         val refreshing = refresh?.takeIf { p -> ui.legs.any { it.provider == p && !it.booked && !it.state.isTerminal } }
         val labels = buildMap {
             refreshing?.let { put(BubbleAction.READ_FARES, text.string(R.string.bubble_action_refresh_price, text.provider(it))) }
             next?.let { put(BubbleAction.NEXT_APP, text.string(R.string.bubble_action_next_app_named, text.provider(it.provider))) }
-            target?.let { put(BubbleAction.BOOKED_HERE, text.string(R.string.bubble_action_booked_in, text.provider(it.provider))) }
+            choice.legIds.forEachIndexed { i, legId ->
+                ui.leg(legId)?.let { put(BubbleState.BOOKED_SLOTS[i], text.string(R.string.bubble_action_booked_in, text.provider(it.provider))) }
+            }
         }
-        val refreshStatus = refreshing?.let { BubbleStatus(text.string(R.string.bubble_status_refresh_pending, text.provider(it)), StatusKind.INFO) }
-        return BubbleState.comparing(pasteDrop, nextApp = next != null, labels = labels, status = refreshStatus)
+        val line = when {
+            refreshing != null -> BubbleStatus(text.string(R.string.bubble_status_refresh_pending, text.provider(refreshing)), StatusKind.INFO)
+            // RideMate can't see which app is on screen: one "Booked in <app>" per app it could be.
+            choice is BookChoice.Ask -> BubbleStatus(text.string(R.string.bubble_status_book_which_app), StatusKind.INFO)
+            else -> null
+        }
+        return BubbleState.comparing(
+            pasteDrop,
+            nextApp = next != null,
+            labels = labels,
+            status = line,
+            bookedChoices = choice.legIds.size.coerceAtLeast(1),
+        )
     }
 
     /**
@@ -200,13 +220,10 @@ class SessionBubble(
     }
 
     /**
-     * The leg "Booked here" records: the app RideMate opened last while it is still before booking, else the first
-     * unbooked ride-app leg. The button names it ("Booked in Rapido"), so the user sees which app will be recorded.
+     * The app(s) "Booked here" can record ([BookTargets]): the only one it can be, named on the button ("Booked in
+     * Rapido"), or one button per app when RideMate opened several and can't see which one the user booked in.
      */
-    fun bookTarget(status: GuardianStatus, ui: GuardianUiState): LegUi? {
-        fun bookable(leg: LegUi) = !leg.booked && !leg.dismissed && !leg.state.isTerminal && !leg.provider.isNetwork
-        return ui.legs.firstOrNull { it.legId == status.openedLegId && bookable(it) } ?: ui.legs.firstOrNull(::bookable)
-    }
+    fun bookChoice(status: GuardianStatus, ui: GuardianUiState): BookChoice = BookTargets.choose(ui.legs, status.openedLegId)
 
     private fun currentCard(ui: GuardianUiState): CancelCardItem? {
         val fromUi = ui.items.filterIsInstance<CancelCardItem>().lastOrNull { ui.leg(it.legId)?.state == RideState.CANCEL_GUIDED }

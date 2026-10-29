@@ -22,6 +22,13 @@ enum class BubbleAction(
     /** "I cancelled it" during a guided cancel: RideMate checks a minute later, then guides the next app. */
     I_CANCELLED_IT(R.string.bubble_action_i_cancelled_it, R.string.bubble_action_i_cancelled_it_description, R.drawable.ic_bubble_done, 1),
     BOOKED_HERE(R.string.bubble_action_booked_here, R.string.bubble_action_booked_here_description, R.drawable.ic_bubble_booked_here, 2),
+
+    /**
+     * The second and third "Booked in <app>" when RideMate can't tell which app is on screen (several were opened):
+     * one tap per app, each labelled with its app ([BubbleState.labels]); see `BookTargets`.
+     */
+    BOOKED_HERE_2(R.string.bubble_action_booked_here, R.string.bubble_action_booked_here_description, R.drawable.ic_bubble_booked_here, 2),
+    BOOKED_HERE_3(R.string.bubble_action_booked_here, R.string.bubble_action_booked_here_description, R.drawable.ic_bubble_booked_here, 2),
     DONE(R.string.bubble_action_done, R.string.bubble_action_done_description, R.drawable.ic_bubble_done, 3),
 
     /** "Next: <app>": opens the next selected ride app with the route ready (goal 3). */

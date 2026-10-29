@@ -61,6 +61,9 @@ class FareReadingModule(private val graph: AppGraph) {
 
     val installedVersions: InstalledVersions by lazy { InstalledVersions.of(graph.app) }
 
+    /** The server's announced AI pause: Read fares skips consent, capture and upload until it is over. */
+    val aiPause: AiPauseMemory by lazy { AiPauseMemory(graph.clock) }
+
     val readFares: ReadFaresUseCase by lazy {
         ReadFaresUseCase(
             frames = capture,
@@ -74,6 +77,7 @@ class FareReadingModule(private val graph: AppGraph) {
             installedVersions = installedVersions,
             onAllFaresRead = ::stopAfterLastRead,
             cpu = graph.dispatchers.default,
+            aiPause = aiPause,
         )
     }
 

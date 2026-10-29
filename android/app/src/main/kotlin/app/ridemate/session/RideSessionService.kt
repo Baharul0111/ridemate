@@ -146,6 +146,8 @@ class RideSessionService : LifecycleService() {
         if (tickJob?.isActive == true) return
         tickJob = lifecycleScope.launch {
             while (isActive) {
+                // Renews the bounded wake lock while I8 holds (no-op otherwise), even when nothing else changed.
+                module.runtime.status.value.let { wakeKeeper.update(it.needsForegroundService, it.nextDueElapsedMs) }
                 module.runtime.tick()
                 try {
                     graph.outboxDriver.tick()

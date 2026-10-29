@@ -49,6 +49,7 @@ import kotlin.random.Random
  * @param clock elapsed-realtime base for every deadline.
  * @param random jitter source for the single retry.
  * @param newRequestId one id per logical call (tests pin it).
+ * @param hostPolicy the hosts [baseUrl] may name ([ApiHostPolicy.PRODUCTION]); any other host is "not configured".
  */
 class OkHttpApiClient(
     private val http: OkHttpClient,
@@ -60,6 +61,7 @@ class OkHttpApiClient(
     private val random: Random = Random.Default,
     private val newRequestId: () -> String = { UUID.randomUUID().toString() },
     private val listener: ApiCallListener? = null,
+    private val hostPolicy: ApiHostPolicy = ApiHostPolicy.PRODUCTION,
 ) : ApiClient {
 
     // -----------------------------------------------------------------------------------------------------------
@@ -331,10 +333,15 @@ class OkHttpApiClient(
         return withTimeoutOrNull(remaining) { tokens.idToken(forceRefresh) }
     }
 
+    /**
+     * The endpoint's URL under `api_base_url`, or null (NotConfigured: no request, manual mode) when it is empty, not a
+     * URL, or names a host outside [hostPolicy] (§4.11: the ID token and the user's data go to RideMate's server only).
+     */
     private fun resolveUrl(endpoint: Endpoint): HttpUrl? {
         val base = baseUrl()?.trim().orEmpty()
         if (base.isEmpty()) return null
         val parsed = base.toHttpUrlOrNull() ?: return null
+        if (!hostPolicy.allows(parsed)) return null
         return parsed.newBuilder().addPathSegments(endpoint.path).build()
     }
 

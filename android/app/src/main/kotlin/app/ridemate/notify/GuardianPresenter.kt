@@ -157,8 +157,8 @@ class GuardianPresenter(val text: GuardianText, private val cancelSteps: CancelS
     /**
      * The ongoing notification, mirroring the bubble's actions (fallback when an app hides overlays): before a driver
      * is kept [Read fares] [Booked here] [Stop]; during the cancel chain [I cancelled it] [Show me] [Stop]; otherwise
-     * [Done] [Stop]. "Booked here" names the app it records ([openedLegId], the app RideMate opened last, while it is
-     * still before booking; else the first unbooked app): "Booked in Rapido".
+     * [Done] [Stop]. "Booked here" names the app it records ("Booked in Rapido", [BookTargets]); when RideMate opened
+     * several apps and can't see which one is on screen, it is "Booked in…", which asks ([bookPick]).
      */
     fun ongoing(state: GuardianUiState, openedLegId: String? = null): GuardianCard {
         val guided = state.legs.firstOrNull { it.state == RideState.CANCEL_GUIDED && !it.dismissed }
@@ -186,9 +186,16 @@ class GuardianPresenter(val text: GuardianText, private val cancelSteps: CancelS
             )
             kept == null -> listOfNotNull(
                 sessionAction(SessionOpKind.READ_FARES),
-                bookTarget(state, openedLegId)?.let { leg ->
-                    val label = text.string(R.string.guardian_action_booked_in, text.provider(leg.provider))
-                    CardAction(SessionOp(SessionOpKind.BOOKED_HERE, leg.legId), label, label)
+                when (val choice = BookTargets.choose(state.legs, openedLegId)) {
+                    is BookChoice.One -> state.leg(choice.legId)?.let { leg ->
+                        val label = text.string(R.string.guardian_action_booked_in, text.provider(leg.provider))
+                        CardAction(SessionOp(SessionOpKind.BOOKED_HERE, leg.legId), label, label)
+                    }
+                    // No ref: the guardian asks which app ([bookPick]) instead of guessing.
+                    is BookChoice.Ask -> text.string(R.string.guardian_action_booked_ask).let { label ->
+                        CardAction(SessionOp(SessionOpKind.BOOKED_HERE), label, text.string(R.string.guardian_book_pick_title))
+                    }
+                    BookChoice.None -> null
                 },
                 sessionAction(SessionOpKind.STOP),
             )
@@ -204,11 +211,26 @@ class GuardianPresenter(val text: GuardianText, private val cancelSteps: CancelS
         )
     }
 
-    /** The leg "Booked here" records: the app opened last while still before booking, else the first unbooked app. */
-    private fun bookTarget(state: GuardianUiState, openedLegId: String?): LegUi? {
-        fun bookable(leg: LegUi) = !leg.booked && !leg.dismissed && !leg.state.isTerminal && !leg.provider.isNetwork
-        return state.legs.firstOrNull { it.legId == openedLegId && bookable(it) } ?: state.legs.firstOrNull(::bookable)
-    }
+    /**
+     * "Which app did you book in?": RideMate opened several apps and can't see the screen, so "Booked here" asks
+     * instead of guessing. One button per app ([choices]: leg id and app, the app opened last first); each records
+     * that app.
+     */
+    fun bookPick(choices: List<Pair<String, Provider>>): GuardianCard = GuardianCard(
+        id = BOOK_PICK_ID,
+        channel = GuardianChannels.PROMPTS,
+        title = text.string(R.string.guardian_book_pick_title),
+        lines = listOf(text.string(R.string.guardian_book_pick_body)),
+        actions = choices.take(BookTargets.MAX_CHOICES).map { (legId, provider) ->
+            CardAction(
+                SessionOp(SessionOpKind.BOOKED_HERE, legId),
+                text.provider(provider),
+                text.string(R.string.guardian_action_booked_in, text.provider(provider)),
+            )
+        },
+        style = CardStyle.HEADS_UP,
+        timeoutMs = BOOK_PICK_TTL_MS,
+    )
 
     /** "Booked here" was recorded for [provider]: a short notice names the app, so a wrong one is noticed at once. */
     fun bookedRecorded(legId: String, provider: Provider): GuardianCard = GuardianCard(
@@ -416,5 +438,9 @@ class GuardianPresenter(val text: GuardianText, private val cancelSteps: CancelS
         const val ONGOING_ID = "ongoing"
         const val RESUME_ID = "resume"
         const val START_BLOCKED_ID = "start-blocked"
+
+        /** "Which app did you book in?" (one at a time; replaced by a newer one). */
+        const val BOOK_PICK_ID = "book-pick"
+        const val BOOK_PICK_TTL_MS = 2 * 60_000L
     }
 }

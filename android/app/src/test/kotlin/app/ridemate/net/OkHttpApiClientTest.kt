@@ -62,6 +62,7 @@ class OkHttpApiClientTest {
         timing = timing,
         newRequestId = { "req-${++requestIds}" },
         listener = { endpoint, outcome, attempts, _ -> calls += "${endpoint.name}:$outcome:$attempts" },
+        hostPolicy = ApiHostPolicy.ANY_FOR_TESTS,
     )
 
     private fun budget(ms: Long = 20_000) = TapBudget(clock.elapsedRealtimeMs() + ms)
@@ -282,6 +283,38 @@ class OkHttpApiClientTest {
     }
 
     @Test
+    fun `a base url on a foreign or plain-http host is never sent the ID token`() = runBlocking {
+        val seenTokens = mutableListOf<Boolean>()
+        val strict = OkHttpApiClient(
+            http = OkHttpClient(),
+            baseUrl = { baseUrl },
+            tokens = IdTokenSource { force -> seenTokens += force; IdTokenResult.Token("id-token", Long.MAX_VALUE) },
+            appVersionCode = 42,
+            clock = clock,
+            timing = FAST,
+            hostPolicy = ApiHostPolicy.of(listOf("modal.run")),
+        )
+        // The local server itself (http, localhost) is outside the production policy: no token, no request.
+        assertEquals(ApiResult.NotConfigured, strict.configCheck())
+        for (bad in listOf(
+            "https://evil.example.com",
+            "https://modal.run.evil.example.com",
+            "https://evilmodal.run",
+            "https://modal.run",
+            "http://ws--ridemate-api.modal.run",
+        )) {
+            baseUrl = bad
+            assertEquals(bad, ApiResult.NotConfigured, strict.readScreen(readRequest(), budget()))
+        }
+        assertEquals(0, server.requestCount)
+        assertTrue("the token was never even fetched", seenTokens.isEmpty())
+
+        val policy = ApiHostPolicy.PRODUCTION
+        assertTrue(policy.allows(okhttp3.HttpUrl.Builder().scheme("https").host("ws--ridemate-api.modal.run").build()))
+        assertTrue(!policy.allows(okhttp3.HttpUrl.Builder().scheme("https").host("ridemate.invalid").build()))
+    }
+
+    @Test
     fun `missing token means auth needed or offline without a request`() = runBlocking {
         tokens.signedOut = true
         assertEquals(ApiResult.AuthNeeded, client().configCheck())
@@ -460,6 +493,7 @@ class OkHttpApiClientTest {
             appVersionCode = 42,
             clock = clock,
             timing = FAST,
+            hostPolicy = ApiHostPolicy.ANY_FOR_TESTS,
         )
         val started = clock.elapsedRealtimeMs()
 
@@ -477,7 +511,7 @@ class OkHttpApiClientTest {
             if (force) kotlinx.coroutines.awaitCancellation() else IdTokenResult.Token("stale", Long.MAX_VALUE)
         }
         val timing = FAST.copy(phoneMarginMs = 200, serverDeadlineOverridesMs = mapOf(Endpoint.CONFIG_CHECK to 200L))
-        val api = OkHttpApiClient(OkHttpClient(), { baseUrl }, tokensThenHang, 42, clock, timing)
+        val api = OkHttpApiClient(OkHttpClient(), { baseUrl }, tokensThenHang, 42, clock, timing, hostPolicy = ApiHostPolicy.ANY_FOR_TESTS)
         server.enqueue(error(401, "auth_invalid"))
         val started = clock.elapsedRealtimeMs()
 

@@ -75,7 +75,7 @@ class ReadFaresUseCaseTest {
     private fun leg(id: String, provider: Provider, state: RideState = RideState.OPENED) =
         TestData.leg(id = id, sessionId = "s1", provider = provider, state = state).copy(dismissed = false)
 
-    private fun useCase(cpu: CoroutineDispatcher = Dispatchers.Default) = ReadFaresUseCase(
+    private fun useCase(cpu: CoroutineDispatcher = Dispatchers.Default, aiPause: AiPauseMemory? = null) = ReadFaresUseCase(
         frames = frames,
         ocr = ocr,
         masker = masker,
@@ -87,6 +87,7 @@ class ReadFaresUseCaseTest {
         installedVersions = InstalledVersions { 1L },
         onAllFaresRead = { projectionStops++ },
         cpu = cpu,
+        aiPause = aiPause,
     )
 
     private fun request(provider: Provider = Provider.UBER, legId: String = "l1") =
@@ -120,6 +121,61 @@ class ReadFaresUseCaseTest {
         assertEquals(frames.calls.single() + 20_000, api.budgets.single().deadlineElapsedMs)
         // Ola still waits for a read, so the projection keeps running.
         assertEquals(0, projectionStops)
+    }
+
+    @Test
+    fun `once the server said AI is paused, the next tap captures and uploads nothing, and a quick second tap tries anyway`() = runBlocking {
+        val pause = AiPauseMemory(clock)
+        val readFares = useCase(aiPause = pause)
+        // Home's config-check (or an earlier tap) said: paused until 13:30 IST.
+        pause.onConfigCheck(ApiResult.Ok(app.ridemate.net.ConfigCheckResponse(aiEnabled = false, reason = "budget", resumeAtIst = "13:30")))
+
+        val skipped = readFares.read(request()) as ReadFaresResult.ManualMode
+        assertEquals(ManualReason.AI_PAUSED, skipped.reason)
+        assertEquals("13:30", skipped.resumeAtIst)
+        assertTrue(skipped.pausedEarlier)
+        assertTrue("no consent prompt, no capture", frames.calls.isEmpty())
+        assertTrue("nothing uploaded", api.readRequests.isEmpty())
+        assertEquals(
+            "AI reading resumes at 1:30 PM (IST). Type the price, or tap Read fares again to try anyway.",
+            FareReadingMessages.manualText(context, skipped),
+        )
+
+        // "Try anyway": the server is still paused, so the pause is renewed from its answer.
+        clock.advance(20_000)
+        api.readScreenResult = { ApiResult.AiPaused("quota_exhausted", "14:00", "quota") }
+        val tried = readFares.read(request()) as ReadFaresResult.ManualMode
+        assertFalse(tried.pausedEarlier)
+        assertEquals(1, frames.calls.size)
+        assertEquals(1, api.readRequests.size)
+        assertEquals("14:00", pause.current()?.resumeAtIst)
+
+        // The next tap is skipped again; once a read goes through, the pause is forgotten.
+        clock.advance(5 * 60_000L)
+        assertTrue((readFares.read(request()) as ReadFaresResult.ManualMode).pausedEarlier)
+        assertEquals(1, api.readRequests.size)
+        clock.advance(10_000)
+        api.readScreenResult = { readOk(perfectRead(FareFrames.STANDARD)) }
+        assertTrue(readFares.read(request()) is ReadFaresResult.Read)
+        assertNull(pause.current())
+    }
+
+    @Test
+    fun `a pause without a resume time is honoured for a while, then the server is asked again`() = runBlocking {
+        val pause = AiPauseMemory(clock)
+        val readFares = useCase(aiPause = pause)
+        pause.onAiResult(ApiResult.AiPaused("ai_paused", null, "budget"))
+        assertTrue((readFares.precheck(Provider.UBER))!!.pausedEarlier)
+
+        clock.advance(AiPauseMemory.HOLD_WITHOUT_RESUME_MS + 1)
+        assertNull(readFares.precheck(Provider.UBER))
+        // A passing hiccup (meter unavailable, no resume time) is not remembered as a pause.
+        pause.onAiResult(ApiResult.AiPaused("meter_unavailable", null, null))
+        assertNull(readFares.precheck(Provider.UBER))
+        // The kill switch still wins over a remembered pause.
+        pause.paused("23:59")
+        config.aiEnabled = false
+        assertEquals(ManualReason.KILL_SWITCH, readFares.precheck(Provider.UBER)!!.reason)
     }
 
     @Test

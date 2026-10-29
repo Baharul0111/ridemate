@@ -117,6 +117,34 @@ class RetentionPurgerTest {
         assertTrue(infos.single().state in setOf(WorkInfo.State.ENQUEUED, WorkInfo.State.RUNNING))
     }
 
+    @Test
+    fun `the periodic purge also drops recent destinations older than 24 h, without RideMate being opened`() = runBlocking {
+        val context: Context = ApplicationProvider.getApplicationContext()
+        WorkManagerTestInitHelper.initializeTestWorkManager(context)
+        val app = context as TestRideMateApp
+        val graph = RideMateApp.graph(context)
+        val prefs = context.getSharedPreferences(app.ridemate.trip.RecentPlacesStore.PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit().clear().commit()
+        graph.recentPlaces.add(app.ridemate.trip.TripPlace("Paltan Bazaar, Guwahati", null))
+        app.fakes.clock.advance(1 * hour)
+        graph.recentPlaces.add(app.ridemate.trip.TripPlace("LGBI Airport", null))
+        // The phone sits unused for a day: nothing reads the store (a read would purge it by itself).
+        app.fakes.clock.advance(24 * hour - 30 * 60_000L)
+        val before = prefs.getString("recent", null).orEmpty()
+        assertTrue(before.contains("Paltan Bazaar") && before.contains("LGBI Airport"))
+
+        val result = TestListenableWorkerBuilder<PurgeWorker>(context).build().doWork()
+
+        assertEquals(ListenableWorker.Result.success(), result)
+        val after = prefs.getString("recent", null).orEmpty()
+        assertTrue("the 24.5 h old destination is gone from storage", !after.contains("Paltan Bazaar"))
+        assertTrue("the 23.5 h old one stays until its own day is up", after.contains("LGBI Airport"))
+
+        app.fakes.clock.advance(hour)
+        TestListenableWorkerBuilder<PurgeWorker>(context).build().doWork()
+        assertNull(prefs.getString("recent", null))
+    }
+
     private suspend fun seedSession(id: String, closedAt: Long?, createdAt: Long = clock.wall - 30 * hour) {
         val status = if (closedAt == null) SessionStatus.ACTIVE else SessionStatus.CLOSED
         db.sessionDao().insert(TestData.session(id, createdAtUtc = createdAt, status = status, closedAtUtc = closedAt))

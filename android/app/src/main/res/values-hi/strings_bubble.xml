@@ -20,6 +20,7 @@
     <string name="bubble_action_booked_in">%1$s में बुक किया</string>
     <string name="bubble_action_refresh_price">%1$s का दाम ताज़ा करें</string>
     <string name="bubble_status_refresh_pending">%1$s की दाम सूची पर, नया दाम पढ़ने के लिए %1$s का दाम ताज़ा करें टैप करें।</string>
+    <string name="bubble_status_book_which_app">राइड बुक की? जिस ऐप में बुक की, उसे टैप करें।</string>
 
     <string name="bubble_head_description">RideMate नियंत्रण। खोलने या बंद करने के लिए दो बार टैप करें। हटाने के लिए खींचें।</string>
     <string name="bubble_head_open">खुला</string>

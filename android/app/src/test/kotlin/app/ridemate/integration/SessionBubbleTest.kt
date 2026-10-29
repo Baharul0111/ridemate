@@ -150,18 +150,53 @@ class SessionBubbleTest {
         bubble.onBubbleAction(BubbleAction.BOOKED_HERE, "t2")
         assertEquals(listOf("open:OLA:s1:ola", SessionOp(SessionOpKind.BOOKED_HERE, "s1:uber")), deps.calls)
 
-        // Once Ola is opened (the app on screen), the next one is Rapido and "Booked here" means Ola.
+        // Once Ola is opened too, the next one is Rapido. RideMate can't see whether the user is on Ola or went back to
+        // Uber with Recents, so "Booked here" asks: one button per opened app, the app opened last first.
         val afterOla = GuardianUiState(
             sessionId = "s1",
             legs = listOf(leg(Provider.UBER, RideState.QUOTED), leg(Provider.OLA, RideState.OPENED), leg(Provider.RAPIDO, RideState.SELECTED)),
         )
         val next = bubble.stateFor(open.copy(openedLegId = "s1:ola"), afterOla, pasteDrop = false)!!
         assertEquals("Next: Rapido", next.labelFor(BubbleAction.NEXT_APP))
+        assertEquals(
+            listOf(BubbleAction.READ_FARES, BubbleAction.NEXT_APP, BubbleAction.BOOKED_HERE, BubbleAction.BOOKED_HERE_2, BubbleAction.STOP),
+            next.actions,
+        )
         assertEquals("Booked in Ola", next.labelFor(BubbleAction.BOOKED_HERE))
+        assertEquals("Booked in Uber", next.labelFor(BubbleAction.BOOKED_HERE_2))
+        assertEquals("Booked a ride? Tap the app you booked it in.", next.status!!.text)
 
         // Every app opened: no Next button.
         val allOpened = afterOla.copy(legs = afterOla.legs.map { it.copy(state = RideState.OPENED) })
         assertTrue(BubbleAction.NEXT_APP !in bubble.stateFor(open, allOpened, pasteDrop = false)!!.actions)
+    }
+
+    @Test
+    fun `back on an earlier app with Recents, the user picks the app they booked in and that app is recorded`() {
+        // Uber, Ola and Rapido were all opened through RideMate; the user went back to Uber and booked there.
+        deps.status.value = open.copy(openedLegId = "s1:rapido")
+        deps.uiState.value = GuardianUiState(
+            sessionId = "s1",
+            legs = listOf(leg(Provider.UBER, RideState.QUOTED), leg(Provider.OLA, RideState.QUOTED), leg(Provider.RAPIDO, RideState.OPENED)),
+        )
+        val state = bubble.stateFor(deps.status.value, deps.uiState.value, pasteDrop = false)!!
+        assertEquals("Booked in Rapido", state.labelFor(BubbleAction.BOOKED_HERE))
+        assertEquals("Booked in Uber", state.labelFor(BubbleAction.BOOKED_HERE_2))
+        assertEquals("Booked in Ola", state.labelFor(BubbleAction.BOOKED_HERE_3))
+        assertTrue(BubbleAction.NEXT_APP !in state.actions)
+
+        bubble.onBubbleAction(BubbleAction.BOOKED_HERE_2, "t1")
+        assertEquals(listOf(SessionOp(SessionOpKind.BOOKED_HERE, "s1:uber")), deps.calls)
+
+        // Only one app was ever opened through RideMate: that's the one, named on a single button.
+        val one = GuardianUiState(
+            sessionId = "s1",
+            legs = listOf(leg(Provider.UBER, RideState.SELECTED), leg(Provider.OLA, RideState.QUOTED), leg(Provider.RAPIDO, RideState.SELECTED)),
+        )
+        val single = bubble.stateFor(open.copy(openedLegId = "s1:ola"), one, pasteDrop = false)!!
+        assertEquals("Booked in Ola", single.labelFor(BubbleAction.BOOKED_HERE))
+        assertTrue(BubbleAction.BOOKED_HERE_2 !in single.actions)
+        assertNull(single.status)
     }
 
     @Test

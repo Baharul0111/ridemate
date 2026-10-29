@@ -36,6 +36,8 @@ import app.ridemate.data.PlaceColumns
 import app.ridemate.data.SessionEntity
 import app.ridemate.data.SessionStatus
 import app.ridemate.notify.ActionTarget
+import app.ridemate.notify.BookChoice
+import app.ridemate.notify.BookTargets
 import app.ridemate.notify.GuardianIntents
 import app.ridemate.notify.GuardianNotifier
 import app.ridemate.notify.GuardianPresenter
@@ -259,12 +261,18 @@ class GuardianRuntime(
                 SessionOpKind.READ_FARES -> onMain { bindings.fareReader?.readFares() ?: notifier.openRideMate(GuardianIntents.DESTINATION_GUARDIAN) }
                 SessionOpKind.BOOKED_HERE -> enqueue {
                     if (guardian.state.session?.closed != false) return@enqueue
-                    // The bubble and the notification name the app they record (the ref); without one, the app
-                    // RideMate opened last while it is still before booking, else the first unbooked app.
-                    val legId = target.ref?.takeIf { it in guardian.state.legs }
-                        ?: lastOpenedLegId?.takeIf { bookable(it) }
-                        ?: firstUnbookedLeg()
+                    // The bubble and the notification name the app they record (the ref). Without one, the only app
+                    // it can be; when RideMate opened several and can't see which is on screen, it asks (goal 8).
+                    val legId = target.ref?.takeIf { it in guardian.state.legs } ?: when (val choice = bookChoice()) {
+                        is BookChoice.One -> choice.legId
+                        is BookChoice.Ask -> {
+                            askWhichApp(choice.legIds)
+                            null
+                        }
+                        BookChoice.None -> null
+                    }
                     if (legId != null) {
+                        notifier.cancel(GuardianPresenter.BOOK_PICK_ID)
                         applyUserAction(UserAction.BookedHere(legId, newTap()))
                         confirmBooked(legId)
                     }
@@ -312,6 +320,23 @@ class GuardianRuntime(
     fun requestDone() = enqueue {
         val session = guardian.state.session
         if (session != null && !session.closed) doneRequested = true
+    }
+
+    /** "Which app did you book in?": one button per app it could be, each recording that app. */
+    private fun askWhichApp(legIds: List<String>) {
+        val choices = legIds.mapNotNull { id -> guardian.state.legs[id]?.let { id to it.provider } }
+        if (choices.isEmpty()) return
+        try {
+            notifier.post(presenter().bookPick(choices))
+        } catch (e: RuntimeException) {
+            report(e)
+        }
+    }
+
+    /** What "Booked here" without a named app can record ([BookTargets], the same rule the bubble shows). */
+    private fun bookChoice(): BookChoice {
+        if (guardian.state.session?.closed != false) return BookChoice.None
+        return BookTargets.choose(guardian.state.legs.values, lastOpenedLegId, LegRecord::legId, { it.leg.state }) { bookable(it.legId) }
     }
 
     /** "Booked here" from the bubble or notification: a short notice says which app was recorded. */
@@ -380,7 +405,8 @@ class GuardianRuntime(
 
     override fun captureTap(provider: Provider): TapId? = captureTapsByProvider[provider]
 
-    override fun done() = requestStop()
+    // "Done" keeps watching a kept ride that still has a driver (a captain's cancel, the pay hand-off still reach the user).
+    override fun done() = requestDone()
 
     override fun stop() = requestStop()
 
@@ -968,11 +994,6 @@ class GuardianRuntime(
     private fun legOf(provider: Provider): String? {
         if (guardian.state.session?.closed != false) return null
         return guardian.state.legs.values.firstOrNull { it.provider == provider }?.legId
-    }
-
-    private fun firstUnbookedLeg(): String? {
-        if (guardian.state.session?.closed != false) return null
-        return guardian.state.legs.values.firstOrNull { !it.leg.isBooked && !it.leg.state.isTerminal && !it.leg.isNetwork }?.legId
     }
 
     private fun onMain(block: () -> Unit) = mainExecutor.execute {

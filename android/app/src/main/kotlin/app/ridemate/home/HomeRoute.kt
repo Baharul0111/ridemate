@@ -24,6 +24,7 @@ fun HomeRoute(graph: AppGraph, navigator: FeatureNavigator) {
             api = graph.apiClient,
             gate = { shell.preSessionGate },
             scope = scope,
+            onAiCheck = graph.fareReading.aiPause::onConfigCheck,
         )
     }
     val state by model.state.collectAsStateWithLifecycle()

@@ -13,6 +13,7 @@ import app.ridemate.data.SessionStatus
 import app.ridemate.notify.CancelCardItem
 import app.ridemate.notify.DriverSheetItem
 import app.ridemate.notify.GuardianChannels
+import app.ridemate.notify.GuardianPresenter
 import app.ridemate.notify.GuardianTap
 import app.ridemate.notify.PromptItem
 import app.ridemate.notify.ReminderItem
@@ -702,6 +703,67 @@ class GuardianRuntimeTest {
         val presented = r.presenter().present(second)
         assertTrue(presented.alertAgain)
         assertNotNull(r.notification(alertId))
+    }
+
+    @Test
+    fun `I cancelled it twice on the same leg sounds the still-looks-active alert twice`() = runBlocking {
+        val r = rig()
+        r.firstDriverChain()
+        val uber = r.legId(Provider.UBER)
+        val alertId = "alert:$uber:${UiKey.ALERT_STILL_LIVE.name}"
+
+        r.runtime.perform(GuardianTap(TapScope.LEG, uber, UiAction.I_CANCELLED_IT))
+        r.idle()
+        r.advance(60_000)
+        r.serviceTick()
+        assertNotNull("first +60 s check: Uber's ride post is still there", r.notification(alertId))
+        assertEquals(RideState.CANCEL_UNCONFIRMED, r.ui.leg(uber)!!.state)
+
+        // The user opens Uber from the alert (guided again) and says once more that they cancelled.
+        r.runtime.perform(GuardianTap(TapScope.LEG, uber, UiAction.OPEN_APP))
+        r.idle()
+        assertEquals(RideState.CANCEL_GUIDED, r.ui.leg(uber)!!.state)
+        assertNull("the old alert goes while the user cancels again", r.notification(alertId))
+        r.runtime.perform(GuardianTap(TapScope.LEG, uber, UiAction.I_CANCELLED_IT))
+        r.idle()
+        r.advance(60_000)
+        r.serviceTick()
+
+        // Still live: a second loud alert, posted again (heads-up and sound), never swallowed as "unchanged".
+        val again = r.notification(alertId)
+        assertNotNull(again)
+        val item = r.ui.items.filterIsInstance<app.ridemate.notify.AlertItem>().single { it.id == alertId }
+        assertTrue(r.presenter().present(item).alertAgain)
+        assertEquals(RideState.CANCEL_UNCONFIRMED, r.ui.leg(uber)!!.state)
+    }
+
+    @Test
+    fun `Booked here from the notification asks which app when several were opened, and records the one picked`() = runBlocking {
+        val r = rig()
+        r.startSession(Provider.UBER, Provider.OLA, Provider.RAPIDO)
+        // Compared through RideMate: Uber, then Ola, then Rapido; the user went back to Uber with Recents and booked.
+        r.runtime.appOpened(Provider.UBER)
+        r.runtime.appOpened(Provider.OLA)
+        r.runtime.appOpened(Provider.RAPIDO)
+        r.idle()
+        val ongoing = r.presenter().ongoing(r.ui, r.status.openedLegId)
+        val booked = ongoing.actions.single { (it.target as? SessionOp)?.op == SessionOpKind.BOOKED_HERE }
+        assertEquals("the notification names no app it can't be sure of", SessionOp(SessionOpKind.BOOKED_HERE), booked.target)
+
+        r.runtime.perform(booked.target)
+        r.idle()
+        assertEquals("nothing is recorded on a guess", 0, r.status.bookedLegs)
+        val pick = r.notification(GuardianPresenter.BOOK_PICK_ID)
+        assertEquals("Which app did you book in?", r.title(pick))
+        assertEquals(listOf("Rapido", "Uber", "Ola"), r.actionTitles(GuardianPresenter.BOOK_PICK_ID))
+
+        // The user taps Uber.
+        r.runtime.perform(SessionOp(SessionOpKind.BOOKED_HERE, r.legId(Provider.UBER)))
+        r.idle()
+        assertEquals(RideState.BOOK_REQUESTED, r.ui.leg(r.legId(Provider.UBER))!!.state)
+        assertEquals(RideState.OPENED, r.ui.leg(r.legId(Provider.RAPIDO))!!.state)
+        assertNull("the question goes once answered", r.notification(GuardianPresenter.BOOK_PICK_ID))
+        assertEquals("Recorded: booked in Uber", r.title(r.notification("booked:${r.legId(Provider.UBER)}")))
     }
 
     @Test

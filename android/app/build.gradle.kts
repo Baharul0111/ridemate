@@ -29,6 +29,9 @@ android {
         ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a") }
         buildConfigField("String", "GITHUB_REPO", "\"Baharul0111/ridemate\"")
         buildConfigField("String", "PRIVACY_EMAIL", "\"ibaharul567@gmail.com\"")
+        // The only hosts the Remote Config `api_base_url` may point at (https, a subdomain of one of these): the ID token,
+        // masked screenshots and notification text never go anywhere else (§4.11). Comma-separated.
+        buildConfigField("String", "API_HOST_SUFFIXES", "\"modal.run\"")
     }
 
     signingConfigs {
