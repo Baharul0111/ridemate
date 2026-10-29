@@ -254,6 +254,26 @@ class GuardianRuntimeTest {
     }
 
     @Test
+    fun `a demo session left open by a dead process ends on restore and never blocks a comparison`() = runBlocking {
+        val first = rig()
+        first.startSession(Provider.DEMO_KESTREL, Provider.DEMO_PEPPER, demo = true, id = "demo-1")
+        first.book(Provider.DEMO_KESTREL, Provider.DEMO_PEPPER)
+        assertTrue(first.status.sessionOpen && first.status.demo)
+        first.kill()
+
+        // Nothing plays the demo's script in the new process: its fictional bookings are let go at once.
+        val second = rig { GuardianTestRig(db = first.db, clock = first.clock) }
+        assertTrue(second.status.restored)
+        assertFalse(second.status.sessionOpen)
+        assertFalse(second.status.needsForegroundService)
+        assertEquals(app.ridemate.data.SessionStatus.CLOSED, second.db.sessionDao().get("demo-1")?.status)
+
+        second.startSession(Provider.UBER, Provider.OLA, id = "live-1")
+        assertEquals("live-1", second.status.sessionId)
+        assertFalse(second.status.demo)
+    }
+
+    @Test
     fun `after a reboot overdue reminders collapse into one and the outbox follows the rebased schedule`() = runBlocking {
         val first = rig()
         first.firstDriverChain()

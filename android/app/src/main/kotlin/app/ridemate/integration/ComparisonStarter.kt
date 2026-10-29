@@ -59,7 +59,9 @@ class ComparisonStarter(
             onNetworkBookingLive()
             return null
         }
-        val refused = previous.sessionOpen && previous.needsForegroundService
+        // The guardian refuses (and says why) while the previous session still has bookings to cancel (I8), or while
+        // Try the demo is running: a live comparison never replaces the demo's session.
+        val refused = previous.sessionOpen && (previous.needsForegroundService || previous.demo)
         val sessionId = newSessionId()
         val spec = SessionSpec(
             pickup = placeOf(plan.pickup),

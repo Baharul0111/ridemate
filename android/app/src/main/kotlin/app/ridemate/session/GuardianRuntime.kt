@@ -516,6 +516,14 @@ class GuardianRuntime(
         val g = guardian
         val current = g.state.session
         if (current != null && !current.closed) {
+            if (current.demo && !demo) {
+                // Try the demo owns its session while it plays: a live comparison never replaces it. Replacing it
+                // would stop the demo's scripted rides half way (no pay hand-off) and leave the guardian on a live
+                // session the demo screen knows nothing of. The user leaves the demo first (that ends its session).
+                startRefused = true
+                notifier.post(presenter().startBlockedByDemo())
+                return
+            }
             if (!g.closeSession()) {
                 // I8: the previous session still has bookings to cancel; it keeps running.
                 startRefused = true
@@ -650,6 +658,15 @@ class GuardianRuntime(
             closedAtUtc = row?.closedAtUtc
             ui = GuardianUiState.decode(journal)?.takeIf { it.sessionId == restored.state.session?.sessionId } ?: GuardianUiState.EMPTY
             restored.resume()
+            // Try the demo is played by the process that started it: a demo session that outlived its process has
+            // no script left to finish it, so it ends now (its bookings are fictional) instead of lingering open,
+            // reminding about fictional bookings, and keeping a real comparison from starting.
+            if (restored.state.session?.let { it.demo && !it.closed } == true) {
+                restored.endDemoSession()
+                closedAtUtc = clock.wallMs()
+                pipeline.demoSessionActive = false
+                onMain { bindings.bubble.clearCancelCard() }
+            }
         }
         val stale = active.drop(if (restored != null) 1 else 0).map { it.first.sessionId }
         if (stale.isNotEmpty()) {

@@ -159,3 +159,36 @@ RIDEMATE_KEYSTORE_PASSWORD=… tools/release.sh
 | GitHub | `Baharul0111/ridemate` main pushed (green commit `a658b4e` and later docs); `Baharul0111/ridemate-golden` private golden set pushed |
 | Modal spend | **$0.23 of $100** (AI $0.21, compute $0.01), all through the meter |
 | Not done in time | Gradle dependency-verification file (`tools/update_dependency_verification.sh` — run it once, commit `android/gradle/verification-metadata.xml`; until then the Android CI job may fail early); a few minor redesign items noted by the agents (restricted-settings guide still a card, under-18 screen paragraph, active-ride card timeline) |
+
+## 10. Ready for normal people? (status 29 Oct 2026, evening)
+**What already works for any user today** (signed APK in `dist/`, backend live on Modal):
+* Install → onboarding (18+, privacy notice, optional Google sign-in, permissions with reasons, self-test).
+* Enter a trip by typing, voice, or **pinning pickup/drop on the map**; pick apps and vehicle types.
+* RideMate opens Uber with the route filled in and Ola/Rapido with the drop address ready to paste.
+* Read fares with the bubble: the two-reader check shows a price only when Muse Spark Open and the on-phone reader
+  agree; otherwise "Couldn't read · check in app" and the user can type the price. AI is limited per person (6
+  reads + 10 notification checks a day; 3 on day one) and pauses safely before the credit runs out — the guardian
+  keeps working without AI.
+* After booking, RideWatch watches only Uber/Ola/Rapido notifications; when a driver is found it asks "Cancel the
+  others?", guides each cancel, proves it, and keeps reminding (30 s, 1 min, 2 min, then every 2 min).
+* If a notification's wording is not recognised, RideMate **asks** ("Rapido has an update. Got a driver?") instead
+  of staying silent — so it is safe even before the real-app templates are tuned.
+* Erase, My data, English + Hindi, TalkBack labels.
+
+**Evening fix (29 Oct):** a live comparison could replace a running "Try the demo" session, which stopped the demo
+before the pay hand-off. A live comparison is now refused while the demo runs (with a clear message), and a demo
+session left over after an app restart ends cleanly. Regression tests added; on-phone suite re-run (see
+`docs/test-evidence.md`).
+
+**What still needs you before inviting the public** (these are deliberate gates from `goal.md`/`setup.md`):
+1. **Modal's written billing confirmation** (reply from billing@modal.com) — no public sharing before it.
+2. **Your explicit go-ahead to switch the server to public-launch settings** — one command, documented in
+   `docs/runbooks/public-launch.md`: ONDC off in production (the demo seller is for the hackathon only), caps on,
+   judging profile off, tag `v1.1.0`.
+3. **Your go-ahead to publish the GitHub Release** (`tools/release.sh --skip-build --publish`), which is how normal
+   people download the APK with its checksum.
+4. **Record real Uber/Ola/Rapido screens and notifications with the in-app Recorder** (Developer mode, your own rides)
+   so the real-app templates move from "unverified" to verified; push them through Remote Config — no app update
+   needed. Until then real-app reading works but falls back to "Couldn't read · type the price" and "Got a driver?"
+   questions more often.
+5. Optional: Play Store listing ($25) and Android developer verification (2027) — both your decision.

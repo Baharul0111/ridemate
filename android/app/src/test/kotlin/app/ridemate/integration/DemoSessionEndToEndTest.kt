@@ -12,6 +12,7 @@ import app.ridemate.config.AssetBundledConfig
 import app.ridemate.core.guardian.UiAction
 import app.ridemate.core.guardian.UiKey
 import app.ridemate.core.model.EvidenceRung
+import app.ridemate.core.model.LatLng
 import app.ridemate.core.model.Provider
 import app.ridemate.core.model.Provider.DEMO_KESTREL
 import app.ridemate.core.model.Provider.DEMO_PEPPER
@@ -39,6 +40,9 @@ import app.ridemate.ocr.OcrEngine
 import app.ridemate.session.GuardianRuntime
 import app.ridemate.testing.ProgrammableApiClient
 import app.ridemate.testing.TestRideMateApp
+import app.ridemate.trip.TripPlace
+import app.ridemate.trip.TripPlan
+import app.ridemate.trip.VehicleChoice
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -47,6 +51,7 @@ import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -225,6 +230,68 @@ class DemoSessionEndToEndTest {
         assertEquals(RideState.PAY_HANDOFF, leg(DEMO_TAMARIND).state)
         c.stop()
         settle()
+    }
+
+    @Test
+    fun `a Compare while the demo plays never replaces its session - the demo still reaches the pay hand-off`() {
+        // Found on the phone: the guardian ended up on a live Uber/Ola/Rapido session (all SELECTED) in the middle of
+        // the keep-searching walk, so the demo's ride never ended and the next test found Home showing that session.
+        val c = graph.demoController
+        assertEquals(DemoStartResult.STARTED, c.start(DemoTrackChoice.KEEP_SEARCHING))
+        settle()
+        val demoSession = runtime.status.value.sessionId
+        for (provider in listOf(DEMO_KESTREL, DEMO_PEPPER, DEMO_TAMARIND)) {
+            c.bookedHere(provider)
+            settle()
+        }
+        advance(9_000)
+        val first = runtime.uiState.value.items.filterIsInstance<DriverSheetItem>().single()
+        runtime.perform(GuardianTap(TapScope.SHEET, first.id, UiAction.KEEP_SEARCHING))
+        settle()
+        advance(8_000)
+        val offer = runtime.uiState.value.items.filterIsInstance<BetterRideItem>().single()
+        runtime.perform(GuardianTap(TapScope.SHEET, offer.id, UiAction.SWITCH))
+        settle()
+        advance(1_000)
+        val second = runtime.uiState.value.items.filterIsInstance<DriverSheetItem>().single()
+        runtime.perform(GuardianTap(TapScope.SHEET, second.id, UiAction.YES_CANCEL_OTHERS))
+        settle()
+        eventually("Pepper guided first") { c.state.value.app?.provider == DEMO_PEPPER && c.state.value.app?.purpose == DemoAppPurpose.CANCEL }
+        c.tapCancelRide(DEMO_PEPPER)
+        advance(2_000)
+        eventually("Kestrel next") { c.state.value.app?.provider == DEMO_KESTREL }
+        c.tapCancelRide(DEMO_KESTREL)
+        advance(2_000)
+        assertEquals(RideState.CANCEL_CONFIRMED, leg(DEMO_PEPPER).state)
+        assertEquals(RideState.CANCEL_CONFIRMED, leg(DEMO_KESTREL).state)
+
+        // Both other bookings proven cancelled, Tamarind's ride still to end: a real comparison is asked for.
+        val plan = TripPlan(
+            pickup = TripPlace("Pickup", LatLng(26.1445, 91.7362)),
+            drop = TripPlace("Drop", LatLng(26.1158, 91.7086)),
+            apps = listOf(Provider.UBER, Provider.OLA, Provider.RAPIDO),
+            vehicles = setOf(VehicleChoice.AUTO),
+            includeOndc = false,
+        )
+        assertNull("refused while the demo runs", graph.comparisonStarter.start(plan))
+        settle()
+        val status = runtime.status.value
+        assertEquals("the demo keeps its session", demoSession, status.sessionId)
+        assertTrue(status.sessionOpen && status.demo)
+        assertTrue("no live leg", runtime.uiState.value.legs.all { it.provider.isDemo })
+        assertTrue(c.state.value.running)
+
+        // The scripted ride still ends: pay hand-off in Tamarind Cabs, then the demo ends cleanly.
+        advance(45_000)
+        assertTrue(c.state.value.progress.payOffered)
+        c.pay(DEMO_TAMARIND)
+        settle()
+        eventually("pay hand-off") { c.state.value.phase == DemoPhase.FINISHED }
+        assertEquals(RideState.PAY_HANDOFF, leg(DEMO_TAMARIND).state)
+        c.stop()
+        settle()
+        eventually("demo session ended") { !runtime.status.value.sessionOpen }
+        assertEquals(SessionStatus.CLOSED, runBlocking { graph.db.sessionDao().get(demoSession!!) }?.status)
     }
 
     @Test

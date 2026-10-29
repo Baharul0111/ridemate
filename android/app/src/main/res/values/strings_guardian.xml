@@ -247,6 +247,7 @@
     <string name="guardian_resume_body">RideMate needs to run to keep reminding you about extra bookings.</string>
     <string name="guardian_start_blocked">Finish cancelling your previous bookings before starting a new comparison.</string>
     <string name="guardian_start_blocked_network">Your open-network ride is still booked. Cancel it in RideMate, or let it finish, before starting a new comparison.</string>
+    <string name="guardian_start_blocked_demo">Try the demo is still running. Leave the demo before starting a new comparison.</string>
 
     <!-- Onboarding self-test. -->
 

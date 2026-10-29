@@ -91,6 +91,9 @@ class DemoEndToEndTest {
     private val verifiedProviders = mutableSetOf<Provider>()
     private val unverifiedReasons = mutableListOf<String>()
 
+    /** True from the start of a walk until the test itself leaves the demo: the demo must keep running meanwhile. */
+    private var walking = false
+
     @Before
     fun setUp() {
         ensureOnboarded()
@@ -100,6 +103,9 @@ class DemoEndToEndTest {
         }
         log("api base url host: ${android.net.Uri.parse(baseUrl).host}")
         assertTrue("demo_enabled must be on", graph.configRepository.demoEnabled.value)
+        // Every walk starts from a clean guardian: no demo running and no session left open by an earlier test (or
+        // an earlier run restored from storage), so Home shows its Try the demo tile and no active-ride card.
+        endOpenSessions(strict = true)
         // Signed out, so the demo itself must fetch an anonymous token (M9: no Google sign-in needed).
         runBlocking { graph.authGateway.signOut() }
         waitUntil("signed out", 10_000) { graph.authGateway.state.value == AuthState.SignedOut }
@@ -109,7 +115,9 @@ class DemoEndToEndTest {
 
     @After
     fun tearDown() {
-        instrumentation.runOnMainSync { if (demo.state.value.running) demo.stop() }
+        walking = false
+        // Nothing this test opened is left for the next one (a failed walk can leave its demo or a session open).
+        runCatching { endOpenSessions(strict = false) }.onFailure { log("tearDown: ${it.message}") }
         DeviceE2e.finishActivities()
     }
 
@@ -301,6 +309,7 @@ class DemoEndToEndTest {
             confirm = { demo.state.value.phase == DemoPhase.BOOKING })
         waitUntil("demo running ($choice)", 15_000) { demo.state.value.phase == DemoPhase.BOOKING }
         assertTrue(ui().demo)
+        walking = true
     }
 
     /** The two-reader gate's output for one demo screen (I2): VERIFIED numbers only, cheapest only among them. */
@@ -436,6 +445,7 @@ class DemoEndToEndTest {
     }
 
     private fun leaveDemo() {
+        walking = false
         scrollAndTap(By.desc(str(R.string.demo_leave_description)), "Leave demo", obstructionTop = ::sheetTop,
             confirm = { !demo.state.value.running })
         waitUntil("demo left", 10_000) { !demo.state.value.running }
@@ -445,7 +455,14 @@ class DemoEndToEndTest {
 
     /** [DeviceE2e.waitFor] that logs the guardian and demo state (enums and counts only) when it times out. */
     private fun <T : Any> waitFor(what: String, timeoutMs: Long, pollMs: Long = 250, value: () -> T?): T = try {
-        DeviceE2e.waitFor(what, timeoutMs, pollMs, value)
+        DeviceE2e.waitFor(what, timeoutMs, pollMs) {
+            // The demo ends only when its screen closes; nothing in the walk closes it before leaveDemo(). Say so at
+            // once instead of waiting out the timeout (seen when the phone was used by hand during a run).
+            if (walking && !demo.state.value.running) {
+                fail("the demo stopped while waiting for $what: its screen was closed (Back, or the phone was used during the run)")
+            }
+            value()
+        }
     } catch (e: AssertionError) {
         log("STATE at timeout ($what): ${describe()}")
         throw e
@@ -475,6 +492,27 @@ class DemoEndToEndTest {
     }
 
     private fun ui(): GuardianUiState = guardian.uiState.value
+
+    /**
+     * Ends whatever this process's guardian still has open, through the app's own paths: a running demo is left (that
+     * ends its session) and a live session gets Stop, which closes it once I8 allows. A live session that still looks
+     * after real bookings cannot be closed by a test: [strict] fails with what is open instead of starting on top of it.
+     */
+    private fun endOpenSessions(strict: Boolean) {
+        instrumentation.runOnMainSync { if (demo.state.value.running) demo.stop() }
+        runBlocking { withTimeout(20_000) { guardian.awaitIdle() } }
+        val open = guardian.status.value
+        if (open.sessionOpen) {
+            log("closing a session left open (demo=${open.demo}, booked=${open.bookedLegs})")
+            if (open.demo) guardian.endDemoSession() else guardian.requestStop()
+            runBlocking { withTimeout(20_000) { guardian.awaitIdle() } }
+        }
+        val after = guardian.status.value
+        if (strict && after.sessionOpen) {
+            fail("a session is still open before the walk (demo=${after.demo}, booked=${after.bookedLegs}, " +
+                "foreground=${after.needsForegroundService}): ${describe()}")
+        }
+    }
 
     /** Fails unless [condition] stays true for the whole of [durationMs] (a negative check: nothing happens unasked). */
     private fun holdsFor(what: String, durationMs: Long, condition: () -> Boolean) {

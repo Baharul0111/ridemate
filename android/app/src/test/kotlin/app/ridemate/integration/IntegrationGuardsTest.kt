@@ -152,6 +152,57 @@ class IntegrationGuardsTest {
     }
 
     @Test
+    fun `a live comparison never replaces Try the demo while it runs`() {
+        assertEquals(DemoStartResult.STARTED, graph.demoController.start(DemoTrackChoice.MAIN))
+        settle()
+        val demoSession = runtime.status.value.sessionId
+        assertTrue(runtime.status.value.demo)
+
+        // Nothing booked in the demo yet, so I8 alone would let the live session close it.
+        runtime.startSession(liveSpec(SESSION))
+        settle()
+        val status = runtime.status.value
+        assertEquals("the demo keeps the guardian's session", demoSession, status.sessionId)
+        assertTrue(status.sessionOpen && status.demo)
+        assertNull(runtime.legIdFor(Provider.UBER))
+        assertTrue(graph.demoController.state.value.running)
+
+        // Leaving the demo ends its session; then the comparison starts.
+        graph.demoController.stop()
+        settle()
+        runtime.startSession(liveSpec(SESSION))
+        settle()
+        assertEquals(SESSION, runtime.status.value.sessionId)
+        assertFalse(runtime.status.value.demo)
+    }
+
+    @Test
+    fun `a Compare while Try the demo runs opens no app and starts no network search`() {
+        val guardian = RecordingGuardian(GuardianStatus(restored = true, sessionId = "demo-1", demo = true, sessionOpen = true))
+        val opened = mutableListOf<LaunchRequest>()
+        val searched = mutableListOf<String>()
+        val starter = ComparisonStarter(
+            guardian = guardian,
+            launcher = RouteLauncher { request -> opened += request; null },
+            network = NetworkSearch { _, legId, _, _ -> searched += legId; OndcResult.Ok },
+            keepSearchingDefault = { false },
+            scope = CoroutineScope(Dispatchers.Unconfined),
+        )
+        val plan = TripPlan(
+            pickup = TripPlace("Pickup", LatLng(26.1445, 91.7362)),
+            drop = TripPlace("Drop", LatLng(26.1158, 91.7086)),
+            apps = listOf(Provider.UBER, Provider.OLA),
+            vehicles = setOf(VehicleChoice.AUTO),
+            includeOndc = true,
+        )
+
+        assertNull(starter.start(plan))
+        assertEquals("the guardian still gets the start, refuses it and says why", 1, guardian.started.size)
+        assertTrue("no ride app opened for a session that won't exist", opened.isEmpty())
+        assertTrue("no network search either", searched.isEmpty())
+    }
+
+    @Test
     fun `the demo waits only for live bookings that are still running`() {
         val open = GuardianStatus(restored = true, sessionId = SESSION, sessionOpen = true)
         fun ui(vararg legs: LegUi) = GuardianUiState(sessionId = SESSION, legs = legs.toList())

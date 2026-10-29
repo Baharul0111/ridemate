@@ -1,5 +1,20 @@
 # On-phone test evidence
 
+## Final run — 29 Oct 2026, 21:33–21:37 IST (moto g57 power, Android 17 / API 37), final redesigned build
+Command: `cd android && ./gradlew :app:connectedDebugAndroidTest` (fresh install).
+
+| Test | Result | Time |
+|---|---|---|
+| FreshInstallOnboardingTest — every onboarding step, health check sees RideMate's own notification, Home | PASS | 23.5 s |
+| DemoEndToEndTest — keep-searching walk: better-ride offer → Yes → others cancelled with rung-2 proof → pay hand-off | PASS | 133.6 s |
+| DemoEndToEndTest — main walk: real Muse Spark Open reads via the backend + two-reader gate (≥ 2 providers VERIFIED, every VERIFIED price equals the label, no number on unreadable rows), driver found → Cancel the others → cancel guide → rung-2 proof → reminders → pay hand-off | PASS | 218.6 s |
+| DemoOcrRecorderTest — real ML Kit OCR of every bundled demo screen | PASS | 6.7 s |
+| MigrationTest — Room v1→v2 (2 tests) | PASS | 0.1 s each |
+
+Fix verified by this run: a live comparison can no longer replace a running "Try the demo" session (it used to stop
+the demo before the pay hand-off), and a demo session left over after a restart ends cleanly.
+
+
 Run on 29 October 2026 (IST) against RideMate's deployed backend on Modal (Remote Config `api_base_url`), with
 Muse Spark Open answering the demo reads. Counts, rates and enums only: no fare values appear here.
 

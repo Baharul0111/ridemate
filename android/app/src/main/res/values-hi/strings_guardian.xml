@@ -224,6 +224,7 @@
     <string name="guardian_resume_body">अतिरिक्त बुकिंग के रिमाइंडर देते रहने के लिए RideMate का चलना ज़रूरी है।</string>
     <string name="guardian_start_blocked">नई तुलना शुरू करने से पहले अपनी पिछली बुकिंग रद्द करना पूरा करें।</string>
     <string name="guardian_start_blocked_network">आपकी ओपन नेटवर्क राइड अभी बुक है। नई तुलना शुरू करने से पहले उसे RideMate में रद्द करें, या राइड पूरी होने दें।</string>
+    <string name="guardian_start_blocked_demo">डेमो अभी चल रहा है। नई तुलना शुरू करने से पहले डेमो छोड़ें।</string>
 
 
     <string name="guardian_channel_guardian">राइड गार्डियन की स्थिति</string>

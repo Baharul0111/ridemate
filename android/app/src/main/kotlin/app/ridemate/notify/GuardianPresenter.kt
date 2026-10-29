@@ -275,6 +275,17 @@ class GuardianPresenter(val text: GuardianText, private val cancelSteps: CancelS
         timeoutMs = GuardianUiReducer.NOTICE_TTL_MS,
     )
 
+    /** A new comparison was refused because Try the demo is running: leave the demo first. */
+    fun startBlockedByDemo(): GuardianCard = GuardianCard(
+        id = START_BLOCKED_ID,
+        channel = GuardianChannels.PROMPTS,
+        title = text.string(R.string.guardian_start_blocked_demo),
+        lines = emptyList(),
+        actions = emptyList(),
+        style = CardStyle.HEADS_UP,
+        timeoutMs = GuardianUiReducer.NOTICE_TTL_MS,
+    )
+
     fun stopBlockedLine(state: GuardianUiState): String {
         val pending = state.legs.filter { it.role == LegRole.EXTRA && !it.dismissed && !it.state.isTerminal }
         return text.string(R.string.guardian_stop_blocked, text.providers(pending.map { it.provider }))
