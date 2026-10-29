@@ -8,15 +8,12 @@
     <string name="home_warnings_heading">तुलना से पहले</string>
     <string name="home_continue_anyway">फिर भी आगे बढ़ें</string>
     <string name="home_check_close">बंद करें</string>
-
-    <string name="home_demo_title">डेमो आज़माएँ</string>
     <string name="home_demo_body">काल्पनिक नमूना स्क्रीन से देखें कि RideMate किराए कैसे पढ़ता है, ड्राइवर मिलने पर क्या करता है, रद्द करने में कैसे मदद करता है और बेहतर राइड कैसे सुझाता है। किसी राइड ऐप या साइन-इन की ज़रूरत नहीं।</string>
     <string name="home_demo_off">डेमो अभी बंद है। बाद में फिर कोशिश करें।</string>
     <string name="home_try_demo">डेमो आज़माएँ</string>
     <string name="home_try_demo_cd">काल्पनिक नमूना स्क्रीन के साथ डेमो आज़माएँ</string>
 
     <string name="home_session_title">राइड जारी है</string>
-    <string name="home_session_body">%1$s तक · %2$s · %3$s पर शुरू</string>
     <string name="home_session_open">राइड गार्डियन खोलें</string>
 
     <string name="home_update_download">अपडेट डाउनलोड करें</string>
@@ -36,8 +33,6 @@
     <string name="home_ai_retry">फिर से जाँचें</string>
     <string name="home_sign_in">Google से साइन इन करें</string>
     <string name="home_guardian_keeps_working">राइड गार्डियन और रद्द करने के रिमाइंडर काम करते रहते हैं।</string>
-
-    <string name="home_status_heading">सुविधाओं की स्थिति</string>
     <string name="home_switch_on">चालू</string>
     <string name="home_switch_off">बंद</string>
     <string name="home_switch_ai">AI से पढ़ना</string>
@@ -66,4 +61,13 @@
     <string name="home_issue_offline_title">आप ऑफ़लाइन हैं</string>
     <string name="home_issue_offline_body">राइड ऐप्स और AI से पढ़ने के लिए इंटरनेट चाहिए। इंटरनेट से जुड़ें, फिर दोबारा जाँचें।</string>
     <string name="home_issue_offline_action">फिर से जाँचें</string>
+
+    <!-- Redesigned Home (one glance, one tap). -->
+    <string name="home_about_cd">RideMate कैसे काम करता है</string>
+    <string name="home_about_title">RideMate कैसे काम करता है</string>
+    <string name="home_about_close">समझ गया</string>
+    <string name="home_session_to">%1$s तक</string>
+    <string name="home_session_started">%1$s पर शुरू</string>
+    <string name="home_why_cd">क्यों: %1$s</string>
+    <string name="home_recent_area">हाल का</string>
 </resources>

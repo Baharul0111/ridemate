@@ -2,6 +2,9 @@ package app.ridemate.home
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -28,13 +31,16 @@ fun HomeRoute(graph: AppGraph, navigator: FeatureNavigator) {
     }
     val state by model.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    var recent by remember { mutableStateOf(emptyList<String>()) }
     // Coming back from a settings screen a fix-it card opened: the cards show what is still wrong.
     LifecycleResumeEffect(model) {
         model.recheckIfShowing()
+        recent = graph.recentPlaces.recent().map { it.label }.take(HOME_MAX_RECENT)
         onPauseOrDispose { }
     }
     HomeScreen(
         state = state,
+        recentPlaces = recent,
         actions = HomeActions(
             compare = { model.compare(navigator::tripInput) },
             demo = navigator::demo,

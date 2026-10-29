@@ -41,4 +41,5 @@
 
     <string name="precheck_fix_description">%1$s: %2$s</string>
     <string name="precheck_settings_missing">इस फ़ोन पर यह सेटिंग स्क्रीन नहीं है। Settings खोलें, RideMate ढूँढें और वहीं बदलें।</string>
+    <string name="precheck_why_cd">क्यों: %1$s</string>
 </resources>
