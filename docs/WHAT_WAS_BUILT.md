@@ -152,10 +152,10 @@ RIDEMATE_KEYSTORE_PASSWORD=… tools/release.sh
 | Backend tests | **807 passed** (+ ruff, bandit, secrets scan clean) |
 | Config / eval / Template Doctor / CI-tool tests | 313 / 283 / 83 / 63 passed |
 | Debug, release (R8) and androidTest builds | all build |
-| On-phone instrumented suite (moto g57 power, Android 17) | earlier run: 5/6 passed (onboarding, keep-searching walk, OCR recorder, 2 migration tests; the main demo walk failed only on Kestrel's AI boxes, see §4). Final run on the redesigned build: see `docs/test-evidence.md` |
+| On-phone instrumented suite (moto g57 power, Android 17) | **6/6 passed** on the final redesigned build (29 Oct 21:37): onboarding, both demo walks incl. real AI reads, cancel proof, reminders, better-ride and pay hand-off, ML Kit OCR, migrations |
 | Accuracy test (real ML Kit OCR + real Muse Spark Open, recorded) | zero wrong prices shown; ≥ 75 % VERIFIED floor enforced |
 | Live backend | `https://ibaharul567--ridemate-api-web.us-east.modal.run` — `/readyz` all checks OK; demo read through Muse Spark Open OK |
-| Signed APK | `dist/RideMate-1.0.0-hackathon.apk` (55 MB), SHA-256 `1da7c4bbf639ee6a8015bba2796b6afbbcb22209122e9004d034236b13fc0f8b`, certificate verified, not debuggable, no AccessibilityService. **Not published** (waits for your go-ahead) |
+| Signed APK | `dist/RideMate-1.0.0-hackathon.apk` (~55 MB, built from commit 6515190, installed on your phone), SHA-256 `0d7aa0ba611522e1864b021bea4df9ddd304c3e887e9cc2c826172f526876e47`, certificate verified, not debuggable, no AccessibilityService. **Not published** (waits for your go-ahead) |
 | GitHub | `Baharul0111/ridemate` main pushed (green commit `a658b4e` and later docs); `Baharul0111/ridemate-golden` private golden set pushed |
 | Modal spend | **$0.23 of $100** (AI $0.21, compute $0.01), all through the meter |
 | Not done in time | Gradle dependency-verification file (`tools/update_dependency_verification.sh` — run it once, commit `android/gradle/verification-metadata.xml`; until then the Android CI job may fail early); a few minor redesign items noted by the agents (restricted-settings guide still a card, under-18 screen paragraph, active-ride card timeline) |
