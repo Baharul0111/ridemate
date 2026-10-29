@@ -1,8 +1,12 @@
 """AI endpoints (contracts §1.3): read-screen, reread, point, parse-notification, place-pick.
 
-Every endpoint runs the same order: IP limit → auth (Google, unless every image is an allowlisted demo image) →
-kill switches → body and magic-byte checks → quota (read or parse; refunded when the server fails to answer) →
-router call → validation → metrics/audit → response. Demo images never use the caller's quota (M9). The upload
+Every endpoint runs the same order: IP limit → auth (Google, unless the image is an allowlisted demo image on
+read-screen or point) → kill switches → body and magic-byte checks → quota (read or parse; refunded when the server
+fails to answer) → router call → validation → metrics/audit → response. Demo images never use the caller's quota
+(M9); what anonymous demo traffic can cost is bounded instead: by the 16 bundled images × the point targets
+(prompts.POINT_TARGETS, enforced before any model call), the demo cache's global daily count of live misses, and
+the demo sub-budget's own daily cap, which is separate from the public's day cap. /v1/reread always needs Google
+sign-in (the app never rereads demo frames, and row ids would make every request a fresh cache key). The upload
 itself (already size-capped by the body limit) is read before auth only to hash it for the demo allowlist.
 Bodies are parsed by hand rather than by FastAPI parameters so that this order holds and every failure renders
 as the §1.2 error envelope.
@@ -30,7 +34,7 @@ from starlette.datastructures import FormData, UploadFile
 from .. import prompts
 from ..audit import AuditEntry
 from ..clock import ist_day
-from ..demo_cache import DemoCache, crops_key, sha256_hex
+from ..demo_cache import DemoCache, sha256_hex
 from ..deps import Deps, get_deps
 from ..interfaces import ApiError, FirestoreUnavailable, Principal, Purpose, QuotaKind
 from ..middleware import header_uint, normalize_id
@@ -415,40 +419,25 @@ async def reread(request: Request, deps: DepsDep) -> dict[str, Any]:
                 total += len(crop)
         if total > MAX_IMAGE_BYTES:
             raise ApiError(413, "too_large")
-        hashes = {row_id: sha256_hex(crop) for row_id, crop in crops.items()}
-        cache = _demo_cache(deps)
-        demo = cache is not None and cache.all_allowlisted(hashes.values())
-        call.principal = await deps.auth.verify(request, require_google=not demo)
+        # Always Google: crops of demo images are not a demo path (the app never sends them), and their
+        # caller-chosen row ids would make every anonymous request a fresh, model-backed cache miss.
+        call.principal = await deps.auth.verify(request, require_google=True)
         meta = _meta(form.get("meta"), RereadMeta)
         call.app = meta.app
         row_ids = [row.row_id for row in meta.rows]
         if len(set(row_ids)) != len(row_ids) or set(row_ids) != set(crops):
             raise ApiError(422, "invalid")
-        ai_on = _ai_switched_on(deps, meta.app, screen=True)
-        if not ai_on and not demo:
+        if not _ai_switched_on(deps, meta.app, screen=True):
             raise ApiError(503, "ai_unavailable", reason="kill_switch")
         parts = [(row_id, _image(crops[row_id])) for row_id in row_ids]
-
-        async def live(purpose: Purpose) -> tuple[dict[str, Any], str]:
-            raw, model = await _model(
-                call, prompts.reread_request(parts), task=TaskKind.REREAD, purpose=purpose
+        _router(deps)
+        async with _quota(call, "read"):
+            raw, _ = await _model(
+                call, prompts.reread_request(parts), task=TaskKind.REREAD, purpose=Purpose.REREAD
             )
-            return {"rows": prompts.validate_reread(raw, row_ids)}, model
-
-        if cache is not None and demo:
-            answer = await cache.cached_call(
-                "reread",
-                crops_key((row_id, hashes[row_id]) for row_id in row_ids),
-                (lambda: live(Purpose.DEMO)) if ai_on and deps.router is not None else None,
-            )
-            payload, source = answer.payload, answer.source
-        else:
-            _router(deps)
-            async with _quota(call, "read"):
-                payload, _ = await live(Purpose.REREAD)
-            source = "live"
-        await call.audit("ok", source=source)
-        return {"rows": payload["rows"], "source": source, "request_id": call.request_id}
+        rows = prompts.validate_reread(raw, row_ids)
+        await call.audit("ok", source="live")
+        return {"rows": rows, "source": "live", "request_id": call.request_id}
     except Exception as e:
         await call.audit(_outcome(e))
         raise
@@ -467,6 +456,9 @@ async def point(request: Request, deps: DepsDep) -> dict[str, Any]:
         call.principal = await deps.auth.verify(request, require_google=not demo)
         meta = _meta(form.get("meta"), PointMeta)
         call.app = meta.app
+        if meta.target not in prompts.POINT_TARGETS:
+            # A closed set: free-form targets would let anonymous demo requests mint unlimited cache keys.
+            raise ApiError(422, "invalid")
         if not deps.remote_config.get_bool("point_supported", False):
             # Day-1 spike pinned grounding as unsupported: the phone hides "Show me". No model call.
             await call.audit("unsupported")

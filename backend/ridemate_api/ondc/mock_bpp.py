@@ -165,6 +165,17 @@ def _info_tags(eta_min: int, driver_m: int) -> list[dict[str, Any]]:
     ]
 
 
+def forget_order(store: HotStore, txn_id: str) -> bool:
+    """Drop the demo seller's copy of an order (it holds the pickup/drop points) once nobody will book it. False when
+    the store couldn't be written (the entry then expires with the Dict's 7-day idle limit)."""
+    try:
+        store.delete(f"{STORE_PREFIX}{txn_id}")
+    except StoreUnavailable:
+        log.warning("mock seller order not forgotten: store unavailable")
+        return False
+    return True
+
+
 def _d(value: Any) -> dict[str, Any]:
     return value if isinstance(value, dict) else {}
 
@@ -196,6 +207,9 @@ class MockBpp:
 
     def attach(self, deliver: Deliver) -> None:
         self._deliver = deliver
+
+    def forget(self, txn_id: str) -> bool:
+        return forget_order(self._store, txn_id)
 
     async def drain(self) -> None:
         """Wait until every scheduled callback has been delivered (tests, graceful shutdown). Only unfinished tasks

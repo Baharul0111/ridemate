@@ -29,7 +29,7 @@ from ..auth import any_principal, google_principal, optional_principal
 from ..clock import ist_day, ist_hhmm, next_ist_midnight
 from ..deps import Deps, get_deps
 from ..interfaces import ApiError, Firestore, FirestoreUnavailable, Principal
-from ..limits import allow_daily
+from ..limits import allow_daily, client_bucket
 from ..store import StoreUnavailable
 
 log = logging.getLogger(__name__)
@@ -348,7 +348,12 @@ async def readyz(request: Request, deps: DepsDep) -> JSONResponse:
     routes = getattr(request.app.state, "optional_routes", {})
     checks.update({f"routes_{name}": bool(mounted) for name, mounted in routes.items()})
     ok = all(v for v in checks.values() if isinstance(v, bool))
-    return JSONResponse({"ok": ok, "checks": checks}, status_code=200 if ok else 503)
+    # Not a readiness check: whether THIS request carried a usable client hop in X-Forwarded-For, i.e. whether
+    # per-network limits apply behind Modal's proxy. deploy.sh checks it after every deploy (a bool, never the IP).
+    bucketed = client_bucket(request.headers) is not None
+    return JSONResponse(
+        {"ok": ok, "checks": checks, "client_bucketed": bucketed}, status_code=200 if ok else 503
+    )
 
 
 def _readiness(deps: Deps) -> dict[str, bool]:
@@ -365,4 +370,8 @@ def _readiness(deps: Deps) -> dict[str, bool]:
             checks["firestore"] = True
         except FirestoreUnavailable:
             checks["firestore"] = False
+    elif settings.is_meter_environment:
+        # Production needs Firestore: without it the blocklist can't be read, audit records can't be written and
+        # the spend meter can't tell a lost Dict from a fresh deployment (so AI stays off). Never "ready".
+        checks["firestore"] = False
     return checks

@@ -150,16 +150,29 @@ exit 0
 FAKE_FIREBASE = """#!/usr/bin/env bash
 echo "firebase $*" >>"$FAKE_LOG"
 """
+# /readyz of the fresh deployment, as Modal's proxy would forward it (FAKE_READYZ overrides the body).
+FAKE_CURL = r"""#!/usr/bin/env bash
+echo "curl $*" >>"$FAKE_LOG"
+ready='{"ok":true,"checks":{},"client_bucketed":true}'
+printf '%s' "${FAKE_READYZ:-$ready}"
+"""
 
 
-def fake_run(tmp_path: Path, *args: str) -> tuple[subprocess.CompletedProcess[str], list[str]]:
+def fake_run(
+    tmp_path: Path, *args: str, extra_env: dict[str, str] | None = None
+) -> tuple[subprocess.CompletedProcess[str], list[str]]:
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
-    for name, body in {"uv": FAKE_UV, "gcloud": FAKE_GCLOUD, "firebase": FAKE_FIREBASE}.items():
+    for name, body in {
+        "uv": FAKE_UV,
+        "gcloud": FAKE_GCLOUD,
+        "firebase": FAKE_FIREBASE,
+        "curl": FAKE_CURL,
+    }.items():
         (bin_dir / name).write_text(body)
         (bin_dir / name).chmod(0o755)
     log = tmp_path / "calls.log"
-    env = {**FAKE, "PATH": f"{bin_dir}:{os.environ['PATH']}", "FAKE_LOG": str(log)}
+    env = {**FAKE, "PATH": f"{bin_dir}:{os.environ['PATH']}", "FAKE_LOG": str(log), **(extra_env or {})}
     result = deploy(*args, env=env)
     calls = log.read_text().splitlines()
     for call in calls:
@@ -194,6 +207,25 @@ def test_a_real_run_only_ever_touches_its_own_environments_keys(tmp_path, env_na
     remote_config = [c for c in calls if "--only remoteconfig" in c]
     expected = ["demo-ridemate-dev"] if env_name == "dev" else ["demo-ridemate-dev", "demo-ridemate"]
     assert [c.split("--project ")[1].split()[0] for c in remote_config] == expected
+    # the post-deploy check asked the new deployment itself
+    assert calls[-1] == "curl -sS --max-time 30 https://ws--ridemate-api-web.modal.run/readyz"
+    assert "per-network limits apply" in result.stdout
+
+
+@pytest.mark.skipif(
+    not (BACKEND.parent / "android/app/google-services.json").is_file(), reason="no app config"
+)
+def test_a_deploy_whose_proxy_hides_the_client_address_fails_loudly(tmp_path):
+    readyz = '{"ok":true,"checks":{},"client_bucketed":false}'
+    result, _ = fake_run(tmp_path, "--env", "dev", extra_env={"FAKE_READYZ": readyz})
+    assert result.returncode == 1
+    assert "per-network (per-IP) limits are OFF" in result.stderr
+
+
+def test_dry_run_plans_the_post_deploy_check():
+    result = deploy("--dry-run", env=FAKE)
+    assert "(f) post-deploy check" in result.stdout
+    assert '"client_bucketed": true' in result.stdout
 
 
 # ---- scripts/modal_secrets.py ------------------------------------------------------------------------------

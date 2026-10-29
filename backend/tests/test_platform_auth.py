@@ -307,3 +307,51 @@ async def test_previous_hmac_is_attached_during_rotation() -> None:
     env = Env(keys=("new", "old"))
     p = await env.verify(env.minter.mint(google_sub="g"))
     assert p.sub_hmac_previous == HmacKeyring(["old"]).digest("g", "sub")
+
+
+def _auth_sharing(env: Env, *, firestore: Any) -> FirebaseAuth:
+    """Another container: same hot store and keys, its own (possibly missing or failing) Firestore."""
+    return FirebaseAuth(
+        settings=make_settings(),
+        keyring=env.keyring,
+        clock=env.clock,
+        remote_config=env.rc,
+        firestore=firestore,
+        http_client=env.minter.client(),
+        store=env.store,
+    )
+
+
+async def test_a_cold_start_with_firestore_down_still_enforces_the_last_blocklist() -> None:
+    env = Env()
+    warm = _auth_sharing(env, firestore=env.firestore)
+    env.firestore.set("blocked_uids/list", {"uids": ["bad-actor"]})
+    with pytest.raises(ApiError):
+        await warm.verify(request_for(env.minter.mint(uid="bad-actor")), require_google=True)
+    # a new container starts while Firestore is unreadable, or with its Firestore key missing
+    down = FakeFirestore()
+    down.fail = True
+    for firestore in (down, None):
+        cold = _auth_sharing(env, firestore=firestore)
+        with pytest.raises(ApiError) as e:
+            await cold.verify(request_for(env.minter.mint(uid="bad-actor")), require_google=True)
+        assert (e.value.status, e.value.code) == (403, "blocked")
+        await cold.verify(request_for(env.minter.mint(uid="fine", google_sub="fine")), require_google=True)
+
+
+async def test_the_blocklist_copy_follows_firestore_and_is_written_only_when_it_changes() -> None:
+    env = Env()
+    auth = _auth_sharing(env, firestore=env.firestore)
+    env.firestore.set("blocked_uids/list", {"uids": ["a"]})
+    await auth.verify(request_for(env.minter.mint(uid="ok")), require_google=True)
+    first = env.store.get("auth:blocked_uids")
+    assert first["uids"] == ["a"]
+    env.clock.advance(61)
+    await auth.verify(request_for(env.minter.mint(uid="ok")), require_google=True)
+    assert env.store.get("auth:blocked_uids") == first  # unchanged list: no write
+    env.firestore.set("blocked_uids/list", {"uids": []})  # unblocked
+    env.clock.advance(61)
+    await auth.verify(request_for(env.minter.mint(uid="ok")), require_google=True)
+    assert env.store.get("auth:blocked_uids")["uids"] == []
+    cold = _auth_sharing(env, firestore=None)
+    await cold.verify(request_for(env.minter.mint(uid="a")), require_google=True)  # the copy is current

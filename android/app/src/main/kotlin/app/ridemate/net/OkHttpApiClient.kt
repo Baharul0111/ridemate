@@ -197,6 +197,12 @@ class OkHttpApiClient(
     override suspend fun ondcCancel(txnId: String, tapId: String, confirm: Boolean): ApiResult<Unit> =
         ondc(Endpoint.ONDC_CANCEL, OndcTxnWire(txnId, tapId = tapId, confirm = confirm))
 
+    override suspend fun ondcKeepRide(txnId: String, tapId: String): ApiResult<Unit> =
+        ondc(Endpoint.ONDC_CANCEL, OndcTxnWire(txnId, tapId = tapId, keep = true))
+
+    override suspend fun ondcAbandon(txnId: String): ApiResult<Unit> =
+        ondc(Endpoint.ONDC_CANCEL, OndcTxnWire(txnId, abandon = true))
+
     override suspend fun healthz(): ApiResult<Boolean> =
         execute(Endpoint.HEALTHZ, null, null, deadlineFor(Endpoint.HEALTHZ)) { text -> parseObject(text).bool("ok") ?: false }
 

@@ -429,19 +429,27 @@ credit**. Everything else is free with no card on file.
   Free, with no card: Firebase Spark plan (Auth, Firestore, Remote Config, Crashlytics, FCM), Android Geocoder and
   speech recognizer, ML Kit, GitHub, healthchecks.io.
 - **Budget split of the credit:** AI **$80** · compute **$12** · margin **$8**, with sub-budgets for app traffic,
-  judging, evals and Template Doctor (≤ $5 total, ≤ $0.50 per run), demo cache misses and probes.
+  judging, evals and Template Doctor (≤ $5 total, ≤ $0.50 per run), demo cache misses ($3, at most $0.50 a day),
+  probes, and the dev deployment ($1). There is **one meter for the whole credit**: a deployment in Modal's `dev`
+  environment spends under the `main` meter and its $1, never under budgets of its own.
 - **Modal's own spend limit** is set to $0 (or the lowest Modal allows), so at the limit Modal stops the app instead of
   charging a card. Modal requires a card on file; this limit is what keeps it from ever being charged. The public link
   waits for Modal billing's written confirmation.
 - **All-spend meter.** Every model call (app, demo, evals, Template Doctor, probes) and every container's uptime goes
   through one meter. The maximum possible cost of a call is **reserved before** the call and settled with the real
-  token count after. If the meter can't be read, AI **fails closed**.
+  token count after. If the meter can't be read, or its history can't be verified (no Firestore to tell a lost
+  Dict from a fresh deployment), AI **fails closed**. Compute is metered but not stopped by the app: once AI +
+  compute reach $92 the owner is alerted (`credit_nearly_exhausted`) to stop the app, and Modal's own spend limit is
+  the last backstop.
 - **Daily pacing.** Daily cap = remaining AI budget ÷ days left × 1.5. The credit's expiry date is unknown, so the
   horizon is **90 days from 2026-10-28** (to 2027-01-26), which makes the first day's cap about $1.33. At 70% of the
   day's cap, new and heavy accounts pause; at 100% of the day's cap or any budget, AI pauses for everyone.
 - **Fair share per person:** 6 screen reads + 10 notification parses a day (about 1–2 ride sessions); accounts younger
-  than 24 hours get 3 reads; a judge allowlist gets 20. AI needs Google sign-in; anonymous users never reach anything
-  that costs money.
+  than 24 hours get 3 reads; a judge allowlist gets 20. Per network, 60 requests a minute (every route, health checks
+  included). AI needs Google sign-in. The one exception is **Try the demo**: its bundled images may be read and
+  pointed at anonymously, and that is bounded on its own: a closed set of cache keys (the 16 demo images × the
+  point targets), at most 64 live demo calls a day across all users (then the recorded outputs answer), and the
+  demo sub-budget's own $0.50 daily cap, which never touches the public's daily cap.
 - **Daily reconciliation** against Modal's billing report: a drift above 10% alerts the owner and tightens caps
   automatically.
 - **Manual mode** is the safety net: when AI pauses, you type the price and the guardian keeps working, free.

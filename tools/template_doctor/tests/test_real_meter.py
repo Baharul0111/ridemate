@@ -37,7 +37,8 @@ def _meter() -> SpendMeter:
     return SpendMeter(
         store=MemoryStore(),
         clock=FakeClock(),
-        settings=Settings(environment="dev"),
+        # main: a dev deployment would also be held to the $1 'dev' sub-budget, which isn't what these tests measure
+        settings=Settings(),
         remote_config=RC(),
         shard="t",
     )

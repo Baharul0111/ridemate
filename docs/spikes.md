@@ -64,3 +64,20 @@ Run with `tools/spikes/day1_spikes.py` through the backend router, so every call
   prompt) still fires at the deadline, so "never silent" holds with a 3 s + 10 s bound. The burst test is re-run
   with the new limits.
 * **Cost:** one demo fare-screen read ≈ $0.007; a classification ≈ $0.002–0.003.
+
+## Client-IP header (per-network limits)
+
+**Status: not yet verified against a real Modal deployment.** The day-1 run above recorded the model and endpoint
+spikes only; no result was recorded for which forwarding header Modal's proxy sets. `limits.py` assumes Modal appends
+the address it saw as the **right-most** `X-Forwarded-For` hop (hops to its left are client-supplied and never
+trusted). If that is wrong, or changes later, the per-IP bucket silently skips every request.
+
+What now guards that assumption, so it can't fail silently:
+* every request is counted as `ip_bucket{outcome=bucketed|unbucketed|store_down, scope=v1|other}`, and the dispatcher
+  alerts `ip_unbucketed_rate` when more than 20% of `/v1/*` requests in an hour (≥ 20 requests) had no usable hop;
+* `/readyz` reports `client_bucketed` (a bool, never the address) for the request itself, and `deploy.sh` step (f)
+  fails the deploy when the new deployment's own `/readyz` says `false`.
+
+To record the result (first `./backend/deploy.sh --env dev`): step (f) prints whether this request got a bucket. If it
+fails, look at the request headers Modal forwards (metadata only, never logged with values in production), switch the
+header name in `IpLimiter` (its `header=` parameter), redeploy, and write the header and its hop structure here.

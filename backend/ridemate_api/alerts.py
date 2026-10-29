@@ -20,6 +20,7 @@ from typing import Any
 import httpx
 
 from .firestore import OpKind, ServiceAccountTokens, TokenError, TokenSource
+from .limits import IP_BUCKET_METRIC
 from .metrics import (
     EVENT_PREFIX,
     HTTP_LATENCY_MS,
@@ -29,7 +30,7 @@ from .metrics import (
     MetricsView,
     parse_series,
 )
-from .settings import Settings
+from .settings import BUDGET_MARGIN_USD, Settings
 from .store import HotStore, StoreUnavailable
 
 log = logging.getLogger(__name__)
@@ -61,6 +62,10 @@ DAY_CAP_MAX = 0.70
 BUDGET_MAX = 0.80
 DRIFT_MAX = 0.10
 FIRESTORE_WRITES_MAX = 0.70
+# Per-network limits silently switch off for requests without a usable X-Forwarded-For hop (limits.py).
+IP_UNBUCKETED_MAX = 0.20
+IP_UNBUCKETED_WINDOW_MIN = 60
+IP_UNBUCKETED_MIN_REQUESTS = 20
 SA_KEY_MAX_AGE_DAYS = 80
 RECORD_FRESH = timedelta(hours=30)  # probe/drift records older than this are ignored
 
@@ -110,6 +115,7 @@ CATALOG: tuple[Alert, ...] = (
     Alert("spend_day_cap", 0.75, DAY_CAP_MAX, "%"),
     Alert("spend_budget_ai", 0.85, BUDGET_MAX, "%"),
     Alert("spend_meter_unreadable"),
+    Alert("credit_nearly_exhausted", 92.5, 92.0, "usd"),
     Alert("billing_drift", 0.12, DRIFT_MAX, "%"),
     Alert("reconciliation_unavailable"),
     Alert("firestore_writes", 0.72, FIRESTORE_WRITES_MAX, "%"),
@@ -117,6 +123,8 @@ CATALOG: tuple[Alert, ...] = (
     Alert("sa_key_age_ops", 81, SA_KEY_MAX_AGE_DAYS, "d"),
     Alert("model_missing"),
     Alert("cron_job_failed_cleanup"),
+    Alert("ip_unbucketed_rate", 0.4, IP_UNBUCKETED_MAX, "%"),
+    Alert("judging_allowlist_empty"),
 )
 
 
@@ -131,6 +139,7 @@ class AlertInputs:
     probe: Mapping[str, Any] | None = None
     sa_keys_created: Mapping[str, datetime] = field(default_factory=dict)
     model_missing: bool = False
+    judging_without_judges: bool = False  # cap_profile=judging while judge_allowlist lists no one
     extra: Sequence[Alert] = ()
 
 
@@ -141,6 +150,7 @@ def evaluate(inputs: AlertInputs) -> list[Alert]:
     alerts: list[Alert] = []
     if inputs.view is not None:
         alerts += _http_rules(inputs.view.recent(HTTP_WINDOW_MIN))
+        alerts += _ip_rules(inputs.view.recent(IP_UNBUCKETED_WINDOW_MIN))
         alerts += _latency_rules(inputs.view.recent(READ_P95_WINDOW_MIN))
         alerts += _session_rules(inputs.view)
     alerts += _spend_rules(inputs)
@@ -159,6 +169,10 @@ def evaluate(inputs: AlertInputs) -> list[Alert]:
             alerts.append(Alert(f"sa_key_age_{role}", age_days, SA_KEY_MAX_AGE_DAYS, "d"))
     if inputs.model_missing:
         alerts.append(Alert("model_missing"))
+    if inputs.judging_without_judges:
+        # The judging profile only caps the public day at ≤ $3; judges are protected by the allowlist (and Try the
+        # demo). With nobody listed, judges sign in as brand-new accounts: 3 reads a day, paused first.
+        alerts.append(Alert("judging_allowlist_empty"))
     alerts += list(inputs.extra)
     return _unique(alerts)
 
@@ -175,6 +189,21 @@ def _http_rules(recent: Aggregate) -> list[Alert]:
     if errors >= HTTP_MIN_ERRORS and errors / total > HTTP_5XX_MAX:
         alerts.append(Alert("http_5xx_rate", errors / total, HTTP_5XX_MAX, "%"))
     return alerts
+
+
+def _ip_rules(recent: Aggregate) -> list[Alert]:
+    """Too many /v1 requests without a usable right-most X-Forwarded-For hop: the per-network bucket is off for
+    them, which is what a change in Modal's proxy would look like."""
+    total = unbucketed = 0
+    for key, n in recent.counters.items():
+        name, labels = parse_series(key)
+        if name == IP_BUCKET_METRIC and labels.get("scope") == "v1":
+            total += n
+            if labels.get("outcome") == "unbucketed":
+                unbucketed += n
+    if total >= IP_UNBUCKETED_MIN_REQUESTS and unbucketed / total > IP_UNBUCKETED_MAX:
+        return [Alert("ip_unbucketed_rate", unbucketed / total, IP_UNBUCKETED_MAX, "%")]
+    return []
 
 
 def _latency_rules(recent: Aggregate) -> list[Alert]:
@@ -224,6 +253,11 @@ def _spend_rules(inputs: AlertInputs) -> list[Alert]:
     for name, spent, budget in _budgets(summary):
         if budget and spent / budget > BUDGET_MAX:
             alerts.append(Alert(f"spend_budget_{name}", spent / budget, BUDGET_MAX, "%"))
+    # AI stops itself at its budget, but compute is only metered: once AI + compute reach the credit minus the
+    # margin, only the owner can stop the spend (runbooks/modal-down-or-credit-used-up.md: `modal app stop`).
+    used, credit = _number(summary.get("credit_used_usd")), _number(summary.get("credit_usd"))
+    if used is not None and credit and used >= credit - BUDGET_MARGIN_USD:
+        alerts.append(Alert("credit_nearly_exhausted", used, credit - BUDGET_MARGIN_USD, "usd"))
     return alerts
 
 
@@ -309,7 +343,22 @@ def gather_inputs(
             reason = None
     missing_counted = view is not None and view.recent(60).counter("ai_model_missing") > 0
     inputs.model_missing = reason == "model_missing" or missing_counted
+    inputs.judging_without_judges = _judging_without_judges(deps)
     return inputs
+
+
+def _judging_without_judges(deps: Any) -> bool:
+    rc = getattr(deps, "remote_config", None)
+    if rc is None:
+        return False
+    try:
+        if rc.get_str("cap_profile", "normal") != "judging":
+            return False
+        allowlist = rc.get_json("judge_allowlist", {})
+    except Exception:  # noqa: BLE001 - an unreadable config only skips this rule
+        return False
+    hashes = allowlist.get("sha256_emails") if isinstance(allowlist, Mapping) else None
+    return not (isinstance(hashes, list) and any(str(h).strip() for h in hashes))
 
 
 def _safe_get(store: HotStore, key: str) -> Any:

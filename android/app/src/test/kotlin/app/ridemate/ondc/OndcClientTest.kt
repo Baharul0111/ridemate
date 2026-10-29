@@ -243,6 +243,70 @@ class OndcClientTest {
     }
 
     @Test
+    fun `keep ride is sent with the user's tap, and the ride's progress is shown again`() = runTest {
+        val e = Env(this)
+        e.booked()
+        e.guardian.onUserAction(UserAction.OndcCancel(e.legId, e.tap()))
+        e.run()
+        assertEquals(OndcPhase.CANCEL_FEE_SHOWN, e.client.view.value.phase)
+
+        val keep = e.tap()
+        e.guardian.onUserAction(UserAction.OndcKeepRide(e.legId, keep))
+        e.client.keepRide(e.legId, keep)
+        e.run()
+        assertEquals("ondc.keep:t1:${keep.value}", e.ondcCalls().last())
+        // The server put the transaction back on the ride (here it progressed meanwhile) and cleared the fee.
+        e.source.write("t1", OndcDocs.doc("ARRIVING", selected = "auto-1", driver = e.driver, fee = null))
+        assertEquals(OndcPhase.ARRIVING, e.client.view.value.phase)
+        assertNull(e.client.view.value.feeInr)
+        assertEquals(OndcResult.FeeNotShown, e.client.confirmCancel(e.legId, e.tap()))
+    }
+
+    @Test
+    fun `a new soft cancel shows no fee until the network prices it, even when the old fee was the same`() = runTest {
+        val e = Env(this)
+        e.booked()
+        e.guardian.onUserAction(UserAction.OndcCancel(e.legId, e.tap()))
+        e.run()
+        e.guardian.onUserAction(UserAction.OndcKeepRide(e.legId, e.tap()))
+        e.client.keepRide(e.legId)
+        val quotesBefore = e.effects.filterIsInstance<GuardianEffect.OndcCancelFee>().size
+
+        // Cancel again; the server clears the earlier fee as soon as the request lands (still SOFT_CANCEL here, as
+        // when "Keep ride" never reached it), and the seller has not answered yet.
+        e.api.afterOndcStep = { step ->
+            if (step == "cancel.soft") e.source.write("t1", OndcDocs.doc("SOFT_CANCEL", selected = "auto-1", driver = e.driver, fee = null))
+        }
+        e.guardian.onUserAction(UserAction.OndcCancel(e.legId, e.tap()))
+        e.run()
+        assertEquals("no quote for the new request yet", quotesBefore, e.effects.filterIsInstance<GuardianEffect.OndcCancelFee>().size)
+        assertEquals(OndcPhase.CANCEL_REQUESTED, e.client.view.value.phase)
+        assertNull(e.client.view.value.feeInr)
+        assertEquals(OndcResult.FeeNotShown, e.client.confirmCancel(e.legId, e.tap()))
+
+        e.source.write("t1", e.softCancelDoc(fee = 45))  // the seller's new price
+        assertEquals(45, e.effects.filterIsInstance<GuardianEffect.OndcCancelFee>().last().feeInr)
+        assertEquals(OndcPhase.CANCEL_FEE_SHOWN, e.client.view.value.phase)
+        assertEquals(45, e.client.view.value.feeInr)
+    }
+
+    @Test
+    fun `stopping before anything is booked abandons the search on the server, a booked ride never`() = runTest {
+        val e = Env(this)
+        e.search()
+        e.source.write("t1", OndcDocs.doc("SEARCHING_NET"))
+        e.client.stop()
+        e.run()
+        assertEquals("ondc.abandon:t1", e.ondcCalls().last())
+
+        val booked = Env(this)
+        booked.booked()
+        booked.client.stop()
+        booked.run()
+        assertTrue(booked.ondcCalls().none { it.startsWith("ondc.abandon") })
+    }
+
+    @Test
     fun `free cancellation is shown as fee zero before confirming`() = runTest {
         val e = Env(this)
         e.cooperativeSeller(cancelFee = 0)

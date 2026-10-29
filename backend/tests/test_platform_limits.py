@@ -521,3 +521,22 @@ def test_daily_cap_holds_under_concurrency() -> None:
     for t in threads:
         t.join()
     assert len(allowed) == 7
+
+
+def test_every_check_is_counted_so_a_missing_forwarded_hop_is_noticed() -> None:
+    from ridemate_api.testing import FakeMetrics
+
+    metrics = FakeMetrics()
+    store = MemoryStore()
+    lim = IpLimiter(store, FakeClock(), HmacKeyring(["k"]), metrics=metrics, per_minute=1)
+    lim.check(request_with(REAL_CLIENT))
+    with pytest.raises(ApiError):
+        lim.check(request_with(REAL_CLIENT))  # rate-limited, still bucketed
+    lim.check(request_with())  # no header: the bucket silently does not apply...
+    lim.check(request_with("10.0.0.1"))  # ...nor behind a private right-most hop
+    store.fail = True
+    lim.check(request_with("49.36.120.8"))  # store down: fails open
+    assert metrics.count("ip_bucket", outcome="bucketed", scope="v1") == 2
+    assert metrics.count("ip_bucket", outcome="unbucketed", scope="v1") == 2
+    assert metrics.count("ip_bucket", outcome="store_down", scope="v1") == 1
+    assert metrics.count("ip_bucket") == 5

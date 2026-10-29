@@ -55,8 +55,8 @@ or an obviously fake account in Firebase console → **Authentication → Users*
 
 ### Abuse from many accounts or one network
 - Per-IP limits apply automatically (IPv6 is grouped by /64).
-- Young-account tier: accounts younger than 24 hours already get only 3 reads/day. In the judging profile this tier is
-  always on.
+- Young-account tier: accounts younger than 24 hours already get only 3 reads/day, in every profile (the judging
+  profile included).
 - If needed, keep AI off until the next day's pacing; do **not** raise any limit.
 
 ### Judges are being cut off
@@ -73,8 +73,11 @@ or an obviously fake account in Firebase console → **Authentication → Users*
 
 ### Choosing the cap profile
 - `cap_profile` = `normal`: daily cap = remaining AI budget ÷ days left × 1.5; tiers at 70% and 100%.
-- `cap_profile` = `judging`: daily cap fixed at **$3**, young-account tier on, judge allowlist on. It draws from the same
-  overall budget.
+- `cap_profile` = `judging`: the same computed cap, but never above **$3** (a ceiling, not a fixed amount: on the
+  90-day horizon the computed cap is about $1.33, so it rarely binds). Tiers, the young-account limits and the judge
+  allowlist work exactly as in `normal`: judges are protected only by `judge_allowlist` (and by Try the demo). With
+  the profile on and the list empty, the dispatcher sends `judging_allowlist_empty`. It draws from the same overall
+  budget.
 
 ## Rollback
 

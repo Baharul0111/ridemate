@@ -321,4 +321,5 @@ async def test_router_keeps_the_reservation_when_the_real_gateway_times_out() ->
             read_request(), task=TaskKind.READ, purpose=Purpose.READ, principal=None, request_id="rid-1"
         )
     assert (err.value.status, err.value.code) == (504, "model_timeout")
-    assert spend.kept == ["r1"] and not spend.settled and not spend.released
+    # A read tries once more after a timeout; both timed-out attempts keep their reservations in full.
+    assert spend.kept == ["r1", "r2"] and not spend.settled and not spend.released

@@ -261,6 +261,19 @@ class OkHttpApiClientTest {
     }
 
     @Test
+    fun `keep ride and abandon are the cancel endpoint's other two modes`() = runBlocking {
+        repeat(2) { server.enqueue(json(200, """{"ok":true}""")) }
+        assertEquals(ApiResult.Ok(Unit), client().ondcKeepRide("t-1", "tap-3"))
+        val keep = server.takeRequest()
+        assertEquals("/v1/ondc/cancel", keep.path)
+        assertEquals("""{"txn_id":"t-1","tap_id":"tap-3","keep":true}""", keep.body.readUtf8())
+        assertEquals(ApiResult.Ok(Unit), client().ondcAbandon("t-1"))
+        val abandon = server.takeRequest()
+        assertEquals("/v1/ondc/cancel", abandon.path)
+        assertEquals("""{"txn_id":"t-1","abandon":true}""", abandon.body.readUtf8())
+    }
+
+    @Test
     fun `health checks need no token`() = runBlocking {
         tokens.signedOut = true
         server.enqueue(json(200, """{"ok":true}"""))

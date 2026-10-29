@@ -748,3 +748,87 @@ def test_drift_factor_is_read_fresh_and_set_through_the_meter() -> None:
     assert reader.drift_factor() == 1.0
     assert make(store, shard="dispatcher").set_drift_factor(1.4) == pytest.approx(1.4)
     assert reader.drift_factor() == pytest.approx(1.4)
+
+
+# ---- demo misses, dev deployments, missing history ------------------------------------------------------------
+
+
+def test_demo_misses_have_their_own_daily_cap_and_never_use_up_the_publics_day() -> None:
+    from ridemate_api.settings import DEMO_DAY_CAP_USD
+
+    m = make()
+    day_cap = m.summary()["day_cap_usd"]
+    assert DEMO_DAY_CAP_USD < day_cap  # demo traffic alone could otherwise pause every user
+    used = 0.0
+    with pytest.raises(ApiError) as e:
+        while True:
+            m.keep(m.reserve(purpose=Purpose.DEMO, max_usd=0.05, principal=None, request_id="d"))
+            used += 0.05
+    assert (e.value.status, e.value.reason) == (429, "day_cap")
+    assert used == pytest.approx(DEMO_DAY_CAP_USD)
+    summary = m.summary()
+    assert summary["demo_day_spent_usd"] == pytest.approx(DEMO_DAY_CAP_USD)
+    assert summary["day_spent_usd"] == 0  # the public's paced share is untouched
+    spend_app(m, 0.05)  # app reads still go through
+    assert m.ai_status(user()).enabled
+
+
+def test_a_dev_deployment_charges_its_own_sub_budget_and_is_never_paced() -> None:
+    from ridemate_api.settings import SUB_BUDGET_DEV_USD
+
+    store = MemoryStore()
+    dev = SpendMeter(
+        store=store,
+        clock=FakeClock(),
+        settings=make_settings(environment="dev"),
+        remote_config=FakeRemoteConfig({"cap_profile": "judging"}),
+        shard="dev1",
+        index_ttl_s=0.0,
+        peer_ttl_s=0.0,
+    )
+    main = make(store, shard="main1")
+    assert dev.budgets_for(Purpose.READ, user(), "r") == ["ai", "dev"]
+    assert dev.budgets_for(Purpose.DEMO, None, "r") == ["ai", "dev"]
+    assert dev.budgets_for(Purpose.EVAL, None, "eval-run:x:read:1")[-1] == "dev"
+    assert dev.budgets_for(Purpose.PROBE, None, "p") == ["ai", "probes", "dev"]
+    spent = 0.0
+    with pytest.raises(ApiError) as e:
+        while True:  # dev is bounded by its own $1, never by (or against) the public's day cap
+            dev.keep(dev.reserve(purpose=Purpose.READ, max_usd=0.1, principal=user(), request_id="r"))
+            spent += 0.1
+    assert e.value.reason == "budget" and spent == pytest.approx(SUB_BUDGET_DEV_USD)
+    summary = main.summary()  # the one meter main watches sees it all, against the one AI budget
+    assert summary["ai_spent_usd"] == pytest.approx(SUB_BUDGET_DEV_USD)
+    assert summary["day_spent_usd"] == 0
+    assert sum(b["budget_usd"] for b in summary["sub_budgets"].values()) == pytest.approx(80)
+
+
+def test_require_history_fails_closed_without_firestore_but_accepts_an_existing_rollup() -> None:
+    store = MemoryStore()
+    strict = SpendMeter(
+        store=store,
+        clock=FakeClock(),
+        settings=make_settings(),
+        remote_config=FakeRemoteConfig(),
+        shard="s",
+        index_ttl_s=0.0,
+        require_history=True,
+    )
+    with pytest.raises(ApiError) as e:
+        strict.reserve(purpose=Purpose.READ, max_usd=0.01, principal=user(), request_id="r")
+    assert e.value.code == "meter_unavailable"
+    assert store.get(ROLLUP_KEY) is None  # never a fresh rollup that would hide a lost history
+    with pytest.raises(StoreUnavailable):
+        strict.compact()
+    store.put(ROLLUP_KEY, {"frozen": [], "totals": {"ai:lifetime": usd_to_nano(5.0)}})
+    strict.keep(strict.reserve(purpose=Purpose.READ, max_usd=0.01, principal=user(), request_id="r"))
+    assert strict.summary()["ai_spent_usd"] == pytest.approx(5.01)
+
+
+def test_summary_reports_ai_plus_compute_against_the_whole_credit() -> None:
+    m = make()
+    spend_app(m, 0.5)
+    m.record_compute(cpu_cores=1.0, memory_mib=1024, seconds=1000, source="test")
+    summary = m.summary()
+    assert summary["credit_usd"] == pytest.approx(100.0)
+    assert summary["credit_used_usd"] == pytest.approx(0.5 + compute_cost_usd(1.0, 1024, 1000), abs=1e-6)

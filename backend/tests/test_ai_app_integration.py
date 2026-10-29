@@ -117,18 +117,18 @@ async def test_a_failed_replay_never_gives_back_the_unit_its_answered_first_run_
     # dropped connection) and the refund returns the unit the answer was counted on.
     token = rig.auth.google("alice")
     before = rig.reads_left(token)
-    rig.provider.script("read", READ, ModelTimeout("slow"))
+    rig.provider.script("read", READ, ModelTimeout("slow"), ModelTimeout("slow again"))
     first = await rig.read(token, **{"X-Request-Id": RID})
     replay = await rig.read(token, **{"X-Request-Id": RID})
     assert (first.status_code, replay.status_code) == (200, 504)
-    assert rig.provider.calls == 2
+    assert rig.provider.calls == 3  # the replay's first try and its one more try both timed out
     assert rig.reads_left(token) == before - 1
 
 
 async def test_a_failed_first_run_is_given_back_and_its_retry_is_counted_again(rig: Rig) -> None:
     token = rig.auth.google("alice")
     before = rig.reads_left(token)
-    rig.provider.script("read", ModelTimeout("slow"), READ)
+    rig.provider.script("read", ModelTimeout("slow"), ModelTimeout("slow again"), READ)
     assert (await rig.read(token, **{"X-Request-Id": RID})).status_code == 504
     assert rig.reads_left(token) == before  # the server failed to answer: the unit is given back
     assert (await rig.read(token, **{"X-Request-Id": RID})).status_code == 200

@@ -110,6 +110,7 @@ async def test_a_full_run_executes_every_job_meters_compute_and_pings_the_heartb
         "probe": "skipped",  # no router in this deployment
         "reconcile": "ok",
         "drift": "skipped",
+        "ondc_expire": "ok",
         "alerts": "ok",
     }
     assert report.heartbeat and heartbeat.call_count == 1

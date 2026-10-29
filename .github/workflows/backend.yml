@@ -1,4 +1,4 @@
-# Backend (ridemate-api): pytest, ruff, bandit. Model and Firestore calls are faked in tests; no secrets.
+# Backend (ridemate-api): pytest, ruff, bandit; Template Doctor: lock check, pytest. Model and Firestore calls are faked in tests; no secrets.
 name: Backend
 
 on:
@@ -7,11 +7,13 @@ on:
     paths:
       - "backend/**"
       - "config/remote_config/**" # bundled Remote Config defaults the backend loads (remote_config.py)
+      - "tools/template_doctor/**" # its lock records ridemate-api's metadata, so a backend change can stale it
       - ".github/workflows/backend.yml"
   pull_request:
     paths:
       - "backend/**"
       - "config/remote_config/**" # bundled Remote Config defaults the backend loads (remote_config.py)
+      - "tools/template_doctor/**" # its lock records ridemate-api's metadata, so a backend change can stale it
       - ".github/workflows/backend.yml"
   workflow_dispatch:
 
@@ -81,3 +83,48 @@ jobs:
       - name: bandit
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: uv run --frozen bandit -c pyproject.toml -r ridemate_api
+
+  template-doctor:
+    # tools/template_doctor depends on ridemate-api by path, so its uv.lock records the backend's metadata: a
+    # backend pyproject change leaves it stale, and a plain `uv run` there then dirties the tree release.sh needs.
+    name: Template Doctor lock and pytest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: tools/template_doctor
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: "0.12.3"
+          python-version: "3.12"
+          enable-cache: true
+          cache-dependency-glob: tools/template_doctor/uv.lock
+
+      - name: Lock file matches pyproject.toml (and the backend it depends on)
+        run: uv lock --check
+
+      - name: backend/requirements-doctor.lock (installed into the Modal image) matches uv.lock
+        run: |
+          expected="$(mktemp)"
+          uv export --frozen --no-dev --no-emit-project --no-emit-local --prune ridemate-api --no-header \
+            --format requirements.txt -q -o "$expected"
+          if ! diff -u <(grep -v '^#' ../../backend/requirements-doctor.lock) "$expected"; then
+            echo "::error file=backend/requirements-doctor.lock::Out of date with tools/template_doctor/uv.lock. Regenerate from the repo root: uv export --project tools/template_doctor --frozen --no-dev --no-emit-project --no-emit-local --prune ridemate-api --format requirements.txt -o backend/requirements-doctor.lock"
+            exit 1
+          fi
+
+      - name: Install (frozen lock)
+        id: install
+        if: ${{ !cancelled() }} # a stale lock check above still fails the job, but the tests below run
+        run: uv sync --frozen
+
+      - name: pytest
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: uv run --frozen pytest -q

@@ -683,3 +683,137 @@ async def test_a_confirm_that_timed_out_keeps_the_cancel_waiting(monkeypatch: py
     with pytest.raises(ApiError) as cancel:
         await rig.buyer.cancel(ALICE, txn_id, "tap-cancel", confirm=False)
     assert cancel.value.code == "invalid"
+
+
+# ---- "Keep ride", a second cancel, abandoned searches -----------------------------------------------------------
+
+
+async def test_keep_ride_then_cancel_again_shows_no_fee_until_the_seller_prices_the_new_request() -> None:
+    rig = Rig()
+    txn_id = await rig.confirmed()
+    await rig.buyer.cancel(ALICE, txn_id, "tap-c1", confirm=False)
+    await rig.seller.drain()
+    assert (
+        rig.txn(txn_id)["state"] == "SOFT_CANCEL" and rig.txn(txn_id)["fee"]["amount"] == 0
+    )  # no driver yet
+    # the ride goes on while the fee is on screen: held back, but remembered
+    await rig.buyer.status(ALICE, txn_id)
+    await rig.seller.drain()
+    await rig.buyer.status(ALICE, txn_id)
+    await rig.seller.drain()
+    txn = rig.txn(txn_id)
+    assert txn["state"] == "SOFT_CANCEL" and txn["resume_state"] == "ARRIVING"
+
+    await rig.buyer.keep(ALICE, txn_id, "tap-keep")
+    txn = rig.txn(txn_id)
+    assert txn["state"] == "ARRIVING"  # progress is shown again
+    assert txn["fee"] is None and txn["msg_cancel"] is None and txn["keep_tap_id"] == "tap-keep"
+    assert txn["stops"] is not None  # the ride still needs them
+
+    await rig.buyer.cancel(ALICE, txn_id, "tap-c2", confirm=False)
+    pending = rig.txn(txn_id)
+    # Before the seller answers there is no fee at all: the phone can't present the old ₹0 as this round's quote
+    assert pending["state"] == "ARRIVING" and pending["fee"] is None
+    await rig.seller.drain()
+    quoted = rig.txn(txn_id)
+    price = next(q["price"] for q in quoted["quotes"] if q["item_id"] == "demo-auto")
+    assert quoted["state"] == "SOFT_CANCEL"
+    assert (
+        quoted["fee"] == {"amount": cancellation_fee_inr(price), "currency": "INR"}
+        and quoted["fee"]["amount"] > 0
+    )
+    await rig.buyer.cancel(ALICE, txn_id, "tap-c3", confirm=True)
+    await rig.seller.drain()
+    assert rig.txn(txn_id)["state"] == "CANCEL_CONFIRMED"
+
+
+async def test_a_second_soft_cancel_while_one_is_on_screen_clears_the_old_fee_first() -> None:
+    rig = Rig()
+    txn_id = await rig.confirmed()
+    await rig.buyer.status(ALICE, txn_id)  # driver assigned: the fee is no longer zero
+    await rig.seller.drain()
+    await rig.buyer.cancel(ALICE, txn_id, "tap-c1", confirm=False)
+    await rig.seller.drain()
+    assert rig.txn(txn_id)["fee"]["amount"] > 0
+    await rig.buyer.cancel(
+        ALICE, txn_id, "tap-c2", confirm=False
+    )  # e.g. "Keep ride" never reached the server
+    assert rig.txn(txn_id)["state"] == "SOFT_CANCEL" and rig.txn(txn_id)["fee"] is None
+    await rig.seller.drain()
+    assert rig.txn(txn_id)["fee"]["amount"] > 0
+
+
+async def test_a_quote_that_arrives_after_keep_ride_is_ignored() -> None:
+    rig = Rig()
+    txn_id = await rig.confirmed()
+    await rig.buyer.cancel(ALICE, txn_id, "tap-c1", confirm=False)
+    await rig.buyer.keep(ALICE, txn_id, "tap-keep")  # before the seller's answer
+    await rig.seller.drain()
+    txn = rig.txn(txn_id)
+    assert txn["state"] == "CONFIRMED" and txn["fee"] is None
+    assert (
+        rig.metrics.total("ondc_callback", action="on_cancel", outcome="ok") == 1
+    )  # acknowledged, not applied
+
+
+async def test_keep_ride_is_refused_once_the_cancel_was_confirmed_or_the_ride_ended() -> None:
+    rig = Rig()
+    txn_id = await rig.confirmed()
+    await rig.buyer.cancel(ALICE, txn_id, "tap-c1", confirm=False)
+    await rig.seller.drain()
+    with pytest.raises(ApiError):
+        await rig.buyer.keep(MALLORY, txn_id, "tap-keep")
+    await rig.buyer.cancel(ALICE, txn_id, "tap-c2", confirm=True)
+    await rig.seller.drain()
+    with pytest.raises(ApiError) as err:
+        await rig.buyer.keep(ALICE, txn_id, "tap-keep")
+    assert err.value.status == 422
+    searched = await rig.searched()
+    with pytest.raises(ApiError):
+        await rig.buyer.keep(ALICE, searched, "tap-keep")
+
+
+async def test_abandoning_a_search_clears_pickup_and_drop_and_never_touches_a_booked_ride() -> None:
+    rig = Rig()
+    txn_id = await rig.searched()
+    assert rig.store.get(f"mock_bpp:order:{txn_id}") is not None  # the demo seller's copy holds the points
+    await rig.buyer.abandon(ALICE, txn_id)
+    txn = rig.txn(txn_id)
+    assert txn["state"] == "FAILED" and txn["failure_code"] == "abandoned"
+    assert txn["stops"] is None and txn["quotes"] == []
+    assert rig.store.get(f"mock_bpp:order:{txn_id}") is None
+    booked = await rig.confirmed()
+    await rig.buyer.abandon(ALICE, booked)  # a booked ride needs the user's cancel
+    assert rig.txn(booked)["state"] == "CONFIRMED" and rig.txn(booked)["stops"] is not None
+    with pytest.raises(ApiError):
+        await rig.buyer.abandon(MALLORY, booked)
+
+
+async def test_searches_nobody_booked_or_cancelled_expire_within_the_hour() -> None:
+    from datetime import timedelta
+
+    from ridemate_api.ondc.bap import ABANDONED_AFTER, expire_abandoned
+
+    rig = Rig()
+    walked_away = await rig.searched()
+    selected = await rig.searched()
+    await rig.buyer.select(ALICE, selected, "demo-auto")
+    await rig.seller.drain()
+    booked = await rig.confirmed()
+    assert ABANDONED_AFTER + timedelta(minutes=15) <= timedelta(hours=1)  # + one dispatcher period
+    assert expire_abandoned(rig.fs, rig.clock.now_utc(), store=rig.store) == 0  # fresh ones are left alone
+    rig.clock.advance(ABANDONED_AFTER.total_seconds() - 60)
+    fresh = await rig.searched()
+    rig.clock.advance(120)
+    assert expire_abandoned(rig.fs, rig.clock.now_utc(), store=rig.store) == 2
+    for txn_id in (walked_away, selected):
+        txn = rig.txn(txn_id)
+        assert txn["state"] == "FAILED" and txn["failure_code"] == "expired"
+        assert txn["stops"] is None and txn["quotes"] == []
+        assert rig.store.get(f"mock_bpp:order:{txn_id}") is None
+    assert rig.txn(fresh)["stops"] is not None and rig.txn(fresh)["state"] == "SEARCHING_NET"
+    assert rig.txn(booked)["stops"] is not None and rig.txn(booked)["state"] == "CONFIRMED"
+    assert rig.store.get(f"mock_bpp:order:{booked}") is not None
+    # a late catalogue for an expired search changes nothing
+    with pytest.raises(ApiError):
+        await rig.buyer.select(ALICE, walked_away, "demo-auto")

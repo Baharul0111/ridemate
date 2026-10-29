@@ -3,9 +3,10 @@
 Every model call goes through `ProviderRouter.call`, which in order: resolves the provider and structured mode
 from Remote Config `model_route`, confirms the pinned model id is served (lazy, cached), asks the circuit
 breaker, reserves the worst-case cost in the spend meter, sends the request under its deadline, and settles
-the reservation with the real usage (kept in full on a timeout, released when nothing was sent). A read is
-retried once only when the first attempt failed without timing out and at least 6 s of the phone's 20 s tap
-budget remain.
+the reservation with the real usage (kept in full on a timeout, released when nothing was sent). A read is tried
+once more when its first attempt failed or timed out and at least 6 s of the phone's 20 s tap budget remain; so
+that a slow model gets that second try too, the first attempt is cut short to leave those 6 s (plus 1 s for the
+meter's bookkeeping) whenever the budget fits both attempts.
 
 The spend meter reads and writes the Modal Dict, so every meter call runs in the worker-thread pool, shielded
 from cancellation (offload.py): a reservation is always settled, kept or released, and one made for a request
@@ -49,6 +50,7 @@ from .settings import (
     PINNED_MODEL_ID,
     PRICE_INPUT_PER_M,
     PRICE_OUTPUT_PER_M,
+    RETRY_HEADROOM_S,
     RETRY_MIN_REMAINING_S,
     TAP_BUDGET_S,
     Settings,
@@ -99,6 +101,25 @@ DEFAULT_POLICIES: Mapping[TaskKind, TaskPolicy] = {
     TaskKind.PARSE: TaskPolicy(DEADLINE_PARSE_S, retry=False, tap_budget=False, route_key="parse"),
     TaskKind.PLACE: TaskPolicy(DEADLINE_PLACE_S, retry=False, tap_budget=False, route_key="parse"),
 }
+
+
+def attempt_budget_s(
+    policy: TaskPolicy, *, attempt: int, elapsed_s: float, remaining_s: float | None
+) -> float:
+    """How long one attempt may run. `elapsed_s` is the time since the call started (the lazy model check counts
+    against the first attempt), `remaining_s` what is left of the phone's tap budget (None when unbounded).
+
+    A task that may retry splits the tap budget: its first attempt stops early enough that RETRY_MIN_REMAINING_S
+    plus RETRY_HEADROOM_S are left, so a slow model still gets its one more try, as long as the first attempt
+    keeps at least RETRY_MIN_REMAINING_S itself; with less budget than that, one attempt gets all of it."""
+    budget = policy.deadline_s - elapsed_s if attempt == 1 else policy.deadline_s
+    if remaining_s is None:
+        return budget
+    budget = min(budget, remaining_s)
+    keep_for_retry = RETRY_MIN_REMAINING_S + RETRY_HEADROOM_S
+    if policy.retry and attempt == 1 and remaining_s - keep_for_retry >= RETRY_MIN_REMAINING_S:
+        budget = min(budget, remaining_s - keep_for_retry)
+    return budget
 
 
 def estimate_input_tokens(request: ModelRequest) -> int:
@@ -279,13 +300,25 @@ class ProviderRouter:
             self._metrics.incr("ai_call", task=task.value, outcome="model_missing")
             raise ApiError(503, "ai_unavailable", reason="model_missing")
 
+        def may_retry() -> bool:
+            return (
+                policy.retry
+                and attempt == 1
+                and deadline_at is not None
+                and deadline_at - self._clock.monotonic() >= RETRY_MIN_REMAINING_S
+            )
+
         attempt = 0
         while True:
             attempt += 1
             now = self._clock.monotonic()
-            timeout_s = policy.deadline_s - (now - started) if attempt == 1 else policy.deadline_s
-            if policy.tap_budget and deadline_at is not None:
-                timeout_s = min(timeout_s, deadline_at - now)
+            bounded = policy.tap_budget and deadline_at is not None
+            timeout_s = attempt_budget_s(
+                policy,
+                attempt=attempt,
+                elapsed_s=now - started,
+                remaining_s=(deadline_at - now) if bounded and deadline_at is not None else None,
+            )
             if timeout_s <= 0:
                 self._metrics.incr("ai_call", task=task.value, outcome="no_budget")
                 raise ApiError(504, "model_timeout")
@@ -320,8 +353,12 @@ class ProviderRouter:
                     result = await provider.complete(request, mode=mode)
             except (TimeoutError, ModelTimeout):
                 breaker.record_failure()
+                # The model may have worked on it: the first reservation is kept in full, even when retrying.
                 await off_loop_shielded(self._spend.keep, reservation)
                 self._metrics.incr("ai_call", task=task.value, outcome="timeout")
+                if may_retry():
+                    self._metrics.incr("ai_retry", task=task.value)
+                    continue
                 raise ApiError(504, "model_timeout") from None
             except ModelError as e:
                 breaker.record_failure()
@@ -333,13 +370,7 @@ class ProviderRouter:
                 outcome = _failure_outcome(e)
                 self._metrics.incr("ai_call", task=task.value, outcome=outcome)
                 log.warning("model call failed: task=%s outcome=%s status=%s", task.value, outcome, e.status)
-                if (
-                    policy.retry
-                    and attempt == 1
-                    and _retryable(e)
-                    and deadline_at is not None
-                    and deadline_at - self._clock.monotonic() >= RETRY_MIN_REMAINING_S
-                ):
+                if _retryable(e) and may_retry():
                     self._metrics.incr("ai_retry", task=task.value)
                     continue
                 raise ApiError(503, "ai_unavailable") from None

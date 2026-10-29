@@ -6,6 +6,11 @@ each import is guarded: a missing or broken module degrades that feature (no Fir
 Dict quotas; no router → AI reports unavailable) instead of stopping the server. A missing HMAC key is the
 exception: quotas can't be keyed without it, so startup fails loudly.
 
+Money state is workspace-wide: the spend meter, the per-user quotas and the per-IP buckets always live in the hot
+store of the METER_ENVIRONMENT ('main'), whichever Modal environment this deployment runs in, so a dev deployment
+spends the one $100 credit under main's meter (and its 'dev' sub-budget) rather than under budgets of its own.
+Everything else (metrics, demo cache, ONDC seller state, key-rotation records) stays in this environment's store.
+
 Feature labels in the degradation logs are single words (`remote_config`, `ondc`, ...): the log scrubber keeps
 only token-like %-arguments, so a label with a space would be logged as "[dropped]".
 """
@@ -22,7 +27,7 @@ from .crypto import HmacKeyring
 from .deps import Deps
 from .interfaces import Firestore, Metrics, RemoteConfig
 from .limits import IpLimiter, QuotaManager
-from .settings import Settings
+from .settings import METER_ENVIRONMENT, Settings
 from .spend import SpendMeter
 from .store import HotStore, ModalDictStore
 
@@ -64,15 +69,27 @@ def _optional[T](what: str, build: Callable[[], T]) -> T | None:
 
 
 def build_production_deps(
-    settings: Settings | None = None, *, store: HotStore | None = None, clock: Clock | None = None
+    settings: Settings | None = None,
+    *,
+    store: HotStore | None = None,
+    clock: Clock | None = None,
+    meter_store: HotStore | None = None,
 ) -> Deps:
+    """`store` is this environment's hot store and `meter_store` the one holding money state (spend, quotas, IP
+    buckets); each is the Modal Dict when not given. A test that passes only `store` gets it for both."""
     settings = settings or Settings.from_env()
     clock = clock or SystemClock()
+    if meter_store is None:
+        if store is not None or settings.is_meter_environment:
+            meter_store = store
+        else:
+            meter_store = ModalDictStore(settings.hot_dict_name, environment_name=METER_ENVIRONMENT)
     store = (
         store
         if store is not None
         else ModalDictStore(settings.hot_dict_name, environment_name=settings.environment)
     )
+    meter_store = meter_store if meter_store is not None else store
     keyring = HmacKeyring(settings.hmac_keys, store=store, clock=clock)
 
     metrics = _optional("metrics", lambda: _metrics(store, clock)) or NullMetrics()
@@ -81,24 +98,32 @@ def build_production_deps(
         _optional("remote_config", lambda: _remote_config(settings, clock)) or DefaultRemoteConfig()
     )
 
-    quotas = QuotaManager(store, clock, firestore=firestore)
+    quotas = QuotaManager(meter_store, clock, firestore=firestore)
     spend = SpendMeter(
-        store=store,
+        store=meter_store,
         clock=clock,
         settings=settings,
         remote_config=remote_config,
         tiers=quotas,
         firestore=firestore,
+        # A lost Dict must never restart the meter at $0: without Firestore to tell a lost Dict from a fresh
+        # deployment, AI fails closed (and /readyz in main reports Firestore missing).
+        require_history=True,
     )
     auth = FirebaseAuth(
-        settings=settings, keyring=keyring, clock=clock, remote_config=remote_config, firestore=firestore
+        settings=settings,
+        keyring=keyring,
+        clock=clock,
+        remote_config=remote_config,
+        firestore=firestore,
+        store=store,
     )
     deps = Deps(
         settings=settings,
         clock=clock,
         store=store,
         auth=auth,
-        ip_limiter=IpLimiter(store, clock, keyring),
+        ip_limiter=IpLimiter(meter_store, clock, keyring, metrics=metrics),
         quotas=quotas,
         spend=spend,
         firestore=firestore,
@@ -106,7 +131,7 @@ def build_production_deps(
         metrics=metrics,
     )
     deps.router = _optional("router", lambda: _router(settings, spend, remote_config, metrics, clock))
-    deps.demo_cache = _optional("demo_cache", lambda: _demo_cache(store, metrics))
+    deps.demo_cache = _optional("demo_cache", lambda: _demo_cache(store, metrics, clock))
     deps.ondc = _optional("ondc", lambda: _ondc(settings, firestore, auth, clock, metrics, store))
     if firestore is not None:  # without Firestore an audit record could never be written, so none is kept
         deps.audit = _optional("audit", lambda: _audit(store, clock, firestore, metrics))
@@ -144,10 +169,10 @@ def _router(settings: Settings, spend: SpendMeter, rc: RemoteConfig, metrics: Me
     )
 
 
-def _demo_cache(store: HotStore, metrics: Metrics) -> Any:
+def _demo_cache(store: HotStore, metrics: Metrics, clock: Clock) -> Any:
     from .demo_cache import DemoCache
 
-    return DemoCache.from_manifest(store=store, metrics=metrics)
+    return DemoCache.from_manifest(store=store, metrics=metrics, clock=clock)
 
 
 def _audit(store: HotStore, clock: Clock, firestore: Firestore, metrics: Metrics) -> Any:

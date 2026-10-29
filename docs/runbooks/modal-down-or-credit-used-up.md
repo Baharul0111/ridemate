@@ -53,6 +53,11 @@ Roll back to the last good tag: [rollback.md](rollback.md).
 ### C. The credit or a RideMate budget is used up
 - **Do not raise Modal's spend limit. Do not add money. Do not top up.** The zero-out-of-pocket rule is absolute.
   At the spend limit Modal stops workloads instead of charging the card; that is the system working as designed.
+- **`credit_nearly_exhausted` alert** (the meter's AI + compute reached $92, the credit minus the $8 margin): AI stops
+  itself at its $80, but **compute is only metered, never stopped by RideMate**, so a container kept warm by traffic
+  (health checks included, though they now share the per-network limit) keeps costing money. Stop the app before
+  Modal's spend limit has to: `modal app stop ridemate-api --env main` (and `--env dev` if it is deployed), then
+  follow the rest of this section. Modal's workspace spend limit stays the last backstop.
 - If RideMate's own meter paused AI (AI budget or daily cap reached) but Modal still has credit, that is also by
   design: AI resumes at the time shown in the app (next day's pacing), and the guardian keeps running. Do not reset the
   meter in the Modal Dict to "get more".

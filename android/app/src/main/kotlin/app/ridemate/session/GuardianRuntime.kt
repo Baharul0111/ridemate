@@ -482,7 +482,7 @@ class GuardianRuntime(
                 guardian.state.prompts.firstOrNull { it.promptId == action.promptId }?.let { captureTaps[it.legId] = action.tapId }
             }
             // The user kept the ONDC ride after seeing the fee: the soft cancel lapses on the network side too.
-            is UserAction.OndcKeepRide -> bindings.ondc?.let { sink -> onMain { sink.keepRide(action.legId) } }
+            is UserAction.OndcKeepRide -> bindings.ondc?.let { sink -> onMain { sink.keepRide(action.legId, action.tapId) } }
             else -> Unit
         }
         _userActions.tryEmit(action)
