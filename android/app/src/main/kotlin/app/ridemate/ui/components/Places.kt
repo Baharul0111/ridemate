@@ -66,7 +66,7 @@ fun WhereToBar(
     val colors = RideMateTheme.colors
     val spoken = stringResource(R.string.rm_where_to_cd)
     Surface(
-        color = colors.sheet,
+        color = colors.card,
         contentColor = colors.ink,
         shape = RmShapes.pill,
         border = if (!colors.isDark) BorderStroke(1.dp, colors.line) else null,
@@ -122,7 +122,7 @@ fun RouteStack(
 ) {
     val colors = RideMateTheme.colors
     Surface(
-        color = colors.sheet,
+        color = colors.card,
         contentColor = colors.ink,
         shape = RmShapes.card,
         border = if (!colors.isDark) BorderStroke(1.dp, colors.line) else null,
@@ -172,7 +172,7 @@ private fun RouteLine(
     val ink = colors.ink
     val dots = colors.muted
     val line = colors.line
-    val hole = colors.sheet
+    val hole = colors.card
     Row(Modifier.height(IntrinsicSize.Min), verticalAlignment = Alignment.CenterVertically) {
         // The gutter draws this line's marker and its half of the dotted connector, so the route stays joined
         // whatever the text height (font scaling to 200 %).
@@ -219,7 +219,7 @@ private fun RouteLine(
                     text,
                     style = if (compact) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.bodyLarge,
                     color = if (placeholder) colors.muted else colors.ink,
-                    maxLines = 1,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
             }

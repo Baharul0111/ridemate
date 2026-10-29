@@ -68,6 +68,19 @@ class DesignTokensTest {
         "demo container" to (c.onDemoContainer to c.demoContainer),
         "muted/neutral container" to (c.muted to c.neutralContainer),
         "ink/brand container" to (c.ink to c.brandContainer),
+        // Cards, rows and tiles sit on `card` (tonal in dark).
+        "ink/card" to (c.ink to c.card),
+        "muted/card" to (c.muted to c.card),
+        "brand text/card" to (c.brand to c.card),
+        "danger text/card" to (c.danger to c.card),
+        "good text/card" to (c.onGoodContainer to c.card),
+        "tag text/card" to (c.onNeutralContainer to c.card),
+        // A stale fare card: neutral container, ink label, muted price and words, tags on `card`.
+        "stale ink" to (c.ink to c.neutralContainer),
+        "stale muted price" to (c.muted to c.neutralContainer),
+        // A selected choice tile: label and caption on the brand container.
+        "selected tile caption" to (c.onBrandContainer to c.brandContainer),
+        "demo tag" to (c.onDemoContainer to c.demoContainer),
     )
 
     @Test
@@ -80,8 +93,36 @@ class DesignTokensTest {
             // State icons and dashed borders (non-text) need 3:1 against the card.
             for ((name, color) in mapOf("good" to colors.good, "warn" to colors.warn, "brand" to colors.brand)) {
                 assertTrue("$theme $name icon contrast", Contrast.ratio(color, colors.sheet) >= 3.0)
+                assertTrue("$theme $name icon contrast on card", Contrast.ratio(color, colors.card) >= 3.0)
+            }
+            // The unreadable card's dashed warn border, also when the card is stale (grey).
+            assertTrue("$theme dashed border on stale", Contrast.ratio(colors.warn, colors.neutralContainer) >= 3.0)
+            // The selected tile's check badge on its container.
+            assertTrue("$theme check badge", Contrast.ratio(colors.brand, colors.brandContainer) >= 3.0)
+        }
+    }
+
+    @Test
+    fun `boundaries that must be seen reach 3 to 1 in both themes`() {
+        // WCAG 1.4.11: outlined buttons, an off switch's thumb and border, and upcoming step dots use `outline`.
+        for ((theme, c) in listOf("light" to LightRideMateColors, "dark" to DarkRideMateColors)) {
+            val switchTrack = if (c.isDark) Color(0xFF2A302D) else Color(0xFFE9EEEB) // surfaceContainerHighest
+            for ((name, bg) in mapOf("canvas" to c.canvas, "sheet" to c.sheet, "card" to c.card, "switch track" to switchTrack)) {
+                val ratio = Contrast.ratio(c.outline, bg)
+                assertTrue("$theme outline on $name ${"%.2f".format(ratio)} < 3", ratio >= 3.0)
             }
         }
+    }
+
+    @Test
+    fun `cards are bordered in light and tonal in dark`() {
+        // §2 Elevation: flat white cards with a `line` border in light; a tonal step above the sheet in dark, so a
+        // card on a sheet (Compare) is still visible without a border.
+        assertEquals(LightRideMateColors.sheet, LightRideMateColors.card)
+        val dark = DarkRideMateColors
+        assertTrue("dark card must differ from the sheet", dark.card != dark.sheet)
+        assertTrue("dark card must be lighter than the sheet", dark.card.luminance() > dark.sheet.luminance())
+        assertTrue("dark card must be lighter than the canvas", dark.card.luminance() > dark.canvas.luminance())
     }
 
     @Test

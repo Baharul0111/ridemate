@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Science
@@ -24,6 +25,7 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -56,6 +58,14 @@ val Provider.initial: String
         Provider.DEMO_TAMARIND -> "T"
     }
 
+/**
+ * What TalkBack says for this provider: its [name], plus "demo" for the made-up demo companies (goal 19), whose
+ * DEMO corner tag is only visual. Use it wherever a provider's avatar is hidden from TalkBack inside a bigger node.
+ */
+@Composable
+fun Provider.spokenName(name: String = displayName): String =
+    if (isDemo) stringResource(R.string.rm_provider_demo_cd, name) else name
+
 /** A neutral tonal colour pair for an avatar. Deliberately muted hues, none of them a ride app's brand colour. */
 @Immutable
 data class AvatarColors(val container: Color, val content: Color)
@@ -84,9 +94,12 @@ fun ProviderAvatar(
     modifier: Modifier = Modifier,
     size: Dp = 40.dp,
     name: String = provider.displayName,
-    contentDescription: String? = if (provider.isDemo) stringResource(R.string.rm_provider_demo_cd, name) else name,
+    contentDescription: String? = provider.spokenName(name),
 ) {
     val colors = provider.avatarColors(RideMateTheme.colors.isDark)
+    // The initial is a glyph sized to its circle (like an icon): it doesn't grow with the phone's font size, so it
+    // never overflows the 40 dp circle at 200 %. The provider's name is always in words next to it or spoken.
+    val letterSize = with(LocalDensity.current) { (size * 0.42f).toSp() }
     Box(
         modifier = modifier
             .size(size)
@@ -101,8 +114,10 @@ fun ProviderAvatar(
                 provider.initial,
                 color = colors.content,
                 fontWeight = FontWeight.Bold,
-                fontSize = (size.value * 0.42f).sp,
+                fontSize = letterSize,
+                lineHeight = letterSize * 1.2f,
                 maxLines = 1,
+                softWrap = false,
                 // The letter is decoration: TalkBack reads the provider's name from the avatar itself.
                 modifier = Modifier.clearAndSetSemantics {},
             )
@@ -113,16 +128,26 @@ fun ProviderAvatar(
     }
 }
 
+/**
+ * The small "DEMO" tag on a demo avatar's corner. It may grow past the 40 dp avatar (wrapContentSize unbounded)
+ * so the word is never clipped when the phone's text is 200 %; it grows leftwards over the decorative initial.
+ */
 @Composable
 private fun DemoCornerTag(modifier: Modifier = Modifier) {
     val c = RideMateTheme.colors
-    Surface(color = c.demoContainer, contentColor = c.onDemoContainer, shape = RmShapes.pill, modifier = modifier.testTag(RmTags.DEMO_TAG)) {
+    Surface(
+        color = c.demoContainer,
+        contentColor = c.onDemoContainer,
+        shape = RmShapes.pill,
+        modifier = modifier.wrapContentSize(Alignment.BottomEnd, unbounded = true).testTag(RmTags.DEMO_TAG),
+    ) {
         Text(
             stringResource(R.string.ui_demo_badge),
             fontSize = 8.sp,
             lineHeight = 10.sp,
             fontWeight = FontWeight.Bold,
             maxLines = 1,
+            softWrap = false,
             modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp).clearAndSetSemantics {},
         )
     }

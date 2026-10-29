@@ -27,6 +27,7 @@ import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertWidthIsAtLeast
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasAnyDescendant
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isHeading
@@ -37,6 +38,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.test.core.app.ApplicationProvider
@@ -73,6 +75,14 @@ class DesignSystemBehaviourTest {
     private fun inCard(cardTag: String, tag: String) = hasTestTag(tag) and hasAnyAncestor(hasTestTag(cardTag))
 
     private fun cardTag(q: FareQuote) = RmTags.fareCard(q.provider.wireId, q.vehicleClass.wireId)
+
+    private fun hasTextLayout() = SemanticsMatcher.keyIsDefined(SemanticsActions.GetTextLayoutResult)
+
+    private fun textLayout(node: androidx.compose.ui.semantics.SemanticsNode): TextLayoutResult {
+        val out = mutableListOf<TextLayoutResult>()
+        node.config[SemanticsActions.GetTextLayoutResult].action?.invoke(out)
+        return out.single()
+    }
 
     private fun description(tag: String): String =
         rule.onNodeWithTag(tag).fetchSemanticsNode().config.getOrNull(SemanticsProperties.ContentDescription).orEmpty().joinToString(" ")
@@ -142,6 +152,90 @@ class DesignSystemBehaviourTest {
             "Open network (ONDC), Namma Yatri, ₹90–110, Network, Pickup in 4 min, Seen 10:31 AM",
             description(cardTag(Samples.network)),
         )
+    }
+
+    @Test
+    fun `a stale card greys by colour tokens and keeps every word AA`() {
+        // Stale = grey card + clock + words; never transparency (an alpha-faded name fell to 2.4:1).
+        var dark by mutableStateOf(false)
+        var colors: app.ridemate.ui.RideMateColors? = null
+        rule.setContent {
+            RideMateTheme(darkTheme = dark) {
+                colors = RideMateTheme.colors
+                FareCard(Samples.stale.copy(etaMinutes = 6), onRefresh = {})
+            }
+        }
+        for (theme in listOf(false, true)) {
+            dark = theme
+            rule.waitForIdle()
+            val c = colors!!
+            assertEquals(theme, c.isDark)
+            val card = cardTag(Samples.stale)
+            val texts = rule.onAllNodes(hasAnyAncestor(hasTestTag(card)) and hasTextLayout(), useUnmergedTree = true).fetchSemanticsNodes()
+            assertTrue(texts.size >= 4)
+            val onTag = hasAnyAncestor(hasTestTag(RmTags.FARE_ETA))
+            for (node in texts) {
+                val layout = textLayout(node)
+                val bg = if (onTag.matches(node)) c.card else c.neutralContainer
+                val ratio = Contrast.ratio(layout.layoutInput.style.color, bg)
+                assertTrue("dark=$dark '${layout.layoutInput.text}' ${"%.2f".format(ratio)} < 4.5", ratio >= 4.5)
+            }
+            // The price is muted, not ink, so the card reads as old at a glance (plus the clock and the words).
+            val price = textLayout(rule.onNode(inCard(card, RmTags.FARE_PRICE), useUnmergedTree = true).fetchSemanticsNode())
+            assertEquals(c.muted, price.layoutInput.style.color)
+        }
+    }
+
+    @Test
+    fun `demo providers are spoken as demo wherever their avatar is hidden`() {
+        val leg = TimelineLeg(Provider.DEMO_PEPPER, RideState.ARRIVING)
+        rule.setContent {
+            RideMateTheme {
+                Column {
+                    FareCard(Samples.demo)
+                    LegTimeline(listOf(leg))
+                    ProviderChoiceTile(Provider.DEMO_TAMARIND, selected = false, onClick = {})
+                    ProviderChoiceTile(Provider.OLA, selected = false, onClick = {})
+                }
+            }
+        }
+        assertTrue(description(cardTag(Samples.demo)).startsWith("Kestrel Go, demo, XL, ₹310"))
+        assertTrue(description(RmTags.legRow(Provider.DEMO_PEPPER.wireId)).startsWith("Pepper Rides, demo, Driver coming"))
+        rule.onNode(hasTestTag(RmTags.CHOICE_TILE) and hasContentDescription("Tamarind Cabs, demo")).assertIsOff()
+        // Live providers keep their plain name (the tile reads its text).
+        rule.onNode(hasTestTag(RmTags.CHOICE_TILE) and hasText("Ola")).assertIsOff()
+        rule.onAllNodesWithTag(RmTags.DEMO_TAG, useUnmergedTree = true).assertCountEquals(3)
+    }
+
+    @Test
+    fun `the scaffold frames a header, a rounded sheet body and a bottom action`() {
+        var back = 0
+        var primary = 0
+        rule.setContent {
+            RideMateTheme {
+                RmScaffold(
+                    title = "Compare",
+                    onBack = { back++ },
+                    header = { RouteStack(pickup = "Current location", drop = "LGBI Airport", compact = true) },
+                    bottomBar = { BigPrimaryButton("Open Rapido", { primary++ }) },
+                ) {
+                    RmSectionTitle("Auto", leading = { VehicleIcon(VehicleClass.AUTO, contentDescription = null) })
+                    FareCard(Samples.cheapest)
+                }
+            }
+        }
+        for (tag in listOf(RmTags.SCAFFOLD, RmTags.TOP_BAR, RmTags.ROUTE_STACK, RmTags.SHEET_BODY, RmTags.BOTTOM_BAR)) {
+            rule.onNodeWithTag(tag, useUnmergedTree = true).assertExists()
+        }
+        rule.onNodeWithText("Compare").assert(isHeading())
+        rule.onNode(hasTestTag(RmTags.SECTION_TITLE) and hasText("Auto")).assert(isHeading())
+        rule.onNode(hasTestTag(RmTags.FARE_CARD + "_rapido_auto") and hasAnyAncestor(hasTestTag(RmTags.SHEET_BODY))).assertExists()
+        rule.onNode(hasTestTag(RmTags.BIG_BUTTON) and hasAnyAncestor(hasTestTag(RmTags.BOTTOM_BAR)))
+            .assertHeightIsAtLeast(56.dp)
+            .performClick()
+        rule.onNodeWithContentDescription("Back").performClick()
+        assertEquals(1, primary)
+        assertEquals(1, back)
     }
 
     // ----------------------------------------------------------------------------------------- StatusPill

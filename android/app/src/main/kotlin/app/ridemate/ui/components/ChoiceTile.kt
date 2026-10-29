@@ -35,6 +35,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -52,6 +53,8 @@ import app.ridemate.ui.RmSpacing
  * buttons ("Ride type"). At least 48 dp; give tiles in a row `Modifier.weight(1f)`.
  *
  * @param caption optional one-line muted text under the label (e.g. "Not installed").
+ * @param contentDescription what TalkBack says instead of [label] when the tile carries more than its words
+ *   (e.g. "Kestrel Go, demo"); the checked/selected state is still announced.
  */
 @Composable
 fun ChoiceTile(
@@ -62,6 +65,7 @@ fun ChoiceTile(
     enabled: Boolean = true,
     multiSelect: Boolean = true,
     caption: String? = null,
+    contentDescription: String? = null,
     icon: (@Composable () -> Unit)? = null,
 ) {
     val colors = RideMateTheme.colors
@@ -76,10 +80,10 @@ fun ChoiceTile(
             .defaultMinSize(minWidth = RmSpacing.minTouch, minHeight = 88.dp)
             .alpha(if (enabled) 1f else 0.5f)
             .clip(shape)
-            .background(if (selected) colors.brandContainer else colors.sheet)
+            .background(if (selected) colors.brandContainer else colors.card)
             .border(BorderStroke(if (selected) 2.dp else 1.dp, if (selected) colors.brand else colors.line), shape)
             .then(selection)
-            .semantics(mergeDescendants = true) {}
+            .semantics(mergeDescendants = true) { if (contentDescription != null) this.contentDescription = contentDescription }
             .testTag(RmTags.CHOICE_TILE),
     ) {
         CompositionLocalProvider(LocalContentColor provides if (selected) colors.onBrandContainer else colors.ink) {
@@ -103,7 +107,8 @@ fun ChoiceTile(
                     Text(
                         caption,
                         style = MaterialTheme.typography.labelMedium,
-                        color = colors.muted,
+                        // muted is only 4.4:1 on the dark selected container; the on-container colour is AA there.
+                        color = if (selected) colors.onBrandContainer else colors.muted,
                         textAlign = TextAlign.Center,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -139,12 +144,15 @@ fun ChoiceTile(
     multiSelect: Boolean = true,
     caption: String? = null,
 ) {
-    ChoiceTile(label, selected, onClick, modifier, enabled, multiSelect, caption) {
+    ChoiceTile(label, selected, onClick, modifier, enabled, multiSelect, caption, icon = {
         Icon(icon, contentDescription = null, modifier = Modifier.size(28.dp))
-    }
+    })
 }
 
-/** "Which apps?": a provider's avatar and name as a multi-select tile. */
+/**
+ * "Which apps?": a provider's avatar and name as a multi-select tile. A demo provider's tile is read as
+ * "Kestrel Go, demo" (its DEMO corner tag is only visual).
+ */
 @Composable
 fun ProviderChoiceTile(
     provider: Provider,
@@ -155,7 +163,11 @@ fun ProviderChoiceTile(
     enabled: Boolean = true,
     caption: String? = null,
 ) {
-    ChoiceTile(name, selected, onClick, modifier, enabled, multiSelect = true, caption = caption) {
+    val spoken = provider.spokenName(name).let { if (caption != null) "$it, $caption" else it }
+    ChoiceTile(
+        name, selected, onClick, modifier, enabled, multiSelect = true, caption = caption,
+        contentDescription = if (provider.isDemo) spoken else null,
+    ) {
         ProviderAvatar(provider, name = name, contentDescription = null)
     }
 }
