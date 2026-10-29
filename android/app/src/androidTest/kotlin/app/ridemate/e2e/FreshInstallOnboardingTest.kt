@@ -73,7 +73,7 @@ class FreshInstallOnboardingTest {
         waitUntil("18+ confirmed", 5_000) { store.answers.value.adultConfirmed }
 
         // 2. Privacy notice (long: the accept button is below the fold).
-        waitText(str(R.string.onb_notice_title))
+        waitText(str(R.string.onb_privacy_title))
         scrollAndTap(By.text(str(R.string.onb_notice_accept)), "I agree, continue",
             confirm = { store.answers.value.noticeVersion == OnboardingFlow.NOTICE_VERSION })
         waitUntil("notice accepted", 5_000) { store.answers.value.noticeVersion == OnboardingFlow.NOTICE_VERSION }
@@ -86,7 +86,7 @@ class FreshInstallOnboardingTest {
         waitUntil("manual mode chosen", 5_000) { store.answers.value.signIn == SignInChoice.MANUAL }
 
         // 4. Notifications: the step asks; RideMate's POST_NOTIFICATIONS is granted; the step's button re-checks.
-        waitText(str(R.string.onb_notif_why))
+        waitText(str(R.string.onb_notif_sub))
         assertFalse(checker.isGranted(AppPermission.POST_NOTIFICATIONS))
         assertTrue(DeviceE2e.has(By.desc(chip(AppPermission.POST_NOTIFICATIONS, granted = false))))
         shell("pm grant $PKG android.permission.POST_NOTIFICATIONS")

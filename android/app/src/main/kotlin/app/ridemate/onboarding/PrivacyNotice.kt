@@ -3,9 +3,15 @@ package app.ridemate.onboarding
 import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Cloud
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
@@ -13,8 +19,9 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import app.ridemate.BuildConfig
 import app.ridemate.R
-import app.ridemate.ui.ChipTone
-import app.ridemate.ui.InfoCard
+import app.ridemate.ui.components.IconWell
+import app.ridemate.ui.components.RmCard
+import app.ridemate.ui.components.RmTone
 
 /**
  * The DPDP privacy notice in plain language (docs/privacy-notice.md, version [OnboardingFlow.NOTICE_VERSION]),
@@ -53,11 +60,18 @@ private fun noticeText(@StringRes res: Int): String =
 fun PrivacyNoticeContent(modifier: Modifier = Modifier) {
     Column(modifier, verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text(stringResource(R.string.onb_notice_version), style = MaterialTheme.typography.labelMedium)
-        InfoCard(
-            title = stringResource(R.string.onb_notice_usa_callout),
-            body = stringResource(R.string.onb_notice_usa_callout_body),
-            tone = ChipTone.WARNING,
-        )
+        RmCard(tone = RmTone.WARN) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconWell(Icons.Rounded.Cloud, tone = RmTone.WARN)
+                Spacer(Modifier.width(12.dp))
+                Text(
+                    stringResource(R.string.onb_notice_usa_callout),
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+            Text(stringResource(R.string.onb_notice_usa_callout_body), style = MaterialTheme.typography.bodyMedium)
+        }
         PrivacyNotice.SECTIONS.forEach { (title, body) ->
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
