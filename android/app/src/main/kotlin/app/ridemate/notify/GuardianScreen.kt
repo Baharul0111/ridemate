@@ -210,12 +210,12 @@ fun GuardianSheetHost(
         tonalElevation = 6.dp,
         shadowElevation = 12.dp,
     ) {
-        // Scrolls at 200 % font scale instead of clipping; never taller than most of the screen.
+        // The body scrolls at 200 % font scale instead of clipping; the buttons stay pinned in the thumb zone.
         val maxHeight = (LocalConfiguration.current.screenHeightDp * 0.75f).dp
+        val card = presenter.present(item)
         Column(
             Modifier
                 .heightIn(max = maxHeight)
-                .verticalScroll(rememberScrollState())
                 .padding(horizontal = RmSpacing.l, vertical = RmSpacing.m),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
@@ -225,10 +225,19 @@ fun GuardianSheetHost(
                     .size(width = 36.dp, height = 4.dp)
                     .background(RideMateTheme.colors.line, CircleShape),
             )
-            GuardianItemView(item, presenter.present(item), presenter.text, onAction, flat = true)
+            Column(Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState())) {
+                GuardianItemView(item, card, presenter.text, onAction, flat = true)
+            }
+            Box(Modifier.padding(top = RmSpacing.m)) {
+                Actions(sheetActions(item, card), onAction, destructive = item is AlertItem || (item !is CancelCardItem && card.style == CardStyle.LOUD && item !is DriverSheetItem && item !is BetterRideItem && item !is ReminderItem && item !is PayItem))
+            }
         }
     }
 }
+
+/** The sheet's pinned buttons: the card's actions, without "Show me" (that sits on the first cancel step). */
+private fun sheetActions(item: UiItem, card: GuardianCard): List<CardAction> =
+    if (item is CancelCardItem) card.actions.filter { (it.target as? GuardianTap)?.action != UiAction.SHOW_ME } else card.actions
 
 /** One card rendered generically (title, lines, buttons). Kept for callers that only have a [GuardianCard]. */
 @Composable
@@ -254,14 +263,14 @@ fun GuardianItemView(
         is DriverSheetItem -> ItemShell(card, RmTone.GOOD, Icons.Rounded.DirectionsCar, modifier, details = card.lines, flat = flat) {
             item.drivers.forEach { DriverNumbers(it, text) }
             item.others.forEach { other -> FeeRow(other.provider, other.fee, text) }
-            Actions(card.actions, onAction)
+            if (!flat) Actions(card.actions, onAction)
         }
         is BetterRideItem -> ItemShell(card, RmTone.BRAND, Icons.Rounded.TravelExplore, modifier, details = card.lines, flat = flat) {
             Row(horizontalArrangement = Arrangement.spacedBy(RmSpacing.s), modifier = Modifier.fillMaxWidth()) {
                 SideBySide(text.string(R.string.guardian_better_now), item.current, item.currentFee, text, Modifier.weight(1f))
                 SideBySide(text.string(R.string.guardian_better_new), item.candidate, item.candidateFee, text, Modifier.weight(1f))
             }
-            Actions(card.actions, onAction)
+            if (!flat) Actions(card.actions, onAction)
         }
         is CancelCardItem -> ItemShell(card, RmTone.WARN, null, modifier, details = card.lines, flat = flat, provider = item) {
             Row(horizontalArrangement = Arrangement.spacedBy(RmSpacing.s), verticalAlignment = Alignment.CenterVertically) {
@@ -274,7 +283,7 @@ fun GuardianItemView(
             } else {
                 card.steps.forEachIndexed { index, step -> StepCard(index + 1, step, if (index == 0) showMe else null, onAction) }
             }
-            Actions(card.actions.filter { it !== showMe }, onAction)
+            if (!flat) Actions(card.actions.filter { it !== showMe }, onAction)
         }
         is ReminderItem -> ItemShell(card, RmTone.WARN, Icons.Rounded.NotificationsActive, modifier, details = card.lines, flat = flat) {
             StatusPill(
@@ -288,18 +297,18 @@ fun GuardianItemView(
                     StatusPill(leg.state, text = text.state(leg.state, leg.provider))
                 }
             }
-            Actions(card.actions, onAction)
+            if (!flat) Actions(card.actions, onAction)
         }
         is AlertItem -> ItemShell(card, RmTone.DANGER, Icons.Rounded.Warning, modifier, details = emptyList(), flat = flat) {
             card.lines.forEach { BodyLine(it) }
-            Actions(card.actions, onAction, destructive = true)
+            if (!flat) Actions(card.actions, onAction, destructive = true)
         }
         is PayItem -> ItemShell(card, RmTone.BRAND, Icons.Rounded.Payments, modifier, details = card.lines, flat = flat) {
-            Actions(card.actions, onAction)
+            if (!flat) Actions(card.actions, onAction)
         }
         else -> ItemShell(card, card.toneOf(), card.iconOf(), modifier, details = emptyList(), flat = flat) {
             card.lines.forEach { BodyLine(it) }
-            Actions(card.actions, onAction, destructive = card.style == CardStyle.LOUD)
+            if (!flat) Actions(card.actions, onAction, destructive = card.style == CardStyle.LOUD)
         }
     }
 }
