@@ -142,10 +142,11 @@ class ComparisonScreenTest {
         val cheaper = verified(Provider.OLA, VehicleClass.AUTO, "Ola Auto", 100)
         compose.setContent { ComparisonScreen(data.copy(rows = rows.drop(1) + cheaper + rows.first()), seenAt + 30_000, null, callbacks) }
 
-        val ola = compose.onNodeWithTag(rowTag(Provider.OLA, VehicleClass.AUTO)).fetchSemanticsNode().boundsInRoot.top
+        // The fixture also holds an unreadable Ola Auto card, so take the first (the verified, cheapest one).
+        val ola = compose.onAllNodesWithTag(rowTag(Provider.OLA, VehicleClass.AUTO))[0].fetchSemanticsNode().boundsInRoot.top
         val uber = compose.onNodeWithTag(rowTag(Provider.UBER, VehicleClass.AUTO)).fetchSemanticsNode().boundsInRoot.top
         assert(ola < uber) { "₹100 Ola must sit above ₹120 Uber" }
-        card(Provider.OLA, VehicleClass.AUTO).assert(hasAnyDescendant(hasText("Cheapest")))
+        compose.onAllNodesWithTag(rowTag(Provider.OLA, VehicleClass.AUTO), useUnmergedTree = true)[0].assert(hasAnyDescendant(hasText("Cheapest")))
         card(Provider.UBER, VehicleClass.AUTO).assert(!hasAnyDescendant(hasText("Cheapest")))
     }
 
