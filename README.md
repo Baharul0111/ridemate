@@ -7,6 +7,9 @@ forgot to cancel.**
 Meta Global AI Developer Hackathon (Indie track, theme "Build for Your World").
 
 <!-- RELEASE_INFO -->
+**Release 1.0.0-hackathon** (built 29 Oct 2026, signed locally; publishing waits for the owner's go-ahead):
+`RideMate-1.0.0-hackathon.apk` · SHA-256 `1da7c4bbf639ee6a8015bba2796b6afbbcb22209122e9004d034236b13fc0f8b` ·
+signing certificate SHA-256 `94:F2:DD:5F:DB:02:AD:ED:46:31:CB:0A:09:4A:0B:EE:81:05:32:C1:C8:AE:22:23:C1:7D:1C:7A:A4:22:7A:A0`.
 
 ---
 
@@ -428,6 +431,10 @@ last good git tag ([docs/runbooks/rollback.md](docs/runbooks/rollback.md)).
 Public CI never touches the private golden set and never prints fare values.
 
 <!-- TEST_RESULTS -->
+**Latest results (29 Oct 2026):** Android core 583 tests · Android app 858 tests (Robolectric, incl. replay, migration,
+end-to-end demo session, manifest audit) · backend 807 · config 313 · eval 283 · Template Doctor 83 · CI tools 63 —
+all passing. On-phone instrumented suite on a moto g57 power (Android 17): see `docs/test-evidence.md`. Accuracy test
+on recorded sample screens (real ML Kit OCR + real Muse Spark Open reads): zero wrong prices shown.
 
 ## Cost and money safety
 
