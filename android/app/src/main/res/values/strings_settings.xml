@@ -10,12 +10,12 @@
     <string name="set_section_privacy">Privacy</string>
     <string name="set_privacy_notice">Privacy notice</string>
     <string name="set_my_data">My data</string>
-    <string name="set_my_data_summary">See what RideMate holds on this phone</string>
     <string name="set_my_data_intro">This is everything RideMate keeps on this phone. Ride data is deleted a day after the ride.</string>
     <string name="set_my_data_server">RideMate\'s server keeps only metadata about requests and rides (no text, places or prices). Email us for a copy.</string>
     <string name="set_my_data_failed">RideMate couldn\'t read its data just now. Go back and open My data again.</string>
+    <string name="set_my_data_on_phone">On this phone</string>
+    <string name="set_my_data_why">About my data</string>
     <string name="set_erase">Erase my data</string>
-    <string name="set_erase_summary">Deletes your account and your RideMate data</string>
     <string name="set_contact">Privacy contact</string>
     <string name="set_contact_summary">%1$s · we reply within 30 days</string>
     <string name="set_contact_button">Email the privacy contact</string>
@@ -37,20 +37,23 @@
     <string name="set_language_hindi" translatable="false">हिन्दी</string>
 
     <string name="set_section_rides">Rides</string>
-    <string name="set_keep_searching">Keep searching after a driver is found</string>
-    <string name="set_keep_searching_summary">Off by default. When on, RideMate tells you if a much closer driver turns up, and changes nothing unless you say yes.</string>
+    <string name="set_keep_searching">Keep searching</string>
+    <string name="set_keep_searching_summary">Closer-driver alerts</string>
     <string name="set_keep_searching_warning_title">Play fair with drivers</string>
     <string name="set_keep_searching_warning">Keeping more than one booking means drivers may drive towards you and then be cancelled, which costs them time and fuel. Ride apps may also charge a cancellation fee (up to ₹100 under India\'s rules). Turn this on only if you\'ll cancel extra bookings quickly.</string>
     <string name="set_keep_searching_confirm">Turn on</string>
+    <string name="set_keep_searching_info">Off by default. When on, RideMate tells you if a much closer driver turns up, and changes nothing unless you say yes.</string>
+    <string name="set_keep_searching_why">About keep searching</string>
 
     <string name="set_section_status">Status</string>
     <string name="set_status_body">RideMate\'s owner can switch features off remotely if a ride app changes. When AI reading is off, you type prices and the guardian keeps working.</string>
+    <string name="set_status_why">About status</string>
 
     <string name="set_section_app">App</string>
     <string name="set_about">About RideMate</string>
     <string name="set_about_summary">Version %1$s · Built with Muse Spark Open</string>
     <string name="set_report">Report a problem</string>
-    <string name="set_report_summary">Sends only app and Android versions and settings states. No screenshots or text.</string>
+    <string name="set_report_summary">Versions only · no screenshots or text</string>
     <string name="set_report_subject">RideMate problem report (%1$s)</string>
     <string name="set_report_intro">Describe what happened here. RideMate added only the technical details below (versions and on/off states); please don\'t add phone numbers or OTPs.</string>
 
@@ -63,6 +66,8 @@
     <string name="set_dev_on">Developer mode is on.</string>
     <string name="set_dev_sign_in">Developer mode is only for RideMate\'s owner. Sign in with the owner\'s Google account first.</string>
     <string name="set_dev_not_owner">Developer mode is only for RideMate\'s owner.</string>
+    <string name="set_update_short">This version is too old to use.</string>
+    <string name="set_update_why">Why update?</string>
     <string name="set_developer">Developer mode</string>
     <string name="set_updates">Updates</string>
     <string name="set_up_to_date">You have the latest version</string>
@@ -70,9 +75,11 @@
     <string name="set_certificate">Signing certificate (SHA-256)</string>
     <string name="set_certificate_body">Compare this with the fingerprint in RideMate\'s README to check that your copy is genuine.</string>
     <string name="set_certificate_unavailable">Android didn\'t report a signing certificate for this build.</string>
+    <string name="set_certificate_why">Why check this?</string>
+    <string name="set_certificate_copy">Copy fingerprint</string>
     <string name="set_built_with_body">RideMate reads fare screens with Meta\'s open-weights Muse Spark Open model, running on Modal.</string>
+    <string name="set_built_with_why">About Muse Spark Open</string>
     <string name="set_licences">Open-source licences</string>
-    <string name="set_licences_intro">RideMate is open source and uses these components.</string>
     <string name="set_source">Source code</string>
     <string name="set_source_summary" translatable="false">github.com/%1$s</string>
 

@@ -4,32 +4,37 @@ import android.content.Context
 import android.graphics.BitmapFactory
 import androidx.annotation.StringRes
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CameraAlt
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.IosShare
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Card
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.CameraAlt
+import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.DeveloperMode
+import androidx.compose.material.icons.rounded.FiberManualRecord
+import androidx.compose.material.icons.rounded.IosShare
+import androidx.compose.material.icons.rounded.NotificationsActive
+import androidx.compose.material.icons.rounded.Notifications
+import androidx.compose.material.icons.rounded.PowerSettingsNew
+import androidx.compose.material.icons.rounded.Refresh
+import androidx.compose.material.icons.rounded.Save
+import androidx.compose.material.icons.rounded.Savings
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -38,7 +43,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
@@ -49,19 +53,25 @@ import app.ridemate.core.model.VehicleClass
 import app.ridemate.data.RecorderPostEntity
 import app.ridemate.net.ApiMessages
 import app.ridemate.net.ConfigCheckResponse
-import app.ridemate.ui.ChipTone
-import app.ridemate.ui.InfoCard
-import app.ridemate.ui.KeyValueRow
-import app.ridemate.ui.MinTouchTarget
-import app.ridemate.ui.PrimaryButton
-import app.ridemate.ui.RadioRow
-import app.ridemate.ui.ScreenScaffold
-import app.ridemate.ui.SecondaryButton
-import app.ridemate.ui.SectionHeader
-import app.ridemate.ui.StatusChip
-import app.ridemate.ui.TextAction
-import app.ridemate.ui.ToggleRow
+import app.ridemate.ui.RideMateTheme
 import app.ridemate.ui.UiFormat
+import app.ridemate.ui.components.BigPrimaryButton
+import app.ridemate.ui.components.IconWell
+import app.ridemate.ui.components.InfoSheet
+import app.ridemate.ui.components.InlineBanner
+import app.ridemate.ui.components.QuietButton
+import app.ridemate.ui.components.QuietStyle
+import app.ridemate.ui.components.RmCard
+import app.ridemate.ui.components.RmListDivider
+import app.ridemate.ui.components.RmListGroup
+import app.ridemate.ui.components.RmListRow
+import app.ridemate.ui.components.RmPill
+import app.ridemate.ui.components.RmRadioRow
+import app.ridemate.ui.components.RmScaffold
+import app.ridemate.ui.components.RmSectionTitle
+import app.ridemate.ui.components.RmToggleRow
+import app.ridemate.ui.components.RmTone
+import app.ridemate.ui.components.WhyButton
 import java.io.File
 
 class DevActions(
@@ -80,67 +90,151 @@ class DevActions(
     val clearMessage: () -> Unit = {},
 )
 
+/** Which section's explanation sheet is open (the long text lives there, not on the screen). */
+private enum class DevInfo(@StringRes val title: Int, @StringRes val body: Int) {
+    INTRO(R.string.dev_title, R.string.dev_intro),
+    RECORDER(R.string.dev_recorder, R.string.dev_recorder_body),
+    CAPTURE(R.string.dev_capture_test, R.string.dev_capture_test_body),
+    GOLDEN(R.string.dev_golden, R.string.dev_golden_body),
+}
+
+/** A section title with an ⓘ that opens its explanation. */
+@Composable
+private fun DevSection(@StringRes title: Int, @StringRes why: Int, onWhy: () -> Unit) {
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        RmSectionTitle(stringResource(title), Modifier.weight(1f))
+        WhyButton(onClick = onWhy, contentDescription = stringResource(why))
+    }
+}
+
+/** A titled card in one tone (warnings, failures, "only for the owner"). */
+@Composable
+private fun NoticeCard(title: String, body: String?, tone: RmTone, modifier: Modifier = Modifier) {
+    RmCard(modifier = modifier, tone = tone) {
+        Text(title, style = MaterialTheme.typography.titleSmall)
+        if (body != null) Text(body, style = MaterialTheme.typography.bodyMedium)
+    }
+}
+
 @Composable
 fun DevScreen(state: DevState, imageFile: (String) -> File, actions: DevActions) {
-    ScreenScaffold(title = stringResource(R.string.dev_title), onBack = actions.back) {
+    var info by rememberSaveable { mutableStateOf<DevInfo?>(null) }
+    RmScaffold(
+        title = stringResource(R.string.dev_title),
+        onBack = actions.back,
+        actions = {
+            if (state.enabled) WhyButton(onClick = { info = DevInfo.INTRO }, contentDescription = stringResource(R.string.dev_about))
+        },
+    ) {
         if (!state.enabled) {
-            InfoCard(title = stringResource(R.string.dev_off_title), body = stringResource(R.string.dev_off_body), tone = ChipTone.WARNING)
-            return@ScreenScaffold
+            RmCard(tone = RmTone.WARN) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconWell(Icons.Rounded.DeveloperMode, tone = RmTone.WARN)
+                    Spacer(Modifier.size(12.dp))
+                    Text(stringResource(R.string.dev_off_title), style = MaterialTheme.typography.titleMedium)
+                }
+                Text(stringResource(R.string.dev_off_body), style = MaterialTheme.typography.bodyMedium)
+            }
+            return@RmScaffold
         }
-        Text(stringResource(R.string.dev_intro), style = MaterialTheme.typography.bodyMedium)
         state.message?.let { msg ->
-            InfoCard(title = stringResource(devMessageRes(msg)), body = null, modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite }) {
-                TextAction(stringResource(R.string.dev_ok), actions.clearMessage)
+            InlineBanner(
+                text = stringResource(devMessageRes(msg)),
+                modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+                actionLabel = stringResource(R.string.dev_ok),
+                onAction = actions.clearMessage,
+            )
+        }
+
+        DevSection(R.string.dev_recorder, R.string.dev_recorder_why) { info = DevInfo.RECORDER }
+        RmListGroup {
+            RmToggleRow(
+                stringResource(R.string.dev_recorder_switch),
+                state.recorderOn,
+                actions.setRecorderOn,
+                icon = Icons.Rounded.FiberManualRecord,
+                summary = pluralCount(R.plurals.dev_recorder_recent, state.recent.size),
+            )
+            state.recent.take(RECENT_SHOWN).forEach {
+                RmListDivider()
+                RecorderRow(it)
             }
         }
-
-        SectionHeader(stringResource(R.string.dev_recorder))
-        Text(stringResource(R.string.dev_recorder_body), style = MaterialTheme.typography.bodyMedium)
-        ToggleRow(stringResource(R.string.dev_recorder_switch), state.recorderOn, actions.setRecorderOn)
-        Text(
-            pluralCount(R.plurals.dev_recorder_recent, state.recent.size),
-            style = MaterialTheme.typography.labelMedium,
+        QuietButton(stringResource(R.string.dev_recorder_export), actions.exportRecorder, icon = Icons.Rounded.IosShare, fillWidth = true)
+        QuietButton(
+            stringResource(R.string.dev_recorder_clear),
+            actions.clearRecorder,
+            icon = Icons.Rounded.Delete,
+            fillWidth = true,
+            style = QuietStyle.Text,
         )
-        state.recent.take(RECENT_SHOWN).forEach { RecorderRow(it) }
-        SecondaryButton(stringResource(R.string.dev_recorder_export), actions.exportRecorder, icon = Icons.Filled.IosShare)
-        TextAction(stringResource(R.string.dev_recorder_clear), actions.clearRecorder)
 
-        SectionHeader(stringResource(R.string.dev_capture_test))
-        Text(stringResource(R.string.dev_capture_test_body), style = MaterialTheme.typography.bodyMedium)
+        DevSection(R.string.dev_capture_test, R.string.dev_capture_why) { info = DevInfo.CAPTURE }
         CaptureTestResultView(state.captureTest)
-        SecondaryButton(
+        QuietButton(
             stringResource(R.string.dev_capture_test_run),
             actions.runCaptureTest,
             enabled = state.captureTest != CaptureTestStatus.Running,
-            icon = Icons.Filled.CameraAlt,
+            icon = Icons.Rounded.CameraAlt,
+            fillWidth = true,
         )
 
-        SectionHeader(stringResource(R.string.dev_golden))
-        Text(stringResource(R.string.dev_golden_body), style = MaterialTheme.typography.bodyMedium)
-        SecondaryButton(stringResource(R.string.dev_golden_capture), actions.captureGolden, icon = Icons.Filled.CameraAlt)
+        DevSection(R.string.dev_golden, R.string.dev_golden_why) { info = DevInfo.GOLDEN }
+        QuietButton(stringResource(R.string.dev_golden_capture), actions.captureGolden, icon = Icons.Rounded.CameraAlt, fillWidth = true)
         state.golden.forEachIndexed { index, screen ->
             GoldenEditor(index + 1, screen, imageFile(screen.sha256), actions.saveGolden, actions.removeGolden)
         }
         val complete = state.golden.count(GoldenValidator::isComplete)
-        Text(stringResource(R.string.dev_golden_ready, complete, state.golden.size), style = MaterialTheme.typography.labelMedium)
-        SecondaryButton(stringResource(R.string.dev_golden_export), actions.exportGolden, enabled = complete > 0, icon = Icons.Filled.IosShare)
-
-        SectionHeader(stringResource(R.string.dev_budget))
-        BudgetView(state.budget)
-        SecondaryButton(stringResource(R.string.dev_budget_load), actions.loadBudget, enabled = state.budget != BudgetStatus.Loading)
-
-        SectionHeader(stringResource(R.string.dev_owner_alerts))
-        ToggleRow(
-            title = stringResource(R.string.dev_owner_alerts_switch),
-            checked = state.ownerAlertsOn,
-            onCheckedChange = actions.setOwnerAlerts,
-            summary = stringResource(R.string.dev_owner_alerts_body),
-            enabled = state.ownerAlerts != OwnerAlertsStatus.Working,
+        RmPill(
+            stringResource(R.string.dev_golden_ready, complete, state.golden.size),
+            tone = if (complete > 0) RmTone.GOOD else RmTone.NEUTRAL,
         )
+        QuietButton(
+            stringResource(R.string.dev_golden_export),
+            actions.exportGolden,
+            enabled = complete > 0,
+            icon = Icons.Rounded.IosShare,
+            fillWidth = true,
+        )
+
+        RmSectionTitle(stringResource(R.string.dev_budget))
+        BudgetView(state.budget)
+        QuietButton(
+            stringResource(R.string.dev_budget_load),
+            actions.loadBudget,
+            enabled = state.budget != BudgetStatus.Loading,
+            icon = Icons.Rounded.Refresh,
+            fillWidth = true,
+        )
+
+        RmSectionTitle(stringResource(R.string.dev_owner_alerts))
+        RmListGroup {
+            RmToggleRow(
+                title = stringResource(R.string.dev_owner_alerts_switch),
+                checked = state.ownerAlertsOn,
+                onCheckedChange = actions.setOwnerAlerts,
+                icon = if (state.ownerAlertsOn) Icons.Rounded.NotificationsActive else Icons.Rounded.Notifications,
+                summary = stringResource(R.string.dev_owner_alerts_body),
+                enabled = state.ownerAlerts != OwnerAlertsStatus.Working,
+            )
+        }
         OwnerAlertsText(state.ownerAlerts)
 
-        SectionHeader(stringResource(R.string.dev_leave))
-        TextAction(stringResource(R.string.dev_disable), actions.disable)
+        RmSectionTitle(stringResource(R.string.dev_leave))
+        RmListGroup {
+            RmListRow(
+                stringResource(R.string.dev_disable),
+                icon = Icons.Rounded.PowerSettingsNew,
+                iconTone = RmTone.DANGER,
+                destructive = true,
+                showChevron = false,
+                onClick = actions.disable,
+            )
+        }
+        Spacer(Modifier.size(16.dp))
+    }
+    info?.let { open ->
+        InfoSheet(onDismiss = { info = null }, title = stringResource(open.title), body = stringResource(open.body))
     }
 }
 
@@ -162,17 +256,20 @@ fun devMessageRes(message: DevMessage): Int = when (message) {
     DevMessage.STORAGE_FAILED -> R.string.dev_msg_storage_failed
 }
 
+/** One Recorder entry: time · package · event, then the masked metadata (never unmasked text). */
 @Composable
 private fun RecorderRow(row: RecorderPostEntity) {
+    val colors = RideMateTheme.colors
     Column(
         Modifier
             .fillMaxWidth()
-            .padding(vertical = 4.dp)
+            .padding(horizontal = 16.dp, vertical = 10.dp)
             .semantics(mergeDescendants = true) {},
+        verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
         val event = if (row.removalReason == null) stringResource(R.string.dev_recorder_posted) else
             stringResource(R.string.dev_recorder_removed, RecorderExport.reasonName(row.removalReason).orEmpty())
-        Text("${UiFormat.timeIstWithSeconds(row.atUtc)} · ${row.packageName} · $event", style = MaterialTheme.typography.labelMedium)
+        Text("${UiFormat.timeIstWithSeconds(row.atUtc)} · ${row.packageName} · $event", style = MaterialTheme.typography.labelLarge)
         Text(
             stringResource(
                 R.string.dev_recorder_meta,
@@ -182,10 +279,10 @@ private fun RecorderRow(row: RecorderPostEntity) {
                 row.notifId,
                 row.redacted.toString(),
             ),
-            style = MaterialTheme.typography.bodySmall,
+            style = RideMateTheme.mono,
+            color = colors.muted,
         )
         listOfNotNull(row.titleMasked, row.textMasked).forEach { Text(it, style = MaterialTheme.typography.bodySmall) }
-        HorizontalDivider(Modifier.padding(top = 4.dp))
     }
 }
 
@@ -193,24 +290,18 @@ private fun RecorderRow(row: RecorderPostEntity) {
 private fun CaptureTestResultView(status: CaptureTestStatus) {
     when (status) {
         CaptureTestStatus.Idle -> Unit
-        CaptureTestStatus.Running -> Text(stringResource(R.string.dev_capture_test_running), style = MaterialTheme.typography.bodyMedium)
+        CaptureTestStatus.Running -> RmPill(stringResource(R.string.dev_capture_test_running), tone = RmTone.BRAND)
         is CaptureTestStatus.Finished -> when (val r = status.result) {
-            is CaptureTestResult.Done -> Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            is CaptureTestResult.Done -> Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 val yes = stringResource(R.string.dev_yes)
                 val no = stringResource(R.string.dev_no)
-                StatusChip(
-                    text = if (r.blackFrame) yes else no,
-                    tone = if (r.blackFrame) ChipTone.BAD else ChipTone.GOOD,
-                    label = stringResource(R.string.dev_capture_black_frame),
-                )
-                StatusChip(
-                    text = if (r.bubbleVisible) yes else no,
-                    tone = if (r.bubbleVisible) ChipTone.WARNING else ChipTone.GOOD,
-                    label = stringResource(R.string.dev_capture_bubble_visible),
-                )
+                val black = stringResource(R.string.dev_capture_black_frame) + ": " + (if (r.blackFrame) yes else no)
+                val bubble = stringResource(R.string.dev_capture_bubble_visible) + ": " + (if (r.bubbleVisible) yes else no)
+                RmPill(black, tone = if (r.blackFrame) RmTone.DANGER else RmTone.GOOD)
+                RmPill(bubble, tone = if (r.bubbleVisible) RmTone.WARN else RmTone.GOOD)
             }
-            CaptureTestResult.Denied -> InfoCard(stringResource(R.string.dev_capture_denied), null, tone = ChipTone.WARNING)
-            CaptureTestResult.Unavailable -> InfoCard(stringResource(R.string.dev_capture_unavailable), null, tone = ChipTone.WARNING)
+            CaptureTestResult.Denied -> InlineBanner(stringResource(R.string.dev_capture_denied), tone = RmTone.WARN)
+            CaptureTestResult.Unavailable -> InlineBanner(stringResource(R.string.dev_capture_unavailable), tone = RmTone.WARN)
         }
     }
 }
@@ -273,19 +364,24 @@ object BudgetLines {
 private fun BudgetView(status: BudgetStatus) {
     val context = LocalContext.current
     when (status) {
-        BudgetStatus.Idle -> Text(stringResource(R.string.dev_budget_idle), style = MaterialTheme.typography.bodyMedium)
-        BudgetStatus.Loading -> Text(stringResource(R.string.dev_budget_loading), style = MaterialTheme.typography.bodyMedium)
-        is BudgetStatus.Failed -> InfoCard(
+        BudgetStatus.Idle -> InlineBanner(stringResource(R.string.dev_budget_idle), icon = Icons.Rounded.Savings)
+        BudgetStatus.Loading -> RmPill(stringResource(R.string.dev_budget_loading), tone = RmTone.BRAND)
+        is BudgetStatus.Failed -> NoticeCard(
             title = stringResource(R.string.dev_budget_failed),
             body = ApiMessages.text(context, status.result),
-            tone = ChipTone.WARNING,
+            tone = RmTone.WARN,
         )
         is BudgetStatus.Loaded -> {
             val lines = BudgetLines.lines(context, status.check)
             if (lines.isEmpty()) {
-                InfoCard(stringResource(R.string.dev_budget_not_owner), null, tone = ChipTone.WARNING)
+                NoticeCard(stringResource(R.string.dev_budget_not_owner), null, tone = RmTone.WARN)
             } else {
-                lines.forEach { (label, value) -> KeyValueRow(label, value) }
+                RmListGroup {
+                    lines.forEachIndexed { i, (label, value) ->
+                        if (i > 0) RmListDivider()
+                        RmListRow(label, summary = value)
+                    }
+                }
             }
         }
     }
@@ -302,41 +398,34 @@ private fun OwnerAlertsText(status: OwnerAlertsStatus) {
         OwnerAlertsStatus.NoToken -> stringResource(R.string.dev_owner_alerts_no_token)
         is OwnerAlertsStatus.Failed -> ApiMessages.text(context, status.result)
     }
-    if (text != null) Text(text, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
+    val tone = when (status) {
+        OwnerAlertsStatus.Registered -> RmTone.GOOD
+        OwnerAlertsStatus.NoToken, is OwnerAlertsStatus.Failed -> RmTone.WARN
+        else -> RmTone.NEUTRAL
+    }
+    if (text != null) InlineBanner(text, modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite }, tone = tone)
 }
 
-/** A single-choice field: shows the current value; tapping opens a list of radio options. */
+/** A single-choice field: shows the current value; tapping opens a sheet of radio options. */
 @Composable
 private fun <T> ChoiceField(label: String, options: List<T>, selected: T?, name: @Composable (T) -> String, onSelect: (T) -> Unit) {
     var open by remember { mutableStateOf(false) }
     val current = selected?.let { name(it) } ?: stringResource(R.string.dev_choose)
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .heightIn(min = MinTouchTarget)
-            .clickable(role = Role.Button) { open = true }
-            .padding(vertical = 6.dp)
-            .semantics(mergeDescendants = true) {},
-    ) {
-        Text(label, style = MaterialTheme.typography.labelMedium)
-        Text(current, style = MaterialTheme.typography.bodyLarge)
+    RmListGroup {
+        RmListRow(label, summary = current, onClick = { open = true })
     }
     if (open) {
-        AlertDialog(
-            onDismissRequest = { open = false },
-            title = { Text(label) },
-            text = {
-                Column(Modifier.verticalScroll(rememberScrollState())) {
-                    options.forEach { option ->
-                        RadioRow(name(option), option == selected, {
-                            onSelect(option)
-                            open = false
-                        })
-                    }
+        InfoSheet(onDismiss = { open = false }, title = label, icon = null) {
+            RmListGroup {
+                options.forEachIndexed { i, option ->
+                    if (i > 0) RmListDivider()
+                    RmRadioRow(name(option), option == selected, {
+                        onSelect(option)
+                        open = false
+                    })
                 }
-            },
-            confirmButton = { TextButton({ open = false }, Modifier.heightIn(min = MinTouchTarget)) { Text(stringResource(R.string.dev_close)) } },
-        )
+            }
+        }
     }
 }
 
@@ -379,9 +468,13 @@ private fun GoldenEditor(number: Int, screen: GoldenScreen, image: File, onSave:
         tags = tags.split(',').map { it.trim() }.filter { it.isNotEmpty() },
     )
 
-    Card(Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(stringResource(R.string.dev_golden_item, number), style = MaterialTheme.typography.titleSmall)
+    RmCard(Modifier.fillMaxWidth(), padding = 12.dp) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconWell(Icons.Rounded.CameraAlt, tone = RmTone.BRAND, size = 32.dp)
+                Spacer(Modifier.size(8.dp))
+                Text(stringResource(R.string.dev_golden_item, number), style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+            }
             Thumbnail(image, stringResource(R.string.dev_golden_image_cd, number))
             ChoiceField(stringResource(R.string.dev_golden_app), GoldenWire.APPS, app, { it.displayName }) { app = it }
             ChoiceField(stringResource(R.string.dev_golden_screen_type), ScreenType.entries, type, { GoldenWire.screenType(it) }) { type = it }
@@ -404,9 +497,14 @@ private fun GoldenEditor(number: Int, screen: GoldenScreen, image: File, onSave:
                     NumberField(stringResource(R.string.dev_golden_eta), row.eta, Modifier.weight(1f)) { row.eta = it }
                     NumberField(stringResource(R.string.dev_golden_struck), row.struck, Modifier.weight(1f)) { row.struck = it }
                 }
-                TextAction(stringResource(R.string.dev_golden_remove_row, i + 1), { rows.removeAt(i) })
+                QuietButton(
+                    stringResource(R.string.dev_golden_remove_row, i + 1),
+                    { rows.removeAt(i) },
+                    icon = Icons.Rounded.Delete,
+                    style = QuietStyle.Text,
+                )
             }
-            SecondaryButton(stringResource(R.string.dev_golden_add_row), { rows.add(RowDraft(null)) })
+            QuietButton(stringResource(R.string.dev_golden_add_row), { rows.add(RowDraft(null)) }, icon = Icons.Rounded.Add, fillWidth = true)
             if (type == ScreenType.DRIVER_ASSIGNED) {
                 NumberField(stringResource(R.string.dev_golden_driver_eta), driverEta) { driverEta = it }
                 OutlinedTextField(
@@ -426,17 +524,23 @@ private fun GoldenEditor(number: Int, screen: GoldenScreen, image: File, onSave:
             )
             val problems = GoldenValidator.problems(build())
             if (problems.isEmpty()) {
-                StatusChip(stringResource(R.string.dev_golden_complete), ChipTone.GOOD)
+                RmPill(stringResource(R.string.dev_golden_complete), tone = RmTone.GOOD)
             } else {
-                val texts = problems.map { problemText(it) }
-                StatusChip(
-                    texts.joinToString(", "),
-                    ChipTone.WARNING,
-                    label = stringResource(R.string.dev_golden_incomplete),
+                val texts = problems.map { problemText(it) }.joinToString(", ")
+                RmPill(
+                    texts,
+                    tone = RmTone.WARN,
+                    contentDescription = stringResource(R.string.dev_golden_incomplete) + ": " + texts,
                 )
             }
-            PrimaryButton(stringResource(R.string.dev_golden_save), { onSave(build()) })
-            TextAction(stringResource(R.string.dev_golden_delete), { onRemove(screen.sha256) })
+            BigPrimaryButton(stringResource(R.string.dev_golden_save), { onSave(build()) }, icon = Icons.Rounded.Save)
+            QuietButton(
+                stringResource(R.string.dev_golden_delete),
+                { onRemove(screen.sha256) },
+                icon = Icons.Rounded.Delete,
+                fillWidth = true,
+                style = QuietStyle.Text,
+            )
         }
     }
 }

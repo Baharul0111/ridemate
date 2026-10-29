@@ -3,17 +3,18 @@
 <resources>
     <string name="dev_title">Developer mode</string>
     <string name="dev_intro">Owner tools. Everything here stays on this phone until you share it yourself. RideMate never acts inside the ride apps.</string>
+    <string name="dev_about">About developer mode</string>
     <string name="dev_off_title">Developer mode is off</string>
     <string name="dev_off_body">Developer mode is only for RideMate\'s owner. Sign in with the owner\'s Google account and tap the version in About seven times.</string>
     <string name="dev_ok">OK</string>
     <string name="dev_yes">Yes</string>
     <string name="dev_no">No</string>
-    <string name="dev_close">Close</string>
     <string name="dev_choose">Choose…</string>
     <string name="dev_share_title">Share export</string>
 
     <string name="dev_recorder">Recorder</string>
     <string name="dev_recorder_body">Logs every post and removal from Uber, Ola and Rapido with masked text: package, channel, category, ongoing flag, id and tag, redaction and removal reason.</string>
+    <string name="dev_recorder_why">About the Recorder</string>
     <string name="dev_recorder_switch">Record ride-app notifications</string>
     <plurals name="dev_recorder_recent">
         <item quantity="one">%d recent entry</item>
@@ -27,6 +28,7 @@
 
     <string name="dev_capture_test">Capture test</string>
     <string name="dev_capture_test_body">Open a ride app screen, come back and run one capture. Android asks for permission first. Shows whether the frame was black (the app blocks capture) and whether the bubble was visible.</string>
+    <string name="dev_capture_why">About the capture test</string>
     <string name="dev_capture_test_run">Run capture test</string>
     <string name="dev_capture_test_running">Capturing…</string>
     <string name="dev_capture_black_frame">Black frame</string>
@@ -36,6 +38,7 @@
 
     <string name="dev_golden">Golden captures</string>
     <string name="dev_golden_body">Capture masked screens, label the true price and ETA of every row, then export labels.json and the images for the private golden set.</string>
+    <string name="dev_golden_why">About golden captures</string>
     <string name="dev_golden_capture">Capture a masked screen</string>
     <string name="dev_golden_item">Capture %1$d</string>
     <string name="dev_golden_image_cd">Masked capture %1$d</string>
