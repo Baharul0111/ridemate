@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import io
 import json
+import runpy
 import sys
 import urllib.request
 from dataclasses import dataclass
@@ -62,10 +63,17 @@ class FakeReader:
         return fake_result(self.cost, self.source)
 
 
+# The backend's own settings.py, read independently of the harness's loader.
+BACKEND_SETTINGS = runpy.run_path(str(REPO_ROOT / "backend/ridemate_api/settings.py"))
+
+
 def test_dry_run_lists_demo_screens_without_network_or_token(capsys, tmp_path) -> None:
+    # 16 demo screens × $0.032 worst case = $0.512 > the $0.50 per-run cap: 15 fit, the 16th is left for the next run.
     assert rec.main(["--dry-run", "--out-dir", str(tmp_path)]) == 0
     out = capsys.readouterr().out
-    assert "would record 16" in out and "worst-case" in out
+    assert "would record 15" in out and "worst-case spend $0.4800 (cap $0.50)" in out
+    assert "paused: budget guard" in out and "1 screen(s) would be left for the next run" in out
+    assert "rerun the same command to resume" in out and "stopped:" not in out
     assert not list(tmp_path.iterdir())
 
 
@@ -75,13 +83,52 @@ def test_jobs_resolve_demo_images_and_metadata() -> None:
     assert all(j.image.is_file() and j.meta["demo"] and j.media_type == "image/png" for j in jobs)
 
 
-def test_budget_guard_stops_before_exceeding_cap(tmp_path) -> None:
+def test_budget_guard_pauses_cleanly_before_exceeding_cap(tmp_path) -> None:
     jobs = rec.load_jobs(DEMO_LABELS)
     reader = FakeReader(cost=0.004)
     report = rec.run(jobs, reader, out_dir=tmp_path, max_usd=0.05, worst_case_usd=0.0115, log=lambda *_: None)
-    assert report.stopped_reason and "budget guard" in report.stopped_reason
+    assert report.paused_reason and "budget guard" in report.paused_reason and report.stopped_reason is None
     assert report.spent_usd + 0.0115 > 0.05 and report.spent_usd <= 0.05
     assert reader.calls == len(list(tmp_path.glob("*.json")))
+    assert report.recorded + report.left == [j.sha256 for j in jobs]
+
+
+def test_a_full_demo_run_pauses_at_the_cap_and_the_next_run_resumes(tmp_path) -> None:
+    """Costs unknown (http mode, non-owner token) are counted at the backend-derived worst case ($0.032)."""
+    jobs = rec.load_jobs(DEMO_LABELS)
+    first = FakeReader(cost=None)
+    report = rec.run(jobs, first, out_dir=tmp_path, max_usd=rec.PER_RUN_CAP_USD, log=lambda *_: None)
+    assert first.calls == 15 and len(report.recorded) == 15 and report.stopped_reason is None
+    assert report.left == [jobs[-1].sha256] and report.spent_usd == pytest.approx(15 * 0.032)
+    second = FakeReader(cost=None)
+    report = rec.run(jobs, second, out_dir=tmp_path, max_usd=rec.PER_RUN_CAP_USD, log=lambda *_: None)
+    assert second.calls == 1 and report.recorded == [jobs[-1].sha256] and len(report.skipped) == 15
+    assert report.paused_reason is None and not report.left
+    assert len(list(tmp_path.glob("*.json"))) == 16
+
+
+def test_limit_and_re_recording_passes_resume_instead_of_starting_over(tmp_path) -> None:
+    jobs = rec.load_jobs(DEMO_LABELS)[:3]
+    report = rec.run(jobs, FakeReader(), out_dir=tmp_path, max_usd=1.0, limit=2, log=lambda *_: None)
+    assert len(report.recorded) == 2 and "--limit 2" in (report.paused_reason or "")
+    report = rec.run(jobs, FakeReader(), out_dir=tmp_path, max_usd=1.0, limit=2, log=lambda *_: None)
+    assert report.recorded == [jobs[2].sha256] and len(report.skipped) == 2
+    # A re-recording pass (--force) re-reads only recordings older than the pass, so after a pause it resumes.
+    for j in jobs:
+        path = tmp_path / f"{j.sha256}.json"
+        path.write_text(json.dumps({**json.loads(path.read_text()), "recorded_at": "2000-01-01T00:00:00Z"}))
+    started = rec.utc_now()
+    kw: dict[str, Any] = {
+        "out_dir": tmp_path,
+        "max_usd": 0.025,
+        "worst_case_usd": 0.01,
+        "redo_before": started,
+    }
+    first, second = FakeReader(cost=None), FakeReader(cost=None)
+    report = rec.run(jobs, first, log=lambda *_: None, **kw)
+    assert first.calls == 2 and report.left == [jobs[2].sha256]
+    report = rec.run(jobs, second, log=lambda *_: None, **kw)
+    assert second.calls == 1 and report.recorded == [jobs[2].sha256] and len(report.skipped) == 2
 
 
 def test_unknown_cost_is_counted_at_worst_case(tmp_path) -> None:
@@ -139,7 +186,20 @@ def test_cli_guards(monkeypatch, tmp_path) -> None:
         rec.main(["--dry-run", "--max-usd", "0.51", "--out-dir", str(tmp_path)])
     with pytest.raises(SystemExit):
         rec.main(["--dry-run", "--max-usd", "0", "--out-dir", str(tmp_path)])
+    # Below one worst-case read ($0.032) no screen could ever be read, so resuming would never progress.
+    with pytest.raises(SystemExit):
+        rec.main(["--dry-run", "--max-usd", "0.03", "--out-dir", str(tmp_path)])
+    assert rec.main(["--dry-run", "--max-usd", "0.032", "--out-dir", str(tmp_path)]) == 0
+    # A full demo set does not fit in one $0.50 run at the worst case: the cap is a clean pause, not an error.
     assert rec.main(["--dry-run", "--max-usd", "0.5", "--out-dir", str(tmp_path)]) == 0
+    with pytest.raises(SystemExit):
+        rec.main(["--dry-run", "--limit", "0", "--out-dir", str(tmp_path)])
+    with pytest.raises(SystemExit):
+        rec.main(
+            ["--dry-run", "--force", "--force-before", "2026-10-29T10:00:00Z", "--out-dir", str(tmp_path)]
+        )
+    with pytest.raises(SystemExit):
+        rec.main(["--dry-run", "--force-before", "yesterday", "--out-dir", str(tmp_path)])
     with pytest.raises(SystemExit):
         rec.HttpReader("http://insecure.example", "t")
 
@@ -182,9 +242,22 @@ def test_private_screens_are_never_recorded_into_the_public_repo(tmp_path, capsy
     assert "would record 1" in capsys.readouterr().out
 
 
-def test_worst_case_covers_the_routers_one_retry() -> None:
-    one_attempt = rec.WORST_CASE_INPUT_TOKENS * 1.25e-6 + rec.WORST_CASE_OUTPUT_TOKENS * 4.25e-6
-    assert rec.WORST_CASE_USD == pytest.approx(2 * one_attempt, abs=1e-4)
+def test_worst_case_comes_from_the_backend_settings_and_covers_the_routers_one_retry() -> None:
+    b = BACKEND_SETTINGS
+    assert rec.WORST_CASE_OUTPUT_TOKENS == b["MAX_TOKENS_READ"] == 2000
+    assert (rec.PRICE_INPUT_PER_M, rec.PRICE_OUTPUT_PER_M) == (
+        b["PRICE_INPUT_PER_M"],
+        b["PRICE_OUTPUT_PER_M"],
+    )
+    assert rec.PER_RUN_CAP_USD == b["SUB_BUDGET_EVAL_RUN_USD"] == 0.50
+    one_attempt = (6000 * b["PRICE_INPUT_PER_M"] + b["MAX_TOKENS_READ"] * b["PRICE_OUTPUT_PER_M"]) / 1_000_000
+    assert rec.WORST_CASE_USD == pytest.approx(2 * one_attempt) == pytest.approx(0.032)
+    assert 16 * rec.WORST_CASE_USD > rec.PER_RUN_CAP_USD  # the demo set needs a second (resumed) run
+
+
+def test_harness_readme_quotes_the_current_worst_case() -> None:
+    readme = (EVAL_DIR / "harness/README.md").read_text(encoding="utf-8")
+    assert f"${rec.WORST_CASE_USD:.3f}" in readme and f"{rec.WORST_CASE_OUTPUT_TOKENS:,} output" in readme
 
 
 class FakeResponse(io.BytesIO):
