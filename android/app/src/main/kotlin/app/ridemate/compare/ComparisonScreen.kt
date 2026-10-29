@@ -1,6 +1,5 @@
 package app.ridemate.compare
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -8,25 +7,16 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.Icon
+import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.Edit
+import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.automirrored.rounded.OpenInNew
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -39,26 +29,44 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
-import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import app.ridemate.R
 import app.ridemate.core.gate.ComparisonEntry
 import app.ridemate.core.gate.ComparisonList
-import app.ridemate.core.gate.GateText
 import app.ridemate.core.model.Provider
 import app.ridemate.core.model.QuoteStatus
 import app.ridemate.core.model.VehicleClass
+import app.ridemate.ui.RideMateTheme
+import app.ridemate.ui.RmSpacing
+import app.ridemate.ui.components.BigPrimaryButton
+import app.ridemate.ui.components.FareCard
+import app.ridemate.ui.components.FareQuote
+import app.ridemate.ui.components.Hero
+import app.ridemate.ui.components.HeroIllustration
+import app.ridemate.ui.components.InfoSheet
+import app.ridemate.ui.components.InlineBanner
+import app.ridemate.ui.components.ProviderChoiceTile
+import app.ridemate.ui.components.QuietButton
+import app.ridemate.ui.components.QuietStyle
+import app.ridemate.ui.components.RmListDivider
+import app.ridemate.ui.components.RmListGroup
+import app.ridemate.ui.components.RmListRow
+import app.ridemate.ui.components.RmScaffold
+import app.ridemate.ui.components.RmSectionTitle
+import app.ridemate.ui.components.RmTone
+import app.ridemate.ui.components.VehicleChoiceTile
+import app.ridemate.ui.components.VehicleIcon
+import app.ridemate.ui.components.WhyButton
 import app.ridemate.util.Clock
 import kotlinx.coroutines.delay
 
@@ -93,6 +101,10 @@ object ComparisonTags {
     const val OPEN_APPS = "comparison_open_apps"
     fun openApp(provider: Provider) = "open_${provider.wireId}"
     const val PRICE_FIELD = "comparison_manual_price"
+    const val PRIMARY = "comparison_primary"
+    const val BOOKED = "comparison_booked"
+    const val TYPE_PRICE = "comparison_type_price"
+    const val MANUAL_BANNER = "comparison_manual_banner"
     fun row(provider: Provider, vehicleClass: VehicleClass) = "quote_${provider.wireId}_${vehicleClass.wireId}"
 }
 
@@ -110,10 +122,11 @@ fun rememberWallClock(clock: Clock, periodMs: Long = 1_000): Long {
 }
 
 /**
- * The comparison list (goals 5–8): rows grouped by vehicle type; only VERIFIED rows are sorted and marked cheapest
- * (icon + word, not colour); unreadable rows say "Couldn't read · check in app" with no number; every row says when
- * it was seen and, after 60 s, greys out and adds "old, tap to refresh"; ONDC rows say "network quote" and typed rows
- * "entered by you". Each row has Book (opens the app), and each app has "Booked in <app>".
+ * Compare, the hero screen (goals 5–8), price first: sections per vehicle type (glyph + word), [FareCard]s with only
+ * VERIFIED rows sorted and marked cheapest (icon + word); unreadable cards say "Check in app" with no number; stale
+ * cards grey out with a clock and a refresh button; typed and network cards carry their tags. Tapping a card opens
+ * the app. The bottom bar holds one big action ("Open <next app>" or "Book in <cheapest>") plus "I booked" and
+ * "Type price", which open bottom sheets. Explanations live behind the ⓘ button.
  *
  * Goal 3: every app of the trip that is still before booking has "Open <app>" (the route ready, the leg marked
  * opened so Read fares reads that app), also before it has any price row, so each selected app can be compared.
@@ -126,54 +139,109 @@ fun ComparisonScreen(
     callbacks: ComparisonCallbacks,
     modifier: Modifier = Modifier,
 ) {
+    val context = LocalContext.current
     val list = remember(data.rows, nowMs) { ComparisonList.build(data.rows, nowMs) }
+    // The price sheet opens by itself when a manual-mode tap brought the user here; a card's "Type price" or the
+    // bottom bar opens it for a chosen app.
+    var sheetPrompt by remember(manual) { mutableStateOf(manual) }
     var manualOpen by rememberSaveable(manual) { mutableStateOf(manual != null) }
-    LazyColumn(
-        modifier = modifier.fillMaxWidth().testTag(ComparisonTags.LIST),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-        contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
+    var bookedOpen by rememberSaveable { mutableStateOf(false) }
+    var whyOpen by rememberSaveable { mutableStateOf(false) }
+
+    val readApps = remember(data.rows) { data.rows.map { it.provider }.toSet() }
+    // Only apps still before booking (goal 3): a booked app is never "next".
+    val nextApp = data.openableApps.firstOrNull { it !in readApps }
+    val best = list.groups.flatMap { it.entries }
+        .filter { it.cheapest && !it.stale && it.row.status == QuoteStatus.VERIFIED && !it.row.provider.isNetwork && it.priceText != null }
+        .minByOrNull { it.row.price?.last ?: Int.MAX_VALUE }
+
+    RmScaffold(
+        modifier = modifier,
+        title = stringResource(R.string.compare_title),
+        actions = { WhyButton(onClick = { whyOpen = true }, contentDescription = stringResource(R.string.compare_why_cd)) },
+        bottomBar = if (data.rideApps.isEmpty() && list.groups.isEmpty()) null else {
+            {
+                BottomActions(
+                    nextApp = nextApp,
+                    best = best,
+                    showBooked = callbacks.onBookedHere != null && data.rideApps.isNotEmpty(),
+                    onOpen = callbacks.onBook,
+                    onBooked = { bookedOpen = true },
+                    onTypePrice = { sheetPrompt = manual ?: ManualPrompt(null, null); manualOpen = true },
+                )
+            }
+        },
     ) {
-        item {
-            Text(
-                stringResource(R.string.compare_title),
-                style = MaterialTheme.typography.headlineSmall,
-                modifier = Modifier.semantics { heading() },
-            )
-        }
-        if (data.openableApps.isNotEmpty()) {
-            item(key = "open_apps") { OpenApps(data.openableApps, callbacks.onBook) }
-        }
-        if (manualOpen || manual != null) {
-            item {
-                ManualPriceForm(
-                    prompt = manual ?: ManualPrompt(null, null),
-                    apps = data.rideApps,
-                    classes = data.formClasses,
-                    onSubmit = callbacks.onSubmitManual,
+        Column(
+            modifier = Modifier.fillMaxWidth().testTag(ComparisonTags.LIST),
+            verticalArrangement = Arrangement.spacedBy(RmSpacing.cardGap),
+        ) {
+            if (manual != null && !manualOpen) {
+                InlineBanner(
+                    text = manual.message ?: stringResource(R.string.compare_manual_title),
+                    tone = RmTone.WARN,
+                    icon = Icons.Rounded.Edit,
+                    actionLabel = stringResource(R.string.rm_type_price),
+                    onAction = { sheetPrompt = manual; manualOpen = true },
+                    modifier = Modifier.testTag(ComparisonTags.MANUAL_BANNER),
                 )
             }
-        }
-        if (list.groups.isEmpty()) {
-            item { Text(stringResource(R.string.compare_empty), style = MaterialTheme.typography.bodyLarge) }
-        }
-        list.groups.forEach { group ->
-            item(key = "h_${group.vehicleClass.name}") {
-                Text(
-                    stringResource(FareReadingMessages.vehicleClassRes(group.vehicleClass)),
-                    style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.padding(top = 8.dp).semantics { heading() },
-                )
+            if (data.openableApps.isNotEmpty()) OpenApps(data.openableApps, callbacks.onBook)
+            if (list.groups.isEmpty()) EmptyState()
+            list.groups.forEach { group ->
+                GroupHeader(group.vehicleClass)
+                group.entries.forEach { entry ->
+                    QuoteCard(
+                        entry = entry,
+                        nowMs = nowMs,
+                        callbacks = callbacks,
+                        demoSeller = data.networkDemoSeller,
+                        onTypePrice = { p, c ->
+                            sheetPrompt = ManualPrompt(manual?.message?.takeIf { manual.provider == p }, p, listOf(c))
+                            manualOpen = true
+                        },
+                    )
+                }
             }
-            itemsIndexed(
-                group.entries,
-                key = { i, entry -> entry.row.rowId ?: "${group.vehicleClass.name}_${entry.row.provider.name}_$i" },
-            ) { _, entry ->
-                QuoteRow(entry, callbacks, demoSeller = data.networkDemoSeller)
+        }
+    }
+
+    if (manualOpen) {
+        ManualPriceSheet(
+            prompt = sheetPrompt ?: ManualPrompt(null, null),
+            apps = data.rideApps,
+            classes = data.formClasses,
+            onSubmit = callbacks.onSubmitManual,
+            onDismiss = { manualOpen = false },
+        )
+    }
+    val bookedHere = callbacks.onBookedHere
+    if (bookedOpen && bookedHere != null) {
+        InfoSheet(
+            onDismiss = { bookedOpen = false },
+            title = stringResource(R.string.compare_booked_heading),
+            icon = Icons.Rounded.CheckCircle,
+            tone = RmTone.GOOD,
+        ) {
+            RmListGroup {
+                data.rideApps.forEachIndexed { i, provider ->
+                    if (i > 0) RmListDivider()
+                    RmListRow(
+                        title = stringResource(R.string.compare_booked_here, FareReadingMessages.name(context, provider)),
+                        icon = Icons.Rounded.CheckCircle,
+                        iconTone = RmTone.GOOD,
+                        onClick = { bookedOpen = false; bookedHere(provider) },
+                    )
+                }
             }
         }
-        if (data.rideApps.isNotEmpty()) {
-            item { AppActions(data.rideApps, callbacks, onTypePrice = { manualOpen = true }) }
-        }
+    }
+    if (whyOpen) {
+        InfoSheet(
+            onDismiss = { whyOpen = false },
+            title = stringResource(R.string.compare_why_title),
+            body = stringResource(R.string.compare_why_body),
+        )
     }
 }
 
@@ -181,160 +249,190 @@ fun ComparisonScreen(
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun OpenApps(apps: List<Provider>, onOpen: (Provider) -> Unit) {
-    val context = androidx.compose.ui.platform.LocalContext.current
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.testTag(ComparisonTags.OPEN_APPS)) {
-        Text(stringResource(R.string.compare_open_heading), style = MaterialTheme.typography.titleMedium, modifier = Modifier.semantics { heading() })
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    val context = LocalContext.current
+    Column(verticalArrangement = Arrangement.spacedBy(RmSpacing.s), modifier = Modifier.testTag(ComparisonTags.OPEN_APPS)) {
+        RmSectionTitle(stringResource(R.string.compare_open_heading))
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(RmSpacing.s), verticalArrangement = Arrangement.spacedBy(RmSpacing.s)) {
             apps.forEach { provider ->
                 val app = FareReadingMessages.name(context, provider)
-                val description = stringResource(R.string.compare_open_app_description, app)
-                OutlinedButton(
+                QuietButton(
+                    text = stringResource(R.string.compare_open_app, app),
                     onClick = { onOpen(provider) },
-                    modifier = Modifier
-                        .heightIn(min = 48.dp)
-                        .testTag(ComparisonTags.openApp(provider))
-                        .semantics { contentDescription = description },
-                ) { Text(stringResource(R.string.compare_open_app, app)) }
+                    icon = Icons.AutoMirrored.Rounded.OpenInNew,
+                    contentDescription = stringResource(R.string.compare_open_app_description, app),
+                    style = QuietStyle.Outline,
+                    modifier = Modifier.testTag(ComparisonTags.openApp(provider)),
+                )
             }
         }
     }
 }
 
 @Composable
-private fun QuoteRow(entry: ComparisonEntry, callbacks: ComparisonCallbacks, demoSeller: Boolean) {
-    val context = androidx.compose.ui.platform.LocalContext.current
+private fun GroupHeader(vehicleClass: VehicleClass) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.padding(top = RmSpacing.s),
+    ) {
+        VehicleIcon(vehicleClass, size = 24.dp, tint = RideMateTheme.colors.brand, contentDescription = null)
+        Spacer(Modifier.width(RmSpacing.s))
+        Text(
+            stringResource(FareReadingMessages.vehicleClassRes(vehicleClass)),
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.semantics { heading() },
+        )
+    }
+}
+
+@Composable
+private fun EmptyState() {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(RmSpacing.s),
+        modifier = Modifier.fillMaxWidth().padding(top = RmSpacing.xxl),
+    ) {
+        HeroIllustration(Hero.EMPTY, contentDescription = null)
+        Text(stringResource(R.string.compare_empty), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+        Text(stringResource(R.string.compare_empty_hint), style = MaterialTheme.typography.bodyMedium, color = RideMateTheme.colors.muted)
+    }
+}
+
+@Composable
+private fun QuoteCard(
+    entry: ComparisonEntry,
+    nowMs: Long,
+    callbacks: ComparisonCallbacks,
+    demoSeller: Boolean,
+    onTypePrice: (Provider, VehicleClass) -> Unit,
+) {
+    val context = LocalContext.current
     val row = entry.row
     val app = FareReadingMessages.name(context, row.provider)
     // OCR text or the ONDC provider name (protocol data); otherwise the localised class name. Never model text (I5).
-    val label = if (row.labelFromOcr || row.status == QuoteStatus.NETWORK) row.displayLabel else stringResource(FareReadingMessages.vehicleClassRes(row.vehicleClass))
-    val refreshLabel = stringResource(R.string.compare_refresh, app)
-    val bookDescription = stringResource(R.string.compare_book_description, app)
-    // §4.3.6: every row keeps "seen in <app> at …"; after 60 s it also says "old, tap to refresh" (never colour alone).
-    val seenAt = stringResource(R.string.quote_seen_at, app, entry.seenAtText)
+    val baseLabel = if (row.labelFromOcr || row.status == QuoteStatus.NETWORK) row.displayLabel else stringResource(FareReadingMessages.vehicleClassRes(row.vehicleClass))
+    // The hackathon's mock seller is always labelled as such (goal 17).
+    val label = if (row.status == QuoteStatus.NETWORK && demoSeller) {
+        stringResource(R.string.ondc_row_label, baseLabel, stringResource(R.string.ondc_label_demo_seller))
+    } else {
+        baseLabel
+    }
+    val etaText = if (row.eta == null) entry.etaTextKey?.let { stringResource(FareReadingMessages.gateTextRes(it)) } else null
     val staleText = stringResource(R.string.quote_stale)
-    val freshness = if (entry.stale) staleText else seenAt
-    Card(
+    val freshText = stringResource(R.string.quote_seen_at, app, entry.seenAtText)
+    val quote = FareQuote(
+        provider = row.provider,
+        vehicleClass = row.vehicleClass,
+        label = label,
+        status = row.status,
+        priceText = entry.priceText,
+        seenAtText = entry.seenAtText,
+        providerName = app,
+        etaMinutes = row.eta,
+        etaText = etaText,
+        cheapest = entry.cheapest,
+        stale = entry.stale,
+        ageMinutes = ((nowMs - row.seenAtMs) / 60_000L).toInt().coerceAtLeast(1),
+    )
+    val refresh = { callbacks.onRefresh(row.provider) }
+    val bookNetwork = callbacks.onBookNetwork
+    val rowId = row.rowId
+    val networkBook: (() -> Unit)? =
+        if (row.provider.isNetwork && !entry.stale && bookNetwork != null && rowId != null) ({ bookNetwork(rowId) }) else null
+    val className = stringResource(FareReadingMessages.vehicleClassRes(row.vehicleClass))
+    val networkDescription = stringResource(R.string.ondc_action_book_description, label.ifBlank { app }, entry.priceText ?: className)
+    Column(verticalArrangement = Arrangement.spacedBy(RmSpacing.s)) {
+    FareCard(
+        quote = quote,
         modifier = Modifier
-            .fillMaxWidth()
             .testTag(ComparisonTags.row(row.provider, row.vehicleClass))
-            .alpha(if (entry.stale) STALE_ALPHA else 1f)
-            .then(
-                if (entry.stale) Modifier.clickable(onClickLabel = refreshLabel, role = Role.Button) { callbacks.onRefresh(row.provider) } else Modifier,
+            // §4.3.6: the state is spoken too (never colour alone).
+            .semantics { stateDescription = if (entry.stale) staleText else freshText },
+        onClick = when {
+            entry.stale -> refresh
+            row.provider.isNetwork -> null // ONDC rows are booked inside RideMate
+            else -> ({ callbacks.onBook(row.provider) })
+        },
+        onRefresh = if (entry.stale) refresh else null,
+        onTypePrice = if (row.status == QuoteStatus.UNREADABLE && !row.provider.isNetwork) ({ onTypePrice(row.provider, row.vehicleClass) }) else null,
+    )
+    // An open-network quote is booked inside RideMate: its own "Book" button under the card.
+    if (networkBook != null) {
+        QuietButton(
+            text = stringResource(R.string.ondc_action_book),
+            onClick = networkBook,
+            contentDescription = networkDescription,
+            fillWidth = true,
+        )
+    }
+    }
+}
+
+@Composable
+private fun BottomActions(
+    nextApp: Provider?,
+    best: ComparisonEntry?,
+    showBooked: Boolean,
+    onOpen: (Provider) -> Unit,
+    onBooked: () -> Unit,
+    onTypePrice: () -> Unit,
+) {
+    val context = LocalContext.current
+    Column(verticalArrangement = Arrangement.spacedBy(RmSpacing.s)) {
+        when {
+            nextApp != null -> {
+                val app = FareReadingMessages.name(context, nextApp)
+                BigPrimaryButton(
+                    text = stringResource(R.string.rm_open_app, app),
+                    onClick = { onOpen(nextApp) },
+                    icon = Icons.AutoMirrored.Rounded.OpenInNew,
+                    contentDescription = stringResource(R.string.compare_open_next_description, app),
+                    modifier = Modifier.testTag(ComparisonTags.PRIMARY),
+                )
+            }
+            best != null -> {
+                val app = FareReadingMessages.name(context, best.row.provider)
+                BigPrimaryButton(
+                    text = stringResource(R.string.compare_book_cheapest, app, best.priceText.orEmpty()),
+                    onClick = { onOpen(best.row.provider) },
+                    icon = Icons.AutoMirrored.Rounded.OpenInNew,
+                    contentDescription = stringResource(R.string.compare_book_description, app),
+                    modifier = Modifier.testTag(ComparisonTags.PRIMARY),
+                )
+            }
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(RmSpacing.s), modifier = Modifier.fillMaxWidth()) {
+            if (showBooked) {
+                QuietButton(
+                    text = stringResource(R.string.compare_booked_button),
+                    onClick = onBooked,
+                    icon = Icons.Rounded.CheckCircle,
+                    fillWidth = true,
+                    modifier = Modifier.weight(1f).testTag(ComparisonTags.BOOKED),
+                )
+            }
+            QuietButton(
+                text = stringResource(R.string.rm_type_price),
+                onClick = onTypePrice,
+                icon = Icons.Rounded.Edit,
+                fillWidth = true,
+                modifier = Modifier.weight(1f).testTag(ComparisonTags.TYPE_PRICE),
             )
-            .semantics { stateDescription = freshness },
-        colors = CardDefaults.cardColors(),
-    ) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text(app, style = MaterialTheme.typography.labelLarge)
-                    Text(label, style = MaterialTheme.typography.bodyLarge)
-                }
-                if (entry.priceText != null) {
-                    Text(entry.priceText!!, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                } else {
-                    Text(
-                        stringResource(R.string.quote_unreadable),
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.width(140.dp),
-                    )
-                }
-            }
-            if (entry.cheapest) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Filled.Star, contentDescription = null, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.secondary)
-                    Spacer(Modifier.width(4.dp))
-                    Text(stringResource(R.string.quote_cheapest), style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
-                }
-            }
-            entry.statusTextKey?.takeIf { it != GateText.UNREADABLE }?.let { key ->
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        if (key == GateText.ENTERED_BY_YOU) Icons.Filled.Edit else Icons.Filled.Info,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp),
-                    )
-                    Spacer(Modifier.width(4.dp))
-                    val status = stringResource(FareReadingMessages.gateTextRes(key))
-                    // The hackathon's mock seller is always labelled as such (goal 17).
-                    val text = if (row.status == QuoteStatus.NETWORK && demoSeller) {
-                        stringResource(R.string.ondc_row_label, status, stringResource(R.string.ondc_label_demo_seller))
-                    } else {
-                        status
-                    }
-                    Text(text, style = MaterialTheme.typography.labelMedium)
-                }
-            }
-            if (row.eta != null) {
-                Text(pluralStringResource(R.plurals.compare_eta_minutes, row.eta!!, row.eta!!), style = MaterialTheme.typography.bodyMedium)
-            } else if (entry.etaTextKey != null) {
-                Text(stringResource(FareReadingMessages.gateTextRes(entry.etaTextKey!!)), style = MaterialTheme.typography.bodyMedium)
-            }
-            if (entry.stale) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Filled.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(Modifier.width(4.dp))
-                    Text(staleText, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
-                }
-            }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(seenAt, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
-                val bookNetwork = callbacks.onBookNetwork
-                val rowId = row.rowId
-                if (!row.provider.isNetwork) {
-                    OutlinedButton(
-                        onClick = { callbacks.onBook(row.provider) },
-                        modifier = Modifier.heightIn(min = 48.dp).semantics { contentDescription = bookDescription },
-                    ) { Text(stringResource(R.string.compare_book, app)) }
-                } else if (bookNetwork != null && rowId != null) {
-                    val className = stringResource(FareReadingMessages.vehicleClassRes(row.vehicleClass))
-                    val networkDescription = stringResource(R.string.ondc_action_book_description, label.ifBlank { app }, entry.priceText ?: className)
-                    OutlinedButton(
-                        onClick = { bookNetwork(rowId) },
-                        modifier = Modifier.heightIn(min = 48.dp).semantics { contentDescription = networkDescription },
-                    ) { Text(stringResource(R.string.ondc_action_book)) }
-                }
-            }
         }
     }
 }
 
+/** The "type the price you see" bottom sheet: app tiles, vehicle tiles, the price field and Save. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun AppActions(apps: List<Provider>, callbacks: ComparisonCallbacks, onTypePrice: () -> Unit) {
-    val context = androidx.compose.ui.platform.LocalContext.current
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 8.dp)) {
-        Text(stringResource(R.string.compare_booked_heading), style = MaterialTheme.typography.titleMedium, modifier = Modifier.semantics { heading() })
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            val bookedHere = callbacks.onBookedHere
-            if (bookedHere != null) {
-                apps.forEach { provider ->
-                    val app = FareReadingMessages.name(context, provider)
-                    Button(onClick = { bookedHere(provider) }, modifier = Modifier.heightIn(min = 48.dp)) {
-                        Icon(Icons.Filled.CheckCircle, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Text(stringResource(R.string.compare_booked_here, app))
-                    }
-                }
-            }
-            OutlinedButton(onClick = onTypePrice, modifier = Modifier.heightIn(min = 48.dp)) {
-                Icon(Icons.Filled.Edit, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(6.dp))
-                Text(stringResource(R.string.compare_type_price))
-            }
-        }
-    }
-}
-
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun ManualPriceForm(
+private fun ManualPriceSheet(
     prompt: ManualPrompt,
     apps: List<Provider>,
     classes: List<VehicleClass>,
     onSubmit: (Provider, VehicleClass, String, (String?) -> Unit) -> Unit,
+    onDismiss: () -> Unit,
 ) {
-    val context = androidx.compose.ui.platform.LocalContext.current
+    val context = LocalContext.current
     var provider by remember(prompt, apps) { mutableStateOf(prompt.provider ?: apps.firstOrNull()) }
     // Only the vehicle types chosen for this trip: a typed price of another type would not be listed.
     val offered = remember(prompt, classes) { (prompt.suggestedClasses.filter { it in classes } + classes).distinct() }
@@ -343,38 +441,39 @@ private fun ManualPriceForm(
     var feedback by remember(prompt) { mutableStateOf<String?>(null) }
     val savedText = stringResource(R.string.compare_manual_saved)
     val chooseFirst = stringResource(R.string.compare_manual_choose)
-    Card(
-        modifier = Modifier.fillMaxWidth().testTag(ComparisonTags.MANUAL_FORM),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
+    InfoSheet(
+        onDismiss = onDismiss,
+        title = stringResource(R.string.compare_manual_title),
+        icon = Icons.Rounded.Edit,
     ) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(stringResource(R.string.compare_manual_title), style = MaterialTheme.typography.titleMedium, modifier = Modifier.semantics { heading() })
-            prompt.message?.let {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Filled.Info, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text(it, style = MaterialTheme.typography.bodyMedium)
-                }
-            }
+        Column(
+            modifier = Modifier.fillMaxWidth().testTag(ComparisonTags.MANUAL_FORM),
+            verticalArrangement = Arrangement.spacedBy(RmSpacing.m),
+        ) {
+            prompt.message?.let { InlineBanner(text = it, tone = RmTone.WARN, icon = Icons.Rounded.Info) }
             if (apps.size > 1 || prompt.provider == null) {
-                Text(stringResource(R.string.compare_manual_app), style = MaterialTheme.typography.labelLarge)
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                RmSectionTitle(stringResource(R.string.compare_manual_app))
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(RmSpacing.s), verticalArrangement = Arrangement.spacedBy(RmSpacing.s)) {
                     apps.forEach { p ->
-                        FilterChip(
+                        ProviderChoiceTile(
+                            provider = p,
                             selected = provider == p,
                             onClick = { provider = p },
-                            label = { Text(FareReadingMessages.name(context, p)) },
+                            name = FareReadingMessages.name(context, p),
+                            modifier = Modifier.widthIn(min = 96.dp),
                         )
                     }
                 }
             }
-            Text(stringResource(R.string.compare_manual_vehicle), style = MaterialTheme.typography.labelLarge)
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            RmSectionTitle(stringResource(R.string.compare_manual_vehicle))
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(RmSpacing.s), verticalArrangement = Arrangement.spacedBy(RmSpacing.s)) {
                 offered.forEach { c ->
-                    FilterChip(
+                    VehicleChoiceTile(
+                        vehicleClass = c,
                         selected = vehicleClass == c,
                         onClick = { vehicleClass = c },
-                        label = { Text(stringResource(FareReadingMessages.vehicleClassRes(c))) },
+                        label = stringResource(FareReadingMessages.vehicleClassRes(c)),
+                        modifier = Modifier.widthIn(min = 96.dp),
                     )
                 }
             }
@@ -384,12 +483,14 @@ private fun ManualPriceForm(
                 label = { Text(stringResource(R.string.compare_manual_price_label)) },
                 supportingText = { Text(stringResource(R.string.compare_manual_price_hint)) },
                 singleLine = true,
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                 modifier = Modifier.fillMaxWidth().testTag(ComparisonTags.PRICE_FIELD),
             )
             feedback?.let {
                 Text(it, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
             }
-            Button(
+            BigPrimaryButton(
+                text = stringResource(R.string.compare_manual_save),
                 onClick = {
                     val p = provider
                     val c = vehicleClass
@@ -402,10 +503,7 @@ private fun ManualPriceForm(
                         }
                     }
                 },
-                modifier = Modifier.heightIn(min = 48.dp),
-            ) { Text(stringResource(R.string.compare_manual_save)) }
+            )
         }
     }
 }
-
-private const val STALE_ALPHA = 0.55f

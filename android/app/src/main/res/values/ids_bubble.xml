@@ -3,4 +3,5 @@
     <item name="bubble_head" type="id" />
     <item name="bubble_status" type="id" />
     <item name="bubble_card" type="id" />
+    <item name="bubble_badge" type="id" />
 </resources>

@@ -42,9 +42,7 @@
     <string name="compare_class_other">अन्य</string>
 
     <string name="compare_title">दाम</string>
-    <string name="compare_empty">अभी कोई दाम नहीं। RideMate से राइड ऐप खोलें और बबल पर किराया पढ़ें टैप करें।</string>
-    <string name="compare_refresh">%1$s का दाम ताज़ा करें</string>
-    <string name="compare_book">%1$s में बुक करें</string>
+    <string name="compare_empty">अभी कोई दाम नहीं</string>
     <string name="compare_book_description">बुक करने के लिए %1$s खोलें। वहाँ Book आप खुद टैप करें।</string>
     <string name="compare_booked_heading">पहले ही बुक कर लिया?</string>
     <string name="compare_booked_here">%1$s में बुक किया</string>
@@ -83,4 +81,13 @@
     <string name="show_me_blocked">%1$s अपनी स्क्रीन छिपाता है, इसलिए RideMate तीर नहीं दिखा सकता। कार्ड पर दिए कदम अपनाएँ।</string>
     <string name="show_me_timed_out">बहुत समय लगा। फिर से मुझे दिखाएँ टैप करें, या कार्ड पर दिए कदम अपनाएँ।</string>
     <string name="show_me_pointer_description">%1$s में टैप करने वाले बटन के पास तीर</string>
+
+    <!-- Compare redesign (bottom bar, sheets, empty state). -->
+    <string name="compare_empty_hint">राइड ऐप खोलें, बबल पर किराया पढ़ें दबाएँ</string>
+    <string name="compare_book_cheapest">%1$s में बुक करें · %2$s</string>
+    <string name="compare_open_next_description">बबल से दाम पढ़ने के लिए %1$s खोलें</string>
+    <string name="compare_booked_button">बुक कर लिया</string>
+    <string name="compare_why_cd">दाम कैसे दिखते हैं</string>
+    <string name="compare_why_title">दाम कैसे दिखते हैं</string>
+    <string name="compare_why_body">सिर्फ़ वही दाम क्रम में लगते हैं और सबसे सस्ता कहला सकते हैं जिन्हें RideMate ने पढ़कर जाँचा है। आपके टाइप किए दाम (आपने लिखा) और ओपन नेटवर्क के दाम (नेटवर्क) दिखते हैं, पर कभी सबसे सस्ते नहीं कहलाते। जो दाम RideMate पढ़ नहीं पाया, उस पर ऐप में देखें लिखा होता है और कोई संख्या नहीं होती। एक मिनट बाद दाम घड़ी के साथ धूसर हो जाता है: उसे दबाकर ऐप खोलें और फिर से किराया पढ़ें दबाएँ। कार्ड दबाने पर वह ऐप खुलता है; बुकिंग आप वहीं ख़ुद करते हैं।</string>
 </resources>
