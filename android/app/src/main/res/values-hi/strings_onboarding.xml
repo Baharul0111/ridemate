@@ -49,11 +49,11 @@
     <string name="onb_notice_contact_title">संपर्क</string>
     <string name="onb_notice_contact_body">बहारुल इस्लाम (Baharul Islam), बारपेटा, असम, भारत · %1$s (30 दिनों के भीतर जवाब)</string>
 
-    <string name="onb_signin_title">Google से साइन इन करें</string>
+    <string name="onb_signin_title">AI से दाम पढ़ने के लिए साइन इन</string>
     <string name="onb_signin_why">AI से किराया पढ़ने के लिए Google साइन-इन ज़रूरी है, ताकि मुफ़्त AI बजट सभी लोगों में उचित रूप से बँटे।</string>
-    <string name="onb_signin_manual_note">साइन इन किए बिना आप किराए स्वयं टाइप करते हैं (मैनुअल मोड)। राइड गार्डियन और रद्द करने के रिमाइंडर दोनों तरह से काम करते हैं। आप बाद में भी साइन इन कर सकते हैं।</string>
+    <string name="onb_signin_manual_note">साइन इन नहीं? दाम खुद लिखें। रिमाइंडर फिर भी चलेंगे।</string>
     <string name="onb_signin_google">Google से साइन इन करें</string>
-    <string name="onb_signin_skip">साइन इन किए बिना आगे बढ़ें</string>
+    <string name="onb_signin_skip">छोड़ें, दाम खुद लिखें</string>
     <string name="onb_signin_busy">Google साइन-इन की प्रतीक्षा है…</string>
     <string name="onb_signin_problem_title">साइन इन नहीं हुआ</string>
     <string name="onb_signin_cancelled">साइन-इन रद्द कर दिया गया। फिर से कोशिश करें, या साइन इन किए बिना आगे बढ़ें।</string>
@@ -123,4 +123,23 @@
     <string name="onb_done_health_skipped_title">स्व-जाँच पास नहीं हुई</string>
     <string name="onb_done_health_skipped_body">RideMate से राइड ऐप्स की सूचनाएँ छूट सकती हैं। हर तुलना से पहले वह फिर जाँचेगा और ठीक करने का तरीका दिखाएगा।</string>
     <string name="onb_done_start">RideMate इस्तेमाल करना शुरू करें</string>
+
+    <!-- Redesign: short subtitles and sheet text -->
+    <string name="onb_why_about">क्यों: %1$s</string>
+    <string name="onb_why_short">क्यों?</string>
+    <string name="onb_age_sub">शुरू करने से पहले एक छोटी जाँच।</string>
+    <string name="onb_privacy_title">गोपनीयता, सीधे शब्दों में</string>
+    <string name="onb_privacy_blur">नंबर, OTP और नंबर प्लेट धुंधले</string>
+    <string name="onb_privacy_erase">अपना डेटा कभी भी मिटाएँ</string>
+    <string name="onb_privacy_read_full">पूरी सूचना पढ़ें</string>
+    <string name="onb_signin_manual_full">साइन इन किए बिना आप किराए स्वयं टाइप करते हैं (मैनुअल मोड)। राइड गार्डियन और रद्द करने के रिमाइंडर दोनों तरह से काम करते हैं। आप बाद में भी साइन इन कर सकते हैं।</string>
+    <string name="onb_notif_sub">अतिरिक्त बुकिंग रद्द करने की याद दिलाने के लिए।</string>
+    <string name="onb_access_sub">ड्राइवर कब स्वीकार या रद्द करे, यह जानने के लिए।</string>
+    <string name="onb_overlay_sub">राइड ऐप के ऊपर एक छोटा बटन।</string>
+    <string name="onb_location_sub">पिकअप अपने-आप भरता है, सिर्फ़ ऐप चलते समय।</string>
+    <string name="onb_battery_sub">ताकि रद्द करने की याद देर से न आए।</string>
+    <string name="onb_restricted_sub">दो स्विच के लिए एक बार की अनुमति।</string>
+    <string name="onb_oem_show">दिखाएँ</string>
+    <string name="onb_health_sub">जाँचता है कि RideMate राइड अलर्ट देख सकता है।</string>
+    <string name="onb_done_seen">RideMate राइड अलर्ट देख सकता है</string>
 </resources>

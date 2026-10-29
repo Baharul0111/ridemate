@@ -53,11 +53,11 @@
     <string name="onb_notice_contact_body">Baharul Islam, Barpeta, Assam, India · %1$s (reply within 30 days)</string>
 
     <!-- Sign-in -->
-    <string name="onb_signin_title">Sign in with Google</string>
+    <string name="onb_signin_title">Sign in for AI reading</string>
     <string name="onb_signin_why">AI price reading needs Google sign-in, so the free AI budget is shared fairly between people.</string>
-    <string name="onb_signin_manual_note">Without signing in, you type prices yourself (manual mode). The ride guardian and cancel reminders work either way. You can sign in later.</string>
+    <string name="onb_signin_manual_note">No sign-in? You type prices. Reminders still work.</string>
     <string name="onb_signin_google">Sign in with Google</string>
-    <string name="onb_signin_skip">Continue without signing in</string>
+    <string name="onb_signin_skip">Skip, I\'ll type prices</string>
     <string name="onb_signin_busy">Waiting for Google sign-in…</string>
     <string name="onb_signin_problem_title">Not signed in</string>
     <string name="onb_signin_cancelled">Sign-in was cancelled. Try again, or continue without signing in.</string>
@@ -135,4 +135,23 @@
     <string name="onb_done_health_skipped_title">The self-test didn\'t pass</string>
     <string name="onb_done_health_skipped_body">RideMate may miss ride-app notifications. Before each comparison it checks again and shows how to fix it.</string>
     <string name="onb_done_start">Start using RideMate</string>
+
+    <!-- Redesign: short subtitles and sheet text -->
+    <string name="onb_why_about">Why: %1$s</string>
+    <string name="onb_why_short">Why?</string>
+    <string name="onb_age_sub">A quick check before we start.</string>
+    <string name="onb_privacy_title">Privacy, simply</string>
+    <string name="onb_privacy_blur">Numbers, OTPs and plates blurred</string>
+    <string name="onb_privacy_erase">Erase your data any time</string>
+    <string name="onb_privacy_read_full">Read full notice</string>
+    <string name="onb_signin_manual_full">Without signing in, you type prices yourself (manual mode). The ride guardian and cancel reminders work either way. You can sign in later.</string>
+    <string name="onb_notif_sub">For reminders to cancel extra bookings.</string>
+    <string name="onb_access_sub">To know when a driver accepts or cancels.</string>
+    <string name="onb_overlay_sub">A small button over the ride app.</string>
+    <string name="onb_location_sub">Fills in your pickup, only while in use.</string>
+    <string name="onb_battery_sub">So cancel reminders never come late.</string>
+    <string name="onb_restricted_sub">A one-time unlock for two switches.</string>
+    <string name="onb_oem_show">Show me</string>
+    <string name="onb_health_sub">Checks that RideMate can see ride alerts.</string>
+    <string name="onb_done_seen">RideMate can see ride alerts</string>
 </resources>
