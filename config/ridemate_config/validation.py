@@ -93,6 +93,12 @@ def _semantic_errors(key: KeySpec, payload: Any) -> list[str]:
             if pkg in apps and UNVERIFIED_NOTE not in note and not note.startswith(VERIFIED_NOTE_PREFIX):
                 wanted = f"'{UNVERIFIED_NOTE}' (or start '{VERIFIED_NOTE_PREFIX}')"
                 errors.append(f"{key.name}: notes[{pkg}] must say {wanted}")
+    if key.name == "map_style_url":
+        url = str(payload.get("value", ""))
+        if not url.startswith("https://"):
+            errors.append(f"{key.name}: must be an https URL")
+        if "tile.openstreetmap.org" in url:
+            errors.append(f"{key.name}: OpenStreetMap's own tile servers are not allowed (tile usage policy)")
     if key.name == "launch_templates":
         errors += _launch_errors(payload)
     if key.name in ("notification_templates", "fare_parsers"):

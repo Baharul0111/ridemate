@@ -282,6 +282,8 @@ rejects the whole payload on an unknown launch mode.
 | `ondc_enabled` | bool | true (hackathon mock) |
 | `demo_enabled` | bool | true |
 | `better_ride_enabled` | bool | true. Kill switch for the opt-in better-ride offers ("Keep searching", goal 16): false stops better-ride sheets in an open live session (as the §4.8 stop rule does) and hides the toggle. Demo sessions follow `demo_enabled` |
+| `map_enabled` | bool | true. Kill switch for the in-app map (pin picker, route preview): false hides every map; pickup and drop are typed or searched and the trip is never blocked |
+| `map_style_url` | string (https only) | `https://tiles.openfreemap.org/styles/liberty` (OpenFreeMap: free, no key, OSM data under ODbL, attribution shown on the map). A non-https value is ignored and the default is used; OpenStreetMap's own tile servers are never allowed |
 | `point_supported` | bool | true (set by the day-1 spike, `docs/spikes.md`: grounding hit 3/3 demo cancel screens). The server reads it for `/v1/point` and reports it in `/v1/config-check`; its built-in fallback, used only without the bundled defaults, stays false |
 | `model_route` | JSON `{"schema":"1.0","read":"modal_spark_open","parse":"modal_spark_open"}` | |
 | `latest_version` | JSON `{"schema":"1.0","version_code":1,"version_name":"1.0.0-hackathon","url":"https://github.com/Baharul0111/ridemate/releases/latest","sha256":""}` | |

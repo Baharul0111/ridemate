@@ -581,4 +581,7 @@ fictional companies made up for the demo.
   fictional demo screens and the synthetic test screens (licence files in `eval/fonts/`).
 - The **ONDC TRV10 mobility specification** ([ONDC-Official/mobility-specification](https://github.com/ONDC-Official/mobility-specification));
   the demo seller replays its example payloads, fetched at build time and not committed.
+- **MapLibre Native for Android** (BSD-2-Clause) renders the pin-on-map picker and route preview, with the free, keyless
+  **OpenFreeMap** style and tiles. Map data © **OpenStreetMap contributors**, under the Open Database License (ODbL);
+  the attribution stays visible on every map.
 - RE2/J, FastAPI, PyNaCl, `cryptography`, the `openai` Python SDK, and the Android Jetpack libraries.

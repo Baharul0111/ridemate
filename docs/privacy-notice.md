@@ -32,6 +32,7 @@ Open) running on Modal's cloud servers in the USA.
 | Data | Why | Where it goes | Who processes it | How long it is kept |
 |---|---|---|---|---|
 | **Pickup and drop places**, and places you type | To open the ride apps with your route, and to suggest addresses | Your phone; Android's address lookup (Geocoder); **your destination text is sent to Modal** so the AI can pick the right place from the suggestions | Google (Geocoder), Modal | **On your phone: deleted a day after the ride (24 hours).** Not stored by RideMate's server, except the pickup and drop points of an ONDC ride (next rows) |
+| **Map tiles** (only when you open the map to pin a pickup or drop, or see the route preview) | To draw the map | Your phone downloads map tiles from **OpenFreeMap**, which, like any website, **sees your IP address and the area of the map you view** (not your account, and not your pickup or drop as such) | OpenFreeMap | Not stored by RideMate; OpenFreeMap's own server logs, per its terms |
 | **Screenshots of ride-app fare and status screens** (masked) | To read prices, times and ride status when you tap the button | Kept in your phone's memory only; the **masked** image is sent to Modal, where Muse Spark Open reads it | Modal (USA; data may be processed outside India) | **Screenshots are never stored** by RideMate, on the phone or on our server. Modal processes them under its terms and data-processing agreement |
 | **Addresses visible in uploaded screenshots** | They may appear on a ride app's screen | Masked on your phone where detected; otherwise sent with the masked image | Modal | **Processed transiently** (only while reading); not stored by RideMate |
 | **Text recognised on screen** (OCR) | The second, independent price check | Your phone only | Google ML Kit, running on your phone (it may send Google anonymous usage metrics) | For the current ride session only |
@@ -114,6 +115,7 @@ identifier; and signs you out. If you no longer have the app, email us and we wi
 | **Google Firebase** (Authentication, Cloud Firestore, Remote Config, Crashlytics, Cloud Messaging) | Sign-in, fair-use counters and records, remote settings and switches, crash reports, owner alerts | Google's infrastructure; Firestore in Mumbai (asia-south1) |
 | **Google ML Kit** (on device) | Text recognition on your phone, as the second price check | On your phone |
 | **Android Geocoder and Android speech recognition** (Google services on your phone) | Address suggestions; turning your voice into text | On your phone or Google's service, per your phone's settings |
+| **OpenFreeMap** (free map tiles, OpenStreetMap data) | Draws the map when you pin a place; map tiles from OpenFreeMap see your IP and the area viewed | OpenFreeMap's servers |
 | **Modal** | Runs the Muse Spark Open AI model and RideMate's server | Modal's cloud, USA |
 
 ## 8. How long data is kept, in short

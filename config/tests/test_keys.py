@@ -44,6 +44,8 @@ def test_value_types_match_contract_table() -> None:
         "ondc_enabled": "BOOLEAN",
         "demo_enabled": "BOOLEAN",
         "better_ride_enabled": "BOOLEAN",
+        "map_enabled": "BOOLEAN",
+        "map_style_url": "STRING",
         "point_supported": "BOOLEAN",
         "min_supported_version": "NUMBER",
         "budget_horizon_days": "NUMBER",

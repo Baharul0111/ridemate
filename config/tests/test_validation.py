@@ -24,6 +24,8 @@ def test_contract_scalar_defaults() -> None:
     assert default_value("budget_horizon_start") == "2026-10-28"
     assert default_value("api_base_url") == ""
     assert default_value("better_ride_enabled") is True
+    assert default_value("map_enabled") is True
+    assert default_value("map_style_url") == "https://tiles.openfreemap.org/styles/liberty"
     assert default_value("model_route") == {
         "schema": "1.0",
         "read": "modal_spark_open",
@@ -177,3 +179,14 @@ def test_contract_fee_rules_and_launch_templates_are_exact() -> None:
     for placeholder in ("{plat}", "{plng}", "{pname}", "{dlat}", "{dlng}", "{dname}"):
         assert placeholder in launch["com.ubercab"]["uri"]
     assert "client_id" not in launch["com.ubercab"]["uri"]
+
+
+@pytest.mark.parametrize(
+    "bad",
+    ["http://tiles.openfreemap.org/styles/liberty", "https://tile.openstreetmap.org/styles/x", "ftp://x.org/s"],
+)
+def test_map_style_url_https_only_and_never_osm_tiles(bad: str) -> None:
+    from ridemate_config.keys import KEYS_BY_NAME
+    from ridemate_config.validation import validate_key
+
+    assert validate_key(KEYS_BY_NAME["map_style_url"], {"value": bad})

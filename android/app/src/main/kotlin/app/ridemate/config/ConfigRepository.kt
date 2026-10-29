@@ -80,6 +80,11 @@ class ConfigRepository(
     /** `better_ride_enabled`: the opt-in better-ride offers ("Keep searching") may run. */
     val betterRideEnabled: StateFlow<Boolean> = _betterRideEnabled.asStateFlow()
 
+    private val _mapConfig = MutableStateFlow(app.ridemate.map.MapConfig.DEFAULT)
+
+    /** `map_enabled` + `map_style_url` (https only, else the default style): the in-app map's settings. */
+    val mapConfig: StateFlow<app.ridemate.map.MapConfig> = _mapConfig.asStateFlow()
+
     private val readerFlows: Map<Provider, MutableStateFlow<Boolean>> = Provider.LIVE_APPS.associateWith { MutableStateFlow(true) }
 
     private var startJob: Job? = null
@@ -168,6 +173,10 @@ class ConfigRepository(
         _demoEnabled.value = switches.demoEnabled
         _betterRideEnabled.value = switches.betterRideEnabled
         readerFlows.forEach { (provider, flow) -> flow.value = switches.readerEnabledFor(provider) }
+        _mapConfig.value = app.ridemate.map.MapConfig.from(
+            enabled = boolean(ConfigKeys.MAP_ENABLED, true),
+            styleUrl = remoteOrNull(ConfigKeys.MAP_STYLE_URL) ?: bundled[ConfigKeys.MAP_STYLE_URL],
+        )
         _epoch.update { it + 1 }
     }
 

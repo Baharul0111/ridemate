@@ -19,6 +19,12 @@ object ConfigKeys {
     /** Opt-in better-ride offers ("Keep searching", goal 16); false stops them in open sessions and hides the toggle. */
     const val BETTER_RIDE_ENABLED = "better_ride_enabled"
 
+    /** In-app map (pin picker, route preview); false falls back to typed addresses (architecture §4.2 TripInput). */
+    const val MAP_ENABLED = "map_enabled"
+
+    /** MapLibre style URL for the in-app map; https only, default OpenFreeMap Liberty. */
+    const val MAP_STYLE_URL = "map_style_url"
+
     /** Whether `/v1/point` grounding ("Show me") is served (day-1 spike: true). */
     const val POINT_SUPPORTED = "point_supported"
     const val MODEL_ROUTE = "model_route"
@@ -35,7 +41,7 @@ object ConfigKeys {
 
     /** Keys watched by the real-time listener and exposed as StateFlows. */
     val KILL_SWITCHES: Set<String> =
-        setOf(AI_READER_ENABLED, ONDC_ENABLED, DEMO_ENABLED, BETTER_RIDE_ENABLED) + Provider.LIVE_APPS.map { readerEnabled(it) }
+        setOf(AI_READER_ENABLED, ONDC_ENABLED, DEMO_ENABLED, BETTER_RIDE_ENABLED, MAP_ENABLED) + Provider.LIVE_APPS.map { readerEnabled(it) }
 }
 
 /**
@@ -49,6 +55,8 @@ object BuiltInDefaults {
         put(ConfigKeys.ONDC_ENABLED, "true")
         put(ConfigKeys.DEMO_ENABLED, "true")
         put(ConfigKeys.BETTER_RIDE_ENABLED, "true")
+        put(ConfigKeys.MAP_ENABLED, "true")
+        put(ConfigKeys.MAP_STYLE_URL, "https://tiles.openfreemap.org/styles/liberty")
         put(ConfigKeys.POINT_SUPPORTED, "true")
         put(ConfigKeys.MODEL_ROUTE, """{"schema":"1.0","read":"modal_spark_open","parse":"modal_spark_open"}""")
         put(

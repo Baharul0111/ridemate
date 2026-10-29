@@ -54,6 +54,14 @@
         <value>true</value>
     </entry>
     <entry>
+        <key>map_enabled</key>
+        <value>true</value>
+    </entry>
+    <entry>
+        <key>map_style_url</key>
+        <value>https://tiles.openfreemap.org/styles/liberty</value>
+    </entry>
+    <entry>
         <key>point_supported</key>
         <value>true</value>
     </entry>

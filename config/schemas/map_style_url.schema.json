@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:ridemate:config:map_style_url",
+  "title": "map_style_url (contracts §2.7)",
+  "description": "MapLibre style JSON URL for the in-app map: https only, keyless and free (default OpenFreeMap Liberty; OSM's own tile servers are not allowed). Stored as {\"value\": ...}; published as a Remote Config scalar.",
+  "type": "object",
+  "required": [
+    "value"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "value": {
+      "type": "string",
+      "pattern": "^https://[A-Za-z0-9.-]+(:[0-9]+)?(/[A-Za-z0-9._~/-]*)?$"
+    }
+  }
+}

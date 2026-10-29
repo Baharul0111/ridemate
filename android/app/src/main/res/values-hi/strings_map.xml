@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="map_set_on_map">मैप पर चुनें</string>
+    <string name="map_set_pickup_description">पिकअप मैप पर चुनें</string>
+    <string name="map_set_drop_description">ड्रॉप मैप पर चुनें</string>
+    <string name="map_title_pickup">अपना पिकअप पिन करें</string>
+    <string name="map_title_drop">अपना ड्रॉप पिन करें</string>
+    <string name="map_hint">पिन को सही जगह पर लाने के लिए मैप को खिसकाएँ</string>
+    <string name="map_confirm_pickup">पिकअप पक्का करें</string>
+    <string name="map_confirm_drop">ड्रॉप पक्का करें</string>
+    <string name="map_confirm_pickup_description">%1$s पर पिकअप पक्का करें</string>
+    <string name="map_confirm_drop_description">%1$s पर ड्रॉप पक्का करें</string>
+    <string name="map_back">ट्रिप पर वापस जाएँ</string>
+    <string name="map_my_location">मैप को मेरी लोकेशन पर ले जाएँ</string>
+    <string name="map_resolving">पता ढूँढ रहे हैं…</string>
+    <string name="map_no_address">इस जगह का पता नहीं मिला। फिर भी सही पिन ही इस्तेमाल होगा।</string>
+    <string name="map_pinned_label">पिन की गई जगह (%1$s)</string>
+    <string name="map_pin_description">मैप के बीच में पिन</string>
+    <string name="map_view_description">मैप। पिन हिलाने के लिए खींचें।</string>
+    <string name="map_unavailable">मैप उपलब्ध नहीं · पता टाइप करें</string>
+    <string name="map_type_address">पता टाइप करें</string>
+    <string name="map_location_denied">RideMate के लिए लोकेशन बंद है, इसलिए मैप आपको नहीं ढूँढ सकता। मैप को हाथ से खिसकाएँ।</string>
+    <string name="map_location_unavailable">आपकी लोकेशन नहीं मिली। मैप को हाथ से खिसकाएँ।</string>
+    <string name="map_route_description">%1$s से %2$s तक का रास्ता। मैप पर ड्रॉप बदलने के लिए टैप करें।</string>
+    <string name="map_route_adjust">बदलने के लिए मैप पर टैप करें</string>
+    <string name="map_attribution_note">मैप © OpenFreeMap, डेटा © OpenStreetMap योगदानकर्ता</string>
+</resources>

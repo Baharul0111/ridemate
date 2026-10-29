@@ -20,6 +20,8 @@ credentials = "1.5.0"
 googleid = "1.1.1"
 mlkitText = "16.0.1"
 playLocation = "21.3.0"
+# MapLibre Native (BSD-2-Clause): free, keyless vector maps for the pin picker; tiles from OpenFreeMap (architecture §4.2).
+maplibre = "13.7.1"
 junit = "4.13.2"
 robolectric = "4.14.1"
 androidxTestCore = "1.6.1"
@@ -73,6 +75,7 @@ googleid = { module = "com.google.android.libraries.identity.googleid:googleid",
 mlkit-text-latin = { module = "com.google.mlkit:text-recognition", version.ref = "mlkitText" }
 play-services-location = { module = "com.google.android.gms:play-services-location", version.ref = "playLocation" }
 mlkit-text-devanagari = { module = "com.google.mlkit:text-recognition-devanagari", version.ref = "mlkitText" }
+maplibre-android = { module = "org.maplibre.gl:android-sdk", version.ref = "maplibre" }
 
 junit = { module = "junit:junit", version.ref = "junit" }
 robolectric = { module = "org.robolectric:robolectric", version.ref = "robolectric" }

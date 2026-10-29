@@ -97,6 +97,16 @@ KEYS: tuple[KeySpec, ...] = (
         "Kill switch for the opt-in better-ride offers (\"Keep searching\"): false stops them and hides the toggle.",
     ),
     KeySpec(
+        "map_enabled",
+        "BOOLEAN",
+        "Kill switch for the in-app map (pin picker, route preview): false falls back to typed addresses.",
+    ),
+    KeySpec(
+        "map_style_url",
+        "STRING",
+        "MapLibre style URL for the in-app map (https only; default OpenFreeMap Liberty, never OSM tile servers).",
+    ),
+    KeySpec(
         "point_supported",
         "BOOLEAN",
         "Whether /v1/point grounding is served (\"Show me\"); set by the day-1 spike, false until then.",
