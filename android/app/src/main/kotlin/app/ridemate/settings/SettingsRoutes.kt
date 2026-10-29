@@ -11,6 +11,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.ridemate.AppGraph
 import app.ridemate.BuildConfig
@@ -105,10 +106,11 @@ fun SettingsRoute(graph: AppGraph, nav: SettingsNavigation) {
 @Composable
 fun MyDataRoute(graph: AppGraph, onBack: () -> Unit, afterErase: () -> Unit) {
     val context = LocalContext.current
+    val resources = LocalResources.current
     var lines by remember { mutableStateOf<List<String>?>(null) }
     LaunchedEffect(Unit) {
         lines = runCatching { PrivacyMessages.myDataLines(context, graph.myDataProvider.load()) }
-            .getOrElse { listOf(context.getString(R.string.set_my_data_failed)) }
+            .getOrElse { listOf(resources.getString(R.string.set_my_data_failed)) }
     }
     val model = rememberScopedModel("settings-mydata") { scope -> settingsModel(graph, scope) }
     val state by model.state.collectAsStateWithLifecycle()

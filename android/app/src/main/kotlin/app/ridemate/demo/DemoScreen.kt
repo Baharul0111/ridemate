@@ -63,6 +63,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
@@ -528,6 +529,7 @@ private fun Overview(state: DemoUiState, actions: DemoScreenActions) {
 @Composable
 private fun ReadRows(read: DemoReadResult, booked: Boolean, nowMs: () -> Long) {
     val context = LocalContext.current
+    val resources = LocalResources.current
     val name = DemoText.providerName(context, read.provider)
     val colors = RideMateTheme.colors
     RmCard {
@@ -550,7 +552,7 @@ private fun ReadRows(read: DemoReadResult, booked: Boolean, nowMs: () -> Long) {
         val list = ComparisonList.build(app.ridemate.compare.ComparisonData.chosen(read.rows, emptyList()), nowMs())
         list.groups.flatMap { it.entries }.forEachIndexed { index, entry ->
             if (index > 0) RmListDivider()
-            val description = context.getString(R.string.demo_row_description_with_app, DemoText.rowDescription(context, entry, booked), name)
+            val description = resources.getString(R.string.demo_row_description_with_app, DemoText.rowDescription(context, entry, booked), name)
             val verified = entry.row.status == QuoteStatus.VERIFIED
             Row(
                 modifier = Modifier.fillMaxWidth().heightIn(min = TouchTarget)

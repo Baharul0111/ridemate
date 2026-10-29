@@ -62,6 +62,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -204,12 +205,13 @@ fun TripInputScreen(
 @Composable
 private fun PinPickerHost(request: PinRequest, state: TripUiState, vm: TripViewModel, modifier: Modifier) {
     val context = LocalContext.current
+    val resources = LocalResources.current
     val pinVm: PinPickerViewModel = viewModel(
         key = "pin-${request.target.name}-${request.nonce}",
         factory = viewModelFactory {
             initializer {
                 PinPickerViewModel(
-                    deps = vm.pinPickerDeps { point -> context.getString(R.string.map_pinned_label, coordsText(point)) },
+                    deps = vm.pinPickerDeps { point -> resources.getString(R.string.map_pinned_label, coordsText(point)) },
                     target = request.target,
                     start = request.start,
                     startLabel = request.startLabel,
