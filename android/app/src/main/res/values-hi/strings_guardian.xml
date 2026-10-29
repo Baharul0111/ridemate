@@ -250,4 +250,12 @@
     <string name="guardian_screen_next_reminder">अगला रिमाइंडर %1$s (IST) पर</string>
     <string name="guardian_screen_generation">ड्राइवर बदले: %1$d</string>
     <string name="guardian_screen_dismiss_notice">अपडेट हटाएँ</string>
+    <string name="guardian_hero_found">ड्राइवर मिल गया</string>
+    <string name="guardian_hero_eta">%1$d मिनट</string>
+    <string name="guardian_reminders_open">%1$d अभी खुली</string>
+    <string name="guardian_reminders_next">अगला %1$s</string>
+    <string name="guardian_why_description">और जानकारी</string>
+    <string name="guardian_better_now">अभी</string>
+    <string name="guardian_better_new">नया</string>
+    <string name="guardian_step_number">चरण %1$d</string>
 </resources>

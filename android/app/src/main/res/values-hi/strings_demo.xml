@@ -111,4 +111,8 @@
     <string name="demo_notice_not_now">आपने \"अभी नहीं\" चुना, इसलिए इस डेमो में आगे कुछ नहीं होगा। रद्द करने की गाइड देखने के लिए डेमो से निकलकर फिर शुरू करें।</string>
     <string name="demo_notice_show_me_unavailable">\"मुझे दिखाएँ\" के लिए Google साइन-इन और AI पठन चाहिए। इसके बजाय बड़ा \"राइड रद्द करें\" बटन ढूँढें।</string>
     <string name="demo_notice_switched_off">डेमो बंद कर दिया गया। आपकी असली राइड पर कोई असर नहीं पड़ता।</string>
+    <string name="demo_pick_title">डेमो चुनें</string>
+    <string name="demo_about">डेमो के बारे में</string>
+    <string name="demo_track_why">%1$s के बारे में</string>
+    <string name="demo_apps_title">डेमो ऐप्स</string>
 </resources>

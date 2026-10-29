@@ -122,4 +122,9 @@
     <string name="demo_notice_not_now">You chose Not now, so nothing more happens in this demo. Leave the demo and start again to see the cancel guide.</string>
     <string name="demo_notice_show_me_unavailable">Show me needs Google sign-in and AI reading. Look for the large Cancel ride button instead.</string>
     <string name="demo_notice_switched_off">The demo was switched off. Your real rides are not affected.</string>
+    <!-- Redesign: short labels; the long track and intro texts move verbatim into ⓘ sheets. -->
+    <string name="demo_pick_title">Pick a demo</string>
+    <string name="demo_about">About the demo</string>
+    <string name="demo_track_why">About %1$s</string>
+    <string name="demo_apps_title">Demo apps</string>
 </resources>
