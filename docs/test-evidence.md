@@ -3,7 +3,37 @@
 Run on 29 October 2026 (IST) against RideMate's deployed backend on Modal (Remote Config `api_base_url`), with
 Muse Spark Open answering the demo reads. Counts, rates and enums only: no fare values appear here.
 
-## Device
+## Final check on main after the redesign merges (08:38–08:48 IST): the phone run did not happen
+
+**The instrumented suite was not re-run on main (`a658b4e`, then `42961db`), and none of the redesigned screens were
+checked on the phone.** From 08:38 to 08:48 IST, `adb devices` listed nothing: the moto g57 power wasn't on USB
+(macOS's USB tree showed only a hub and a LAN adapter), no wireless-debugging service showed up, and restarting the
+adb server didn't help. Because of that:
+
+- No connectedDebugAndroidTest results exist for the merged build. The per-test table below is still the **07:01 run
+  on the pre-redesign build**.
+- There are no screenshots of the redesigned Home, Trip ("Set on map" plus the map pin and route preview), Compare,
+  the guardian sheets or Settings, so no layout fixes were made from them.
+- `pm clear` wasn't run, because no phone was attached. RideMate may not even be installed: the 07:01 run ended with
+  Gradle's post-run uninstall.
+
+What was done without the phone:
+
+| Check | Result |
+|---|---|
+| `:app:assembleDebug` + `:app:assembleDebugAndroidTest` on main plus the change below (08:40) | built |
+| `DemoEndToEndTest` per-provider requirement | changed (goal 5, never guess): the main track now needs **at least two** demo providers with VERIFIED prices. Every non-verified row must show no number and be UNREADABLE, and only VERIFIED rows can be marked cheapest (both checks unchanged). Kestrel's "Couldn't read · check in app" is accepted. Its gate reasons are still logged (`VERIFIED_PROVIDERS ...`) |
+| Guardian sheet taps under Robolectric (`GuardianScreenTest` with real touch `performClick`) | **3 fail**: the sheet host's "Open Ola", the list card's "Yes, cancel the others", and the keep-searching dialog's confirm. A semantics click works. A probe with the same structure (Surface plus live region, a `heightIn(max)` column, a `weight(1f, fill = false)` scrolling body and a pinned `BigPrimaryButton`) registers the touch every time, so the sheet's layout skeleton from `f4a3ec4` isn't the cause by itself. Cause still unknown. |
+
+**Before the 08:55 recording:** on the phone, tap one button on a guardian sheet, for example "Yes, cancel the
+others" in the demo. If nothing happens, the next suspect is the sheet body in `GuardianSheetHost`
+(`notify/GuardianScreen.kt`). On the device, `DemoEndToEndTest.tapSheetAction` taps with a real `device.click`, so
+re-running the suite answers the question.
+
+To reproduce once the phone is attached: the "Reproduce" section at the end, then
+`adb shell pm clear in.ridemate.app` so the owner starts from onboarding.
+
+## Device (07:01 run)
 
 | | |
 |---|---|
