@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import sys
+
 import importlib.util
 
 import pytest
@@ -23,6 +25,11 @@ PARSE_REQUEST_KEYS = {
     "leg_state",
 }
 
+# The committed PNGs are rendered on macOS; FreeType rasterises fonts slightly differently on Linux, so a byte-for-byte
+# rebuild is only meaningful there. Everywhere else the committed files are still checked by SHA-256, schema and content.
+GENERATED_ON_THIS_PLATFORM = sys.platform == "darwin"
+
+
 
 @pytest.fixture(scope="module")
 def inj_labels() -> list[dict]:
@@ -38,6 +45,7 @@ def _generator():
     return module
 
 
+@pytest.mark.skipif(not GENERATED_ON_THIS_PLATFORM, reason="byte-exact rebuild only on the generating platform (macOS)")
 def test_committed_injection_files_are_current() -> None:
     assert _generator().main(["--check"]) == 0, (
         "run: cd eval && uv run python injection/generate_injection.py"

@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+import sys
+
+import pytest
+
 import hashlib
 import io
 import re
@@ -21,11 +25,17 @@ EXPECTED_FILES = {
     for s in ("fare_options", "searching", "driver_assigned", "cancel_flow", "cancelled")
 } | {"android/app/src/main/assets/demo/pepper/driver_assigned_better.png"}
 
+# The committed PNGs are rendered on macOS; FreeType rasterises fonts slightly differently on Linux, so a byte-for-byte
+# rebuild is only meaningful there. Everywhere else the committed files are still checked by SHA-256, schema and content.
+GENERATED_ON_THIS_PLATFORM = sys.platform == "darwin"
+
+
 
 def ocr_for(screen: dict) -> dict:
     return load(SYNTHETIC_DIR / "ocr" / f"{screen['sha256']}.json")
 
 
+@pytest.mark.skipif(not GENERATED_ON_THIS_PLATFORM, reason="byte-exact rebuild only on the generating platform (macOS)")
 def test_committed_artifacts_match_a_fresh_build(demo_build) -> None:
     assert stale_files(demo_build) == [], "run: cd eval && uv run python demo/generate_demo.py"
 

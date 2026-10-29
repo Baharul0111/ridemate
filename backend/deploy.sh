@@ -65,7 +65,6 @@ FIREBASE_CONFIG="$REPO_DIR/firebase/firebase.json"
 GOOGLE_SERVICES="$REPO_DIR/android/app/google-services.json"
 RC_BUILDER="$REPO_DIR/config/build_template.py"
 FIRESTORE_LOCATION="asia-south1"
-OWNER_EMAILS_DEFAULT="ibaharul567@gmail.com"
 FREE_APIS=(firestore.googleapis.com iam.googleapis.com iamcredentials.googleapis.com
   firebaseremoteconfig.googleapis.com fcm.googleapis.com)
 WEB_ROLES=(roles/datastore.user roles/cloudconfig.viewer)
@@ -308,7 +307,9 @@ else
   run uv run --project "$REPO_DIR/eval" --frozen --quiet python "$RC_BUILDER" \
     --api-base-url "${WEB_URL:-<web URL from step d>}"
   # The Firebase CLI only reads files inside the firebase/ project directory.
-  run cp "$REPO_DIR/config/remoteconfig.template.json" "$REPO_DIR/firebase/remoteconfig.template.json"
+  if [[ -f "$REPO_DIR/config/remoteconfig.template.json" ]]; then
+    run cp "$REPO_DIR/config/remoteconfig.template.json" "$REPO_DIR/firebase/remoteconfig.template.json"
+  fi
   # The CLI resolves the template path against the working directory, so deploy from inside firebase/.
   (cd "$REPO_DIR/firebase" && run firebase deploy --only remoteconfig --project "$FIREBASE_DEV_PROJECT_ID" \
     --config "$FIREBASE_CONFIG" --non-interactive)
