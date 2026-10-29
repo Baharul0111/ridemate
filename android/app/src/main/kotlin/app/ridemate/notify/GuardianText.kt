@@ -107,7 +107,8 @@ class GuardianText(private val context: Context) {
             RideState.BOOK_REQUESTED -> s(R.string.guardian_state_book_requested, app)
             RideState.SEARCHING -> s(if (c) R.string.guardian_state_searching_captain else R.string.guardian_state_searching)
             RideState.SEARCHING_NET, RideState.ON_SELECT, RideState.INIT -> s(R.string.guardian_state_network_preparing)
-            RideState.MAYBE_ASSIGNED, RideState.MAYBE_CHANGED, RideState.MAYBE_NEW_DRIVER -> s(R.string.guardian_state_question)
+            RideState.MAYBE_BOOKED, RideState.MAYBE_ASSIGNED, RideState.MAYBE_CHANGED, RideState.MAYBE_NEW_DRIVER ->
+                s(R.string.guardian_state_question)
             RideState.ASSIGNED -> s(if (c) R.string.guardian_state_assigned_captain else R.string.guardian_state_assigned)
             RideState.ARRIVING -> s(if (c) R.string.guardian_state_arriving_captain else R.string.guardian_state_arriving)
             RideState.DRIVER_CANCELLED ->
@@ -170,6 +171,7 @@ class GuardianText(private val context: Context) {
             UiKey.SHEET_WITHDRAWN_CURRENT_DRIVER_CLOSE -> s(R.string.guardian_sheet_withdrawn_current_driver_close)
             UiKey.SHEET_REPLACED -> s(R.string.guardian_sheet_replaced)
             UiKey.SHEET_CLOSED -> s(R.string.guardian_sheet_closed)
+            UiKey.PROMPT_MAYBE_BOOKED -> s(R.string.guardian_prompt_maybe_booked, app)
             UiKey.PROMPT_MAYBE_ASSIGNED -> s(R.string.guardian_prompt_maybe_assigned, app)
             UiKey.PROMPT_MAYBE_CHANGED ->
                 s(if (c) R.string.guardian_prompt_maybe_changed_captain else R.string.guardian_prompt_maybe_changed, app)
@@ -186,6 +188,7 @@ class GuardianText(private val context: Context) {
             UiKey.PROMPT_WITHDRAWN_TRIP_STARTED -> s(R.string.guardian_prompt_withdrawn_trip_started, app)
             UiKey.PROMPT_WITHDRAWN_SAME_DRIVER_STILL_COMING -> s(R.string.guardian_prompt_withdrawn_same_driver, app)
             UiKey.PROMPT_WITHDRAWN_CANCELLING -> s(R.string.guardian_prompt_withdrawn_cancelling, app)
+            UiKey.PROMPT_WITHDRAWN_BOOKING_SEEN -> s(R.string.guardian_prompt_withdrawn_booking_seen, app)
             UiKey.PROMPT_ANSWERED -> s(R.string.guardian_prompt_answered)
             UiKey.OPEN_APP_TO_CANCEL -> s(R.string.guardian_open_cancel, app)
             UiKey.OPEN_APP_TO_PAY -> s(R.string.guardian_open_pay, app)
@@ -199,6 +202,7 @@ class GuardianText(private val context: Context) {
                 s(if (c) R.string.guardian_alert_kept_leg_lost_captain else R.string.guardian_alert_kept_leg_lost, app)
             UiKey.ALERT_STILL_LIVE -> s(R.string.guardian_alert_still_live, app)
             UiKey.ALERT_CHECK_SCREEN -> s(R.string.guardian_alert_check_screen, app)
+            UiKey.ALERT_KEPT_LEG_MAY_BE_LOST -> s(R.string.guardian_alert_kept_leg_may_be_lost, app)
             UiKey.BANNER_YOUR_RIDE -> s(R.string.guardian_banner_your_ride, app)
             UiKey.BANNER_FINDING_ANOTHER_CAPTAIN ->
                 s(if (c) R.string.guardian_banner_finding_another_captain else R.string.guardian_banner_finding_another, app)
@@ -209,6 +213,7 @@ class GuardianText(private val context: Context) {
             UiKey.BANNER_LEG_DISMISSED -> s(R.string.guardian_banner_leg_dismissed, app)
             UiKey.BANNER_ALL_CANCELS_DONE -> s(R.string.guardian_banner_all_cancels_done)
             UiKey.PAY_HANDOFF_OFFER -> s(R.string.guardian_pay_offer, app)
+            UiKey.BANNER_ONDC_PAY_DRIVER -> s(R.string.guardian_banner_ondc_pay_driver)
             UiKey.ONDC_BOOK -> s(R.string.guardian_ondc_book)
             UiKey.ONDC_SOFT_CANCEL -> s(R.string.guardian_ondc_soft_cancel)
             UiKey.ONDC_CONFIRM_CANCEL -> s(R.string.guardian_ondc_confirm_cancel)
@@ -234,6 +239,8 @@ class GuardianText(private val context: Context) {
             UiAction.KEEP_CURRENT -> s(R.string.guardian_action_keep_current)
             UiAction.YES -> s(R.string.guardian_action_yes)
             UiAction.NOT_YET -> s(R.string.guardian_action_not_yet)
+            UiAction.YES_BOOKED -> s(R.string.guardian_action_yes_booked)
+            UiAction.NOT_BOOKED -> s(R.string.guardian_action_not_booked)
             // §4.5.6 wording: "[Driver cancelled]" for every app, Rapido included.
             UiAction.DRIVER_CANCELLED -> s(R.string.guardian_action_driver_cancelled)
             UiAction.NO_IT_ENDED -> s(R.string.guardian_action_no_it_ended)

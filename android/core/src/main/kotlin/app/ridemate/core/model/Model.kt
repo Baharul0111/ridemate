@@ -67,7 +67,11 @@ enum class ScreenType {
 
 /** §4.4 leg states (ride apps, user cancel chain and ONDC). */
 enum class RideState {
-    SELECTED, OPENED, QUOTED, BOOK_REQUESTED, SEARCHING,
+    SELECTED, OPENED, QUOTED,
+
+    /** An app RideMate opened (not marked "Booked here") sent a post it could not read: "Did you book on <App>?". */
+    MAYBE_BOOKED,
+    BOOK_REQUESTED, SEARCHING,
     MAYBE_ASSIGNED, ASSIGNED, ARRIVING, MAYBE_CHANGED,
     DRIVER_CANCELLED, MAYBE_NEW_DRIVER,
     ON_TRIP, ENDED, PAY_HANDOFF,
@@ -84,7 +88,7 @@ enum class RideState {
         get() = this == ASSIGNED || this == ARRIVING
 
     val isMaybe: Boolean
-        get() = this == MAYBE_ASSIGNED || this == MAYBE_CHANGED || this == MAYBE_NEW_DRIVER
+        get() = this == MAYBE_BOOKED || this == MAYBE_ASSIGNED || this == MAYBE_CHANGED || this == MAYBE_NEW_DRIVER
 
     companion object {
         val TERMINAL: Set<RideState> = setOf(CANCEL_CONFIRMED, SEARCH_EXPIRED, PROVIDER_CANCELLED, ENDED, PAY_HANDOFF)

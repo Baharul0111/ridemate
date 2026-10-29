@@ -160,6 +160,13 @@ class ReplayHarness(
         test.testScheduler.runCurrent()
     }
 
+    /** The notification listener is unbound and bound again: RideWatch re-reads the shade (§4.5.8). */
+    fun reconnect() {
+        pipeline.onListenerDisconnected()
+        pipeline.onListenerConnected(active.values.map { PostSource.of(it) })
+        test.testScheduler.runCurrent()
+    }
+
     /** The app's process dies and comes back: state from the snapshot, a new RideWatch that re-reads the shade. */
     fun restart(reboot: Boolean = false) {
         val snapshot = guardian.snapshot()

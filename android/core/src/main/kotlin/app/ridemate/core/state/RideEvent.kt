@@ -110,6 +110,8 @@ data class NotificationRemoved(
     val reasonCode: Int,
     val appCancel: Boolean,
     val wasOngoing: Boolean,
+    /** The app still shows another ongoing ride/search post after this one left. */
+    val ongoingLeft: Boolean = false,
 ) : RideEvent {
     override val type: EventType get() = EventType.REMOVAL
 }
@@ -126,7 +128,11 @@ data class DriverData(val etaMin: Int?, val distanceMeters: Int?, val source: Et
 
 /** Answers on prompts, the bubble and the cancel card. */
 enum class Answer {
+    /** "Booked here" on the bubble, and "Yes, booked" on MAYBE_BOOKED. */
     BOOKED_HERE,
+
+    /** MAYBE_BOOKED "No" (nothing was booked there). */
+    NOT_BOOKED,
 
     /** MAYBE_ASSIGNED "Yes, cancel the others", MAYBE_CHANGED "Yes" (still coming), MAYBE_NEW_DRIVER "Yes". */
     YES,

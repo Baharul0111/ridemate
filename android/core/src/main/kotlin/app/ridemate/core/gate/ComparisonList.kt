@@ -65,7 +65,8 @@ data class ClassGroup(val vehicleClass: VehicleClass, val entries: List<Comparis
  * by price, then the others in their original order: only VERIFIED rows are sorted or flagged cheapest (§4.3.7).
  *
  * Cheapest compares the upper end of a price range first (what you may end up paying), then the lower end; every
- * VERIFIED row equal to the best is flagged, so ties are all cheapest.
+ * VERIFIED row equal to the best is flagged, so ties are all cheapest. Only fresh rows compete: a price the list itself
+ * calls old (60 s, [Freshness]) is never flagged cheapest, and a class whose verified rows are all old has no cheapest.
  */
 data class ComparisonList(val groups: List<ClassGroup>) {
     companion object {
@@ -75,12 +76,12 @@ data class ComparisonList(val groups: List<ClassGroup>) {
             val groups = rows.groupBy { it.vehicleClass }.toSortedMap(compareBy { it.ordinal }).map { (vehicleClass, inClass) ->
                 val (verified, others) = inClass.partition { it.status == QuoteStatus.VERIFIED }
                 val sorted = verified.sortedWith(BY_PRICE)
-                val best = sorted.firstOrNull()
+                val best = sorted.firstOrNull { !Freshness.isStale(it.seenAtMs, nowMs) }
                 val entries = (sorted + others).map { row ->
                     val stale = Freshness.isStale(row.seenAtMs, nowMs)
                     ComparisonEntry(
                         row = row,
-                        cheapest = best != null && row.status == QuoteStatus.VERIFIED && BY_PRICE.compare(row, best) == 0,
+                        cheapest = best != null && !stale && row.status == QuoteStatus.VERIFIED && BY_PRICE.compare(row, best) == 0,
                         stale = stale,
                         priceText = row.price?.let { IndianFormat.rupeeRange(it, numerals) },
                         statusTextKey = when (row.status) {

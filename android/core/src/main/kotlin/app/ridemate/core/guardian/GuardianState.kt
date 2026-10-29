@@ -101,6 +101,8 @@ data class OpenSheet(
     val bindings: List<SheetBinding>,
     val shownAtElapsedMs: Long,
     val actions: List<UiAction>,
+    /** First-driver sheets: the other bookings and their fee kinds as last shown, so a change re-sends the sheet. */
+    val othersShown: String? = null,
 )
 
 @Serializable
@@ -111,6 +113,8 @@ data class OpenPrompt(
     val kind: PromptKind,
     val shownAtElapsedMs: Long,
     var repeats: Int = 0,
+    /** MAYBE_ASSIGNED: the Yes button shown is "Yes, cancel the others" (J9), not a plain "Yes". */
+    var cancelsOthers: Boolean = false,
 )
 
 @Serializable

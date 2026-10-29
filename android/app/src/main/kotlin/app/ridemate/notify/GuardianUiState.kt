@@ -361,7 +361,12 @@ object GuardianUiReducer {
                 is CheckScreenItem -> live && rec!!.leg.state in LegState.CHAIN_STATES
                 is CaptureItem -> live && nowWallMs - item.atWallMs < CAPTURE_TTL_MS
                 is ReminderItem -> guardian.reminders != null
-                is AlertItem -> if (item.key == UiKey.ALERT_KEPT_LEG_LOST) rec != null && session?.closed != true else live
+                is AlertItem -> when (item.key) {
+                    UiKey.ALERT_KEPT_LEG_LOST -> rec != null && session?.closed != true
+                    // "Your ride may be lost" lasts only while the driver-cancelled question is still open.
+                    UiKey.ALERT_KEPT_LEG_MAY_BE_LOST -> live && rec!!.leg.state in MAYBE_LOST_STATES
+                    else -> live
+                }
                 is PayItem -> rec?.leg?.state == RideState.ENDED
                 is OndcFeeItem -> rec?.leg?.state == RideState.SOFT_CANCEL
             }
@@ -396,6 +401,7 @@ object GuardianUiReducer {
     }
 
     private val CARD_STATES = setOf(RideState.CANCEL_REQUESTED, RideState.CANCEL_GUIDED)
+    private val MAYBE_LOST_STATES = setOf(RideState.DRIVER_CANCELLED, RideState.MAYBE_NEW_DRIVER)
 
     private fun legUi(rec: LegRecord, guardian: GuardianState, nowElapsedMs: Long): LegUi {
         val leg = rec.leg

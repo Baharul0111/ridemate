@@ -149,8 +149,10 @@ class DemoScreenTest {
         compose.onNodeWithText("old · read before you booked").performScrollTo().assertIsDisplayed()
         assertEquals(0, compose.onAllNodesWithText("old · tap Read fares to refresh").fetchSemanticsNodes().size)
         compose.onNodeWithContentDescription(
-            "Bike: ₹112. 4 min, cheapest. seen in Kestrel Go at 10:30:00 AM. old · read before you booked · Kestrel Go · DEMO",
+            "Bike: ₹112. 4 min. seen in Kestrel Go at 10:30:00 AM. old · read before you booked · Kestrel Go · DEMO",
         ).assertExists()
+        // A price the list calls old is never flagged cheapest.
+        assertEquals(0, compose.onAllNodesWithText("cheapest").fetchSemanticsNodes().size)
     }
 
     @Test

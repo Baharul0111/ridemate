@@ -309,6 +309,7 @@ class GuardianPresenter(val text: GuardianText, private val cancelSteps: CancelS
         val body = when (item.key) {
             UiKey.ALERT_KEPT_LEG_LOST -> text.string(R.string.guardian_alert_kept_leg_lost_body, app)
             UiKey.ALERT_STILL_LIVE -> text.string(R.string.guardian_alert_still_live_body, app)
+            UiKey.ALERT_KEPT_LEG_MAY_BE_LOST -> text.string(R.string.guardian_alert_kept_leg_may_be_lost_body, app)
             else -> text.string(R.string.guardian_alert_check_screen_body, app)
         }
         val actions = item.actions.map { action ->

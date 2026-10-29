@@ -10,7 +10,16 @@ sealed interface UserAction {
     val tapId: TapId
 
     data class BookedHere(val legId: String, override val tapId: TapId) : UserAction
-    data class AnswerPrompt(val promptId: String, val answer: Answer, override val tapId: TapId) : UserAction
+    /**
+     * [button] is the button the user tapped, when known: on MAYBE_ASSIGNED only [UiAction.YES_CANCEL_OTHERS] starts the
+     * cancel chain, so a plain "Yes" tapped on an older copy of the prompt never cancels anything.
+     */
+    data class AnswerPrompt(
+        val promptId: String,
+        val answer: Answer,
+        override val tapId: TapId,
+        val button: UiAction? = null,
+    ) : UserAction
 
     /** [pickedLegId] is required for [SheetChoice.PICK]. */
     data class AnswerSheet(

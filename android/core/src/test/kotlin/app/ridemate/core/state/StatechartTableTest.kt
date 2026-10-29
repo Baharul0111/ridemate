@@ -15,6 +15,7 @@ import app.ridemate.core.model.RideState.CANCEL_UNCONFIRMED
 import app.ridemate.core.model.RideState.DRIVER_CANCELLED
 import app.ridemate.core.model.RideState.ENDED
 import app.ridemate.core.model.RideState.MAYBE_ASSIGNED
+import app.ridemate.core.model.RideState.MAYBE_BOOKED
 import app.ridemate.core.model.RideState.MAYBE_CHANGED
 import app.ridemate.core.model.RideState.MAYBE_NEW_DRIVER
 import app.ridemate.core.model.RideState.ON_TRIP
@@ -27,6 +28,7 @@ import app.ridemate.core.model.RideState.SEARCH_EXPIRED
 import app.ridemate.core.model.RideState.SELECTED
 import app.ridemate.core.model.RideState.USER_SAYS_CANCELLED
 import app.ridemate.core.state.PromptKind.MAYBE_ASSIGNED as MA
+import app.ridemate.core.state.PromptKind.MAYBE_BOOKED as MB
 import app.ridemate.core.state.PromptKind.MAYBE_CHANGED as MC
 import app.ridemate.core.state.PromptKind.MAYBE_NEW_DRIVER as MND
 import app.ridemate.core.time.Moment
@@ -112,15 +114,39 @@ class StatechartTableTest(@Suppress("unused") private val name: String, private 
                 row(l, "removal rung", REMOVAL, PROVIDER_CANCELLED)
                 row(l, "ended tpl", tpl(NotificationEvent.ENDED), s, 0, LOG)
                 row(l, "trip-started tpl", tpl(NotificationEvent.TRIP_STARTED), s, 0, LOG)
+                when (s) {
+                    BOOK_REQUESTED -> row(l, "UNKNOWN_UPDATE", UNKNOWN, MAYBE_ASSIGNED, 0, raise(MA))
+                    // An app RideMate opened: "Did you book on <App>?"
+                    OPENED, QUOTED -> row(l, "UNKNOWN_UPDATE", UNKNOWN, MAYBE_BOOKED, 0, raise(MB))
+                    else -> row(l, "UNKNOWN_UPDATE", UNKNOWN, s, 0, LOG)
+                }
                 if (s == BOOK_REQUESTED) {
-                    row(l, "UNKNOWN_UPDATE", UNKNOWN, MAYBE_ASSIGNED, 0, raise(MA))
                     row(l, "answer Booked here", answer(Answer.BOOKED_HERE), s, 0, DUP)
                 } else {
-                    row(l, "UNKNOWN_UPDATE", UNKNOWN, s, 0, LOG)
                     row(l, "answer Booked here", answer(Answer.BOOKED_HERE), BOOK_REQUESTED)
                 }
+                row(l, "answer No (not booked)", answer(Answer.NOT_BOOKED), s, 0, NA)
                 row(l, "answer Yes", answer(Answer.YES), s, 0, NA)
                 row(l, "timeout", Timeout(TimeoutKind.REPROMPT), s, 0, LOG)
+            }
+
+            for (back in listOf(OPENED, QUOTED)) {
+                val l = leg(MAYBE_BOOKED, returnState = back)
+                val seen = WithdrawReason.BOOKING_SEEN
+                row(l, "searching tpl", tpl(NotificationEvent.SEARCHING), SEARCHING, 0, wd(MB, seen))
+                row(l, "assigned tpl", tpl(NotificationEvent.ASSIGNED), ASSIGNED, 0, wd(MB, seen))
+                row(l, "arriving tpl", tpl(NotificationEvent.ARRIVING), ARRIVING, 0, wd(MB, seen))
+                row(l, "driver-cancelled tpl", tpl(NotificationEvent.DRIVER_CANCELLED), MAYBE_BOOKED, 0, LOG)
+                row(l, "no-drivers tpl", tpl(NotificationEvent.NO_DRIVERS), SEARCH_EXPIRED, 0, wd(MB, WithdrawReason.SEARCH_EXPIRED))
+                row(l, "cancelled tpl", tpl(NotificationEvent.CANCELLED), PROVIDER_CANCELLED, 0, wd(MB, WithdrawReason.PROVIDER_CANCELLED))
+                row(l, "removal rung", REMOVAL, PROVIDER_CANCELLED, 0, wd(MB, WithdrawReason.PROVIDER_CANCELLED))
+                row(l, "ended tpl", tpl(NotificationEvent.ENDED), MAYBE_BOOKED, 0, LOG)
+                row(l, "trip-started tpl", tpl(NotificationEvent.TRIP_STARTED), MAYBE_BOOKED, 0, LOG)
+                row(l, "UNKNOWN_UPDATE", UNKNOWN, MAYBE_BOOKED, 0, DUP)
+                row(l, "answer Yes, booked", answer(Answer.BOOKED_HERE), BOOK_REQUESTED, 0, wd(MB, WithdrawReason.ANSWERED))
+                row(l, "answer No", answer(Answer.NOT_BOOKED), back, 0, wd(MB, WithdrawReason.ANSWERED))
+                row(l, "answer Yes (driver)", answer(Answer.YES), MAYBE_BOOKED, 0, NA)
+                row(l, "timeout 2 min", Timeout(TimeoutKind.REPROMPT), MAYBE_BOOKED, 0, StateOutput.RePrompt(MB))
             }
 
             leg(SEARCHING).let { l ->
@@ -210,7 +236,24 @@ class StatechartTableTest(@Suppress("unused") private val name: String, private 
                 row(l, "UNKNOWN_UPDATE", UNKNOWN, MAYBE_NEW_DRIVER, 0, raise(MND))
                 row(l, "answer Yes", answer(Answer.YES), DRIVER_CANCELLED, 0, NA)
                 row(l, "timeout 3 min, ongoing post", Timeout(TimeoutKind.DRIVER_CANCELLED_WAIT, ongoingPresent = true), MAYBE_NEW_DRIVER, 0, raise(MND))
-                row(l, "timeout 3 min, no ongoing post", Timeout(TimeoutKind.DRIVER_CANCELLED_WAIT), DRIVER_CANCELLED, 0, StateOutput.Logged(LogReason.NO_ONGOING_POST))
+                // The ride post is gone (or the app never flagged it ongoing): still asked, never silent.
+                row(
+                    l, "timeout 3 min, no ongoing post", Timeout(TimeoutKind.DRIVER_CANCELLED_WAIT), MAYBE_NEW_DRIVER, 0,
+                    StateOutput.Logged(LogReason.NO_ONGOING_POST), raise(MND),
+                )
+                val noCapture = l.copy(cancelledCaptureAtElapsedMs = null)
+                row(
+                    noCapture, "removal of the last ride post", REMOVAL, MAYBE_NEW_DRIVER, 0,
+                    StateOutput.Logged(LogReason.REMOVAL_RECORDED), raise(MND),
+                )
+                row(
+                    noCapture, "removal, another ride post left", REMOVAL.copy(ongoingLeft = true), DRIVER_CANCELLED, 0,
+                    StateOutput.Logged(LogReason.REMOVAL_RECORDED),
+                )
+                row(
+                    noCapture, "removal of a non-ongoing post", REMOVAL.copy(wasOngoing = false), DRIVER_CANCELLED, 0,
+                    StateOutput.Logged(LogReason.REMOVAL_RECORDED),
+                )
             }
 
             leg(MAYBE_NEW_DRIVER).let { l ->

@@ -3,9 +3,10 @@ package app.ridemate.core.state
 import app.ridemate.core.model.EvidenceRung
 import app.ridemate.core.model.RideState
 
-enum class PromptKind { MAYBE_ASSIGNED, MAYBE_CHANGED, MAYBE_NEW_DRIVER }
+enum class PromptKind { MAYBE_BOOKED, MAYBE_ASSIGNED, MAYBE_CHANGED, MAYBE_NEW_DRIVER }
 
 fun RideState.promptKind(): PromptKind? = when (this) {
+    RideState.MAYBE_BOOKED -> PromptKind.MAYBE_BOOKED
     RideState.MAYBE_ASSIGNED -> PromptKind.MAYBE_ASSIGNED
     RideState.MAYBE_CHANGED -> PromptKind.MAYBE_CHANGED
     RideState.MAYBE_NEW_DRIVER -> PromptKind.MAYBE_NEW_DRIVER
@@ -16,6 +17,9 @@ fun RideState.promptKind(): PromptKind? = when (this) {
 enum class WithdrawReason {
     SEARCHING_AGAIN, DRIVER_ASSIGNED, DRIVER_ARRIVING, DRIVER_CANCELLED, SEARCH_EXPIRED, PROVIDER_CANCELLED,
     RIDE_ENDED, TRIP_STARTED, SAME_DRIVER_STILL_COMING, CANCELLING,
+
+    /** "Did you book on <App>?" closed because the app's own post shows a live booking (searching or a driver). */
+    BOOKING_SEEN,
 
     /** The user answered it; nothing to explain. */
     ANSWERED,

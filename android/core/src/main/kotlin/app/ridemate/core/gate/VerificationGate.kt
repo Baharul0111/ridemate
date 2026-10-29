@@ -5,6 +5,8 @@ import app.ridemate.core.fare.FareRead
 import app.ridemate.core.fare.FareRow
 import app.ridemate.core.format.Digits
 import app.ridemate.core.format.DistanceText
+import app.ridemate.core.format.RupeeAmount
+import app.ridemate.core.format.RupeeParser
 import app.ridemate.core.model.EtaSource
 import app.ridemate.core.model.Provider
 import app.ridemate.core.model.QuoteStatus
@@ -20,7 +22,8 @@ import kotlin.math.max
 
 /**
  * §4.3: no confident wrong number, ever. A row's price is VERIFIED only when (a) Channel A read the launched app,
- * (b) its price equals the parser's payable token and that token's centre lies in A's box ± 4% of the frame,
+ * (b) its price equals the parser's payable token, that token's centre lies in A's box ± 4% of the frame, and A does
+ * not name that same amount as the struck-out price,
  * (c) the labels match and map to the same vehicle class, (d) both frames show the same digits, and (e) the value is
  * inside the sanity bands. (f) An ETA is shown only on a VERIFIED row whose parser ETA token equals A's in both frames.
  * Driver ETA and distance must equal the parser's anchor-selected tokens, else "see in <app>".
@@ -85,8 +88,10 @@ object VerificationGate {
             if (e.rowId !in planned) return@map e
             val reread = byId[e.rowId] ?: return@map e
             val row = e.row!!
+            // A re-read carries no struck text: the first read's claim still counts against the parser's payable.
             val option = OptionView(
                 reread.vehicleClass, reread.labelText, reread.priceMin, reread.priceMax, reread.etaMin, ctx.cropOf(row).grid,
+                struck = e.option?.struck,
             )
             if (e.failures.isEmpty()) e.copy(eta = ctx.verifiedEta(row, option)) else ctx.evaluate(e.rowId, row, option)
         }
@@ -126,9 +131,20 @@ internal data class OptionView(
     val priceMax: Int?,
     val etaMin: Int?,
     val grid: GridBox?,
+    /** The amount A read as struck out (`price_struck_text`), when it parses as a rupee amount. */
+    val struck: RupeeAmount? = null,
 ) {
     companion object {
-        fun of(o: ChannelAOption) = OptionView(o.vehicleClass, o.labelText, o.priceMin, o.priceMax, o.etaMin, o.gridBox)
+        fun of(o: ChannelAOption) =
+            OptionView(o.vehicleClass, o.labelText, o.priceMin, o.priceMax, o.etaMin, o.gridBox, parseStruck(o.priceStruckText))
+
+        /** `₹150`, `Rs 150`, `150`, or the same with strike-through marks (`~₹150~`, `₹1̶5̶0̶`) the model may copy. */
+        internal fun parseStruck(text: String?): RupeeAmount? {
+            val cleaned = text?.replace(STRIKE_MARKS, "")?.trim()?.takeIf { it.isNotEmpty() } ?: return null
+            return RupeeParser.parse(cleaned, requireCurrency = false)
+        }
+
+        private val STRIKE_MARKS = Regex("[\\p{M}~]")
     }
 }
 
@@ -198,6 +214,8 @@ internal class GateContext(
             } else if (option.priceMin != price.amount.min || option.priceMax != price.amount.max) {
                 f += GateFailure.PRICE_MISMATCH
             }
+            // A says the parser's payable is the struck-out price: whichever channel is right, the number is unsure.
+            if (price != null && option.struck?.range == price.amount.range) f += GateFailure.STRUCK_CONFLICT
             if (price != null) {
                 val (x, y) = gridPoint(price.box)
                 if (option.grid?.expand(VerificationGate.POSITION_TOLERANCE)?.contains(x, y) != true) f += GateFailure.POSITION_MISMATCH

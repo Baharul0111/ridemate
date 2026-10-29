@@ -248,13 +248,21 @@ class Guardian(
         val rec = leg(prompt.legId) ?: return reject(a.tapId)
         if (rec.leg.generation != prompt.generation || rec.leg.state.promptKind() != prompt.kind) return reject(a.tapId)
         val session = s.session ?: return reject(a.tapId)
-        // J9: "Yes, cancel the others" on MAYBE_ASSIGNED is itself the Yes for the chain; no second sheet.
-        val startsChain = prompt.kind == PromptKind.MAYBE_ASSIGNED && a.answer == Answer.YES && session.keptLegId == null
+        // J9: "Yes, cancel the others" on MAYBE_ASSIGNED is itself the Yes for the chain; no second sheet. Only that
+        // button starts it: a plain "Yes" (nothing else booked when asked, Keep searching on, or a ride already kept)
+        // just says a driver came, and any "Cancel the others?" question then comes from the first-driver sheet.
+        val yesCancelsOthers = a.button?.let { it == UiAction.YES_CANCEL_OTHERS } ?: prompt.cancelsOthers
+        val startsChain = prompt.kind == PromptKind.MAYBE_ASSIGNED && a.answer == Answer.YES && session.keptLegId == null &&
+            yesCancelsOthers
         if (startsChain) makeKept(rec)
         val t = apply(rec, UserAnswer(a.answer, a.tapId))
         if (t.logReason == LogReason.ANSWER_NOT_APPLICABLE) {
             if (startsChain) unKeep(rec)
             return reject(a.tapId)
+        }
+        // "Did you book on <App>? Yes, booked" is the user's "Booked here" (I1: the booking links to this tap).
+        if (prompt.kind == PromptKind.MAYBE_BOOKED && t.after.state == RideState.BOOK_REQUESTED && t.stateChanged) {
+            record(ActionKind.BOOKED_HERE, rec, a.tapId)
         }
         if (startsChain) {
             if (rec.leg.state in LegState.DRIVER_STATES) startChain(rec, a.tapId) else unKeep(rec)
@@ -411,6 +419,8 @@ class Guardian(
 
     private fun pay(a: UserAction.Pay) {
         val rec = leg(a.legId) ?: return reject(a.tapId)
+        // An ONDC ride has no app to pay in: the driver is paid as agreed (BANNER_ONDC_PAY_DRIVER).
+        if (rec.leg.isNetwork) return reject(a.tapId)
         val t = apply(rec, UserAnswer(Answer.PAY, a.tapId))
         if (t.after.state == RideState.PAY_HANDOFF && t.stateChanged) {
             record(ActionKind.PAY_HANDOFF, rec, a.tapId)
@@ -613,8 +623,18 @@ class Guardian(
                 }
             }
         }
-        if (after.state == RideState.ENDED) emit(GuardianEffect.PayHandoffOffer(rec.legId, rec.provider))
+        if (after.state == RideState.ENDED) {
+            // Pay in the original app; an ONDC ride has no app to open, so the user pays the driver as agreed.
+            emit(
+                if (rec.leg.isNetwork) {
+                    GuardianEffect.Banner(rec.legId, rec.provider, UiKey.BANNER_ONDC_PAY_DRIVER)
+                } else {
+                    GuardianEffect.PayHandoffOffer(rec.legId, rec.provider)
+                },
+            )
+        }
         firstDriverDecision()
+        refreshPrompts()
         ensureReminders()
     }
 
@@ -696,7 +716,12 @@ class Guardian(
             else -> SheetKind.CANCEL_OTHERS to listOf(first)
         }
         val bindings = subjects.map { SheetBinding(it.legId, it.leg.generation) }
-        if (current != null && current.kind == kind && current.bindings == bindings) return
+        if (current != null && current.kind == kind && current.bindings == bindings) {
+            // Same question, same drivers; another booking may have changed (got a driver of its own, ended): its fee
+            // note is re-sent on the same sheet.
+            refreshDriverSheet(current, subjects)
+            return
+        }
         if (kind == SheetKind.TWO_DRIVERS && bindings.all { bindingKey(it) in s.notNowDrivers }) return
         if (kind == SheetKind.CANCEL_OTHERS && bindingKey(bindings.single()) in s.notNowDrivers) {
             current?.let { closeSheet(it, UiKey.SHEET_CLOSED) }
@@ -718,16 +743,37 @@ class Guardian(
             )
             else -> listOf(UiAction.PICK, UiAction.NOT_NOW)
         }
-        val others = activeLegs().filter { other ->
-            subjects.none { it === other } && other.leg.isBooked && !other.leg.state.isTerminal && !other.dismissed
-        }
-        showDriverSheet(kind, subjects, others, actions)
+        showDriverSheet(kind, subjects, sheetOthers(subjects), actions)
     }
 
+    /** The other live bookings a first-driver sheet lists with their fee notes. */
+    private fun sheetOthers(subjects: List<LegRecord>): List<LegRecord> = activeLegs().filter { other ->
+        subjects.none { it === other } && other.leg.isBooked && !other.leg.state.isTerminal && !other.dismissed
+    }
+
+    /** What the sheet's "others" section says, for spotting a change: each booking, its status and its fee kind. */
+    private fun othersShown(others: List<LegRecord>): String =
+        others.joinToString("|") { "${it.legId}:${it.leg.underlyingState}:${feeNote(it).kind}" }
+
     private fun showDriverSheet(kind: SheetKind, subjects: List<LegRecord>, others: List<LegRecord>, actions: List<UiAction>) {
-        val sheet = OpenSheet(nextId("sheet"), kind, subjects.map { SheetBinding(it.legId, it.leg.generation) }, now().elapsedMs, actions)
+        val sheet = OpenSheet(
+            nextId("sheet"), kind, subjects.map { SheetBinding(it.legId, it.leg.generation) }, now().elapsedMs, actions,
+            othersShown(others),
+        )
         s.sheets += sheet
         emit(driverSheetEffect(sheet, subjects, others))
+    }
+
+    /** Re-sends an open first-driver sheet (same id) when its other bookings or their fee kinds changed, or [force]. */
+    private fun refreshDriverSheet(sheet: OpenSheet, subjects: List<LegRecord>, force: Boolean = false) {
+        val others = sheetOthers(subjects)
+        val shown = othersShown(others)
+        if (!force && shown == sheet.othersShown) return
+        val index = s.sheets.indexOf(sheet)
+        if (index < 0) return
+        val updated = sheet.copy(othersShown = shown)
+        s.sheets[index] = updated
+        emit(driverSheetEffect(updated, subjects, others))
     }
 
     private fun driverSheetEffect(sheet: OpenSheet, subjects: List<LegRecord>, others: List<LegRecord>) =
@@ -983,11 +1029,10 @@ class Guardian(
         } else if (kept != null && rec.role != LegRole.EXTRA && rec.leg.state in LegState.DRIVER_STATES) {
             betterRideCheck(kept, rec)
         }
-        // Refresh the numbers on any open driver sheet showing this leg.
-        s.sheets.filter { sheet -> sheet.kind in FIRST_DRIVER_KINDS && sheet.bindings.any { it.legId == rec.legId } }.forEach { sheet ->
+        // Refresh the numbers on any open driver sheet showing this leg, and the fee notes of any sheet listing it.
+        s.sheets.filter { it.kind in FIRST_DRIVER_KINDS }.forEach { sheet ->
             val subjects = sheet.bindings.mapNotNull { leg(it.legId) }
-            val others = activeLegs().filter { o -> subjects.none { it === o } && o.leg.isBooked && !o.leg.state.isTerminal && !o.dismissed }
-            emit(driverSheetEffect(sheet, subjects, others))
+            refreshDriverSheet(sheet, subjects, force = subjects.any { it === rec })
         }
     }
 
@@ -1038,6 +1083,7 @@ class Guardian(
     private fun openPrompt(rec: LegRecord, kind: PromptKind) {
         s.prompts.removeAll { it.legId == rec.legId }
         val prompt = OpenPrompt(nextId("prompt"), rec.legId, rec.leg.generation, kind, now().elapsedMs)
+        prompt.cancelsOthers = yesCancelsOthers(rec, kind)
         s.prompts += prompt
         emit(promptEffect(rec, prompt))
         scheduleTimer(TimerKind.REPROMPT, rec, config.repromptMs)
@@ -1046,18 +1092,48 @@ class Guardian(
     private fun rePrompt(rec: LegRecord) {
         val prompt = s.prompts.firstOrNull { it.legId == rec.legId } ?: return
         prompt.repeats++
+        prompt.cancelsOthers = yesCancelsOthers(rec, prompt.kind)
         emit(promptEffect(rec, prompt))
         scheduleTimer(TimerKind.REPROMPT, rec, config.repromptMs)
+        // §4.4 kept leg lost: the kept ride's driver cancelled and a whole round of "Is a new driver coming?" went by
+        // without an answer or a new driver. The ride may be gone, so the user is told loudly (once per question).
+        if (prompt.kind == PromptKind.MAYBE_NEW_DRIVER && prompt.repeats == 1 && rec.role == LegRole.KEPT) {
+            emit(
+                GuardianEffect.LoudAlert(
+                    rec.legId, rec.provider, UiKey.ALERT_KEPT_LEG_MAY_BE_LOST, listOf(UiAction.OPEN_APP, UiAction.CHECK_SCREEN),
+                ),
+            )
+        }
+    }
+
+    /**
+     * J9: "Got a driver?" offers "Yes, cancel the others" only while no ride is kept, other bookings exist to cancel,
+     * and Keep searching is off (with it on, a Yes leads to the "Cancel the others?" sheet with [Keep searching]).
+     */
+    private fun yesCancelsOthers(rec: LegRecord, kind: PromptKind): Boolean {
+        val session = s.session ?: return false
+        return kind == PromptKind.MAYBE_ASSIGNED && keptLeg() == null && !session.keepSearching && cancellableOthers(rec).isNotEmpty()
+    }
+
+    /** An open "Got a driver?" whose Yes button no longer matches (another booking appeared or ended) is re-sent. */
+    private fun refreshPrompts() {
+        for (prompt in s.prompts.toList()) {
+            if (prompt.kind != PromptKind.MAYBE_ASSIGNED) continue
+            val rec = leg(prompt.legId) ?: continue
+            if (rec.leg.state.promptKind() != prompt.kind || rec.leg.generation != prompt.generation) continue
+            val cancelsOthers = yesCancelsOthers(rec, prompt.kind)
+            if (cancelsOthers == prompt.cancelsOthers) continue
+            prompt.cancelsOthers = cancelsOthers
+            emit(promptEffect(rec, prompt))
+        }
     }
 
     private fun promptEffect(rec: LegRecord, prompt: OpenPrompt): GuardianEffect.MaybePrompt {
         val (key, actions) = when (prompt.kind) {
-            PromptKind.MAYBE_ASSIGNED -> {
-                val cancelsOthers = keptLeg() == null && cancellableOthers(rec).isNotEmpty()
-                UiKey.PROMPT_MAYBE_ASSIGNED to listOf(
-                    if (cancelsOthers) UiAction.YES_CANCEL_OTHERS else UiAction.YES, UiAction.NOT_YET, UiAction.CHECK_SCREEN,
-                )
-            }
+            PromptKind.MAYBE_BOOKED -> UiKey.PROMPT_MAYBE_BOOKED to listOf(UiAction.YES_BOOKED, UiAction.NOT_BOOKED)
+            PromptKind.MAYBE_ASSIGNED -> UiKey.PROMPT_MAYBE_ASSIGNED to listOf(
+                if (prompt.cancelsOthers) UiAction.YES_CANCEL_OTHERS else UiAction.YES, UiAction.NOT_YET, UiAction.CHECK_SCREEN,
+            )
             PromptKind.MAYBE_CHANGED -> UiKey.PROMPT_MAYBE_CHANGED to listOf(UiAction.YES, UiAction.DRIVER_CANCELLED, UiAction.CHECK_SCREEN)
             PromptKind.MAYBE_NEW_DRIVER -> UiKey.PROMPT_MAYBE_NEW_DRIVER to listOf(UiAction.YES, UiAction.NO_IT_ENDED, UiAction.CHECK_SCREEN)
         }
@@ -1081,6 +1157,7 @@ class Guardian(
         WithdrawReason.TRIP_STARTED -> UiKey.PROMPT_WITHDRAWN_TRIP_STARTED
         WithdrawReason.SAME_DRIVER_STILL_COMING -> UiKey.PROMPT_WITHDRAWN_SAME_DRIVER_STILL_COMING
         WithdrawReason.CANCELLING -> UiKey.PROMPT_WITHDRAWN_CANCELLING
+        WithdrawReason.BOOKING_SEEN -> UiKey.PROMPT_WITHDRAWN_BOOKING_SEEN
         WithdrawReason.ANSWERED -> UiKey.PROMPT_ANSWERED
     }
 

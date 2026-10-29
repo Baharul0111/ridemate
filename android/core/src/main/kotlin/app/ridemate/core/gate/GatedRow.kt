@@ -18,6 +18,12 @@ enum class GateFailure {
     PRICE_MISMATCH,
     /** (b) the payable token's centre is outside Channel A's box ± 4%. */
     POSITION_MISMATCH,
+    /**
+     * (b) Channel A says the amount the parser took as payable is the struck-out price (`price_struck_text`): the two
+     * channels disagree about which number is payable. Another look at the crop cannot settle it (a re-read carries no
+     * struck text), so the row ends UNREADABLE.
+     */
+    STRUCK_CONFLICT,
     /** (c) labels differ or map to different vehicle classes. */
     LABEL_MISMATCH,
     /** (d) the two frames show different digits. */

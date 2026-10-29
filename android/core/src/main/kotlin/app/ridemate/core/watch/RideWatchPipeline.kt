@@ -94,7 +94,10 @@ class RideWatchPipeline(
         if (leg != null) {
             sink.onRideEvent(
                 leg.legId,
-                NotificationRemoved(removal.sbnKey, removal.reason.code, removal.reason.isAppCancel, wasOngoing),
+                NotificationRemoved(
+                    removal.sbnKey, removal.reason.code, removal.reason.isAppCancel, wasOngoing,
+                    ongoingLeft = hasOngoingRide(removal.packageName),
+                ),
             )
         }
     }
