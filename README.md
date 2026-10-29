@@ -216,7 +216,7 @@ pinned and checked at startup; changing it must pass the evaluation harness firs
 
 | Task | How Muse Spark Open is used | If it isn't available |
 |---|---|---|
-| **Fare and status reading** (Channel A) | Reads the masked screenshot alone (no OCR text in the prompt) into a strict schema: screen type, up to 12 rows of vehicle class, label, payable price, struck price, ETA and box, plus driver ETA and distance. Low reasoning, ≤ 800 output tokens. | One retry within the 20 s tap budget, then "Couldn't read · check in app" or manual entry. The gate applies either way. |
+| **Fare and status reading** (Channel A) | Reads the masked screenshot alone (no OCR text in the prompt) into a strict schema: screen type, up to 12 rows of vehicle class, label, payable price, struck price, ETA and box, plus driver ETA and distance. Low reasoning, ≤ 2,000 output tokens (reasoning included: the endpoint cannot switch reasoning off, see [day-1 spikes](docs/spikes.md)). | One retry within the 20 s tap budget, then "Couldn't read · check in app" or manual entry. The gate applies either way. |
 | **Re-reading disagreeing rows** | One call with just the crops of the rows the two readers disagreed on. | The row stays "Couldn't read". |
 | **"Show me" pointing** | Grounding: finds the Cancel button's box (0–1000 grid) so an arrow can be drawn beside it, if the day-1 check showed grounding is supported. | The Show me button hides. |
 | **Notification understanding** | For ride-app notifications no template recognises (a "rule miss"), classifies the masked text into searching / assigned / arriving / cancelled / … and must quote an `evidence_span` that really appears in the text. A label can only raise a question to you or move a ride forward; it can never mark a booking cancelled or end it. | RideMate asks you directly ("Rapido has an update. Got a driver?"). |
@@ -412,7 +412,7 @@ last good git tag ([docs/runbooks/rollback.md](docs/runbooks/rollback.md)).
 | Replay tests | Every ride-state change from recorded notification sequences, including drivers cancelling and re-matching, redacted posts, the "never silent" (I9) and "always reminds" (I8) promises | part of `:core:test` |
 | App unit + migration tests | Room database upgrades with `MigrationTestHelper` (no destructive fallback), app wiring | `./gradlew :app:testDebugUnitTest` (and `:app:connectedDebugAndroidTest` on a connected phone) |
 | Backend tests | Auth, per-IP and per-user limits, spend meter and pacing, router deadlines and breaker, body limits, ONDC signing and ownership, erase | `cd backend && uv sync && uv run pytest` |
-| Firestore rules tests | Deny by default, no client writes, owner-only ONDC reads | in `firebase/`, run against the Firestore emulator: `firebase emulators:exec --only firestore --project demo-ridemate "<test command in firebase/package.json>"` |
+| Firestore rules tests | Deny by default, no client writes, owner-only ONDC reads | in `firebase/tests/` (Node 20+, a JDK 17+): `cd firebase/tests && npm ci && npm test`. `npm test` runs `run.sh`, which starts the Firestore emulator for the offline `demo-ridemate` project itself (through `firebase emulators:exec` on Java 21+ when the Firebase CLI is installed, otherwise the SHA-256-pinned emulator jar) |
 | Accuracy test | Runs the full two-reader check on labelled sample screens using **recorded** Muse Spark Open outputs and recorded ML Kit tokens. **No AI spend, no network.** | `./gradlew :core:test --tests '*Accuracy*'` and the harness in `eval/` in recorded mode |
 | Static checks | CodeQL (Kotlin, Python), Android Lint security, bandit, ruff, dependency verification | GitHub Actions |
 
@@ -440,8 +440,10 @@ credit**. Everything else is free with no card on file.
   horizon is **90 days from 2026-10-28** (to 2027-01-26), which makes the first day's cap about $1.33. At 70% of the
   day's cap, new and heavy accounts pause; at 100% of the day's cap or any budget, AI pauses for everyone.
 - **Fair share per person:** 6 screen reads + 10 notification parses a day (about 1–2 ride sessions); accounts younger
-  than 24 hours get 3 reads; a judge allowlist gets 20. AI needs Google sign-in; anonymous users never reach anything
-  that costs money.
+  than 24 hours get 3 reads; a judge allowlist gets 20. AI needs Google sign-in, with one exception: in Try the demo
+  an anonymous user can read the allowlisted demo screens only. They come from the cache or from recorded outputs; a
+  screen that is not cached yet gets one live read, charged to the demo budget (never to a user's quota), and the
+  answer is then cached.
 - **Daily reconciliation** against Modal's billing report: a drift above 10% alerts the owner and tightens caps
   automatically.
 - **Manual mode** is the safety net: when AI pauses, you type the price and the guardian keeps working, free.

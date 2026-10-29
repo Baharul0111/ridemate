@@ -365,7 +365,7 @@ async def test_the_model_check_runs_inside_the_first_attempts_deadline() -> None
     rig.provider.list_models = listing_that_uses_the_whole_budget  # type: ignore[method-assign]
     with pytest.raises(ApiError) as err:
         await rig.parse()
-    assert err.value.code == "model_timeout"  # parse still answers within its 6 s (I9)
+    assert err.value.code == "model_timeout"  # parse still answers within its 10 s deadline (I9)
     assert rig.provider.calls == 0 and not rig.spend.reservations
 
 

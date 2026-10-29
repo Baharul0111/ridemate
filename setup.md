@@ -43,7 +43,7 @@ You pay **nothing** out of your pocket. Your only funding is the **$100 Modal cr
 2. Name it `ridemate`, note the **Project ID** shown under the name (for example `ridemate-4f2a1`), turn Google Analytics **off**, and click **Create project**.
 3. **Stay on the Spark (no-cost) plan.** If any screen offers Blaze, skip it.
 4. In the left menu open **Build → Authentication** → **Get started** → **Sign-in method** tab → **Google** → turn **Enable** on → choose your **support email** → **Save**.
-5. Still on **Sign-in method** → **Add new provider** → **Anonymous** → **Enable** → **Save**. This is only for manual mode, which makes no AI calls.
+5. Still on **Sign-in method** → **Add new provider** → **Anonymous** → **Enable** → **Save**. Anonymous is needed for **Try the demo** without Google sign-in (demo reads come from the cache or from recorded outputs; a demo screen that is not cached yet gets one metered live read, charged to the demo budget, and the answer is then cached) and for manual mode, which makes no AI calls.
 6. Repeat steps 1–3 for a second project named `ridemate-dev` (for safe testing of remote config changes). No sign-in setup is needed there; Claude Code configures it.
 
 **You'll end with:** two Project IDs (`ridemate-…` and `ridemate-dev-…`), both on Spark, with Google + Anonymous sign-in on the main one.

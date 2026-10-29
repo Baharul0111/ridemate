@@ -18,8 +18,8 @@ base URL is `https://` and a token is given.
 | Item | Value |
 |---|---|
 | Model calls | 20 (plus at most one retry each, inside the 20 s tap budget) |
-| Worst case reserved per read | about $0.0081 (≈ 3,800 input tokens + 800 output tokens at $1.25 / $4.25 per 1M) |
-| Expected total | about $0.10; at most $0.33 even if every read is retried; drawn from the AI budget like app traffic |
+| Worst case reserved per read | about $0.0133 (≈ 3,800 input tokens + the 2,000-token read ceiling, reasoning included since the [day-1 spike](../../docs/spikes.md), at $1.25 / $4.25 per 1M) |
+| Expected total | about $0.14 (the day-1 spike measured ≈ $0.007 per demo fare-screen read); at most $0.53 even if every read is retried and uses its whole ceiling; drawn from the AI budget like app traffic |
 | Fair share | the tester account needs 20 reads that day: put it on the judge allowlist (20 reads/day), or split the run over several Google tester accounts (6 reads/day each, 3 for accounts younger than 24 h) |
 | Per-IP limit | 60 requests/min; 20 reads is well under |
 
