@@ -29,18 +29,34 @@ now sits in `wall_ms` and they carry no `latency_ms`. Judge read latency from `a
 | `gateway` | `cd backend && uv run python ../eval/harness/record_channel_a.py --mode gateway` | In-process, through the backend's own `ProviderRouter` and production spend meter under `Purpose.EVAL`, with request ids `eval-run:<run id>:…`. The meter itself then enforces the evals sub-budget ($5) and the $0.50 per-run cap, retries included. The script refuses to start without `deps.spend`, refuses each call while `ai_status` is disabled, and **aborts** if `spend.summary()["ai_spent_usd"]` did not grow by the call's cost (meter bypass) or cannot be read. `usage` is `null`: the router returns only the settled cost |
 
 Guards:
-- `--max-usd` defaults to $0.50 and may not exceed it: that is the per-run eval cap (architecture §4.2). The
-  $5 evals sub-budget is spread over runs; it is not a per-run allowance.
-- Before each call the script checks that spent + worst case (≈ $0.0218: two attempts, because the router may
-  retry once, of 6,000 input + 800 output tokens at $1.25 / $4.25 per 1M) stays under the cap. A call whose
+- `--max-usd` defaults to $0.50 and may not exceed it: that is the per-run eval cap (architecture §4.2,
+  `SUB_BUDGET_EVAL_RUN_USD`). It may not be set below one worst-case read either. The $5 evals sub-budget is spread
+  over runs; it is not a per-run allowance.
+- Before each call the script checks that spent + worst case stays under the cap. The worst case is computed from
+  the backend's own constants in `backend/ridemate_api/settings.py`, never copied here: two attempts, because the
+  router may retry once, of 6,000 input + `MAX_TOKENS_READ` output tokens at `PRICE_INPUT_PER_M` /
+  `PRICE_OUTPUT_PER_M`. Today that is 2 × (6,000 input + 2,000 output) at $1.25 / $4.25 per 1M ≈ **$0.032** per
+  call (the day-1 spike raised the read ceiling to 2,000 tokens because reasoning counts against it). A call whose
   cost is unknown is counted at that worst case. In gateway mode a call is counted at the meter's growth, so a
   first attempt the router retried is counted too.
-- An error envelope (`ai_paused`, `quota_exhausted`, `meter_unavailable`, auth …) stops the run. It is never
-  retried.
+- At $0.032 a run fits 15 worst-case reads, so the 16 demo screens need two runs when costs are unknown (and in
+  `--dry-run`). Real reads cost far less and usually finish in one run.
+- An error envelope (`ai_paused`, `quota_exhausted`, `meter_unavailable`, auth …) stops the run with exit 2. It is
+  never retried.
 - A response with `source: "recorded"` is not saved: it would be circular.
-- Screens that already have a recording are skipped unless `--force` is given.
 - `--dry-run` lists the screens and the worst-case spend. It needs no network and no token.
 - The token is read from the environment only. It is never printed or written.
+
+Pausing at the cap and resuming:
+- When the next call could pass `--max-usd`, the run **pauses cleanly**. Nothing is half-written, it prints
+  `paused: budget guard …` with how many screens are left, and it exits 0. `--limit N` (at most N reads this run)
+  pauses the same way.
+- Screens that already have a recording are skipped, so running the same command again resumes where the last run
+  paused. In gateway mode each run is a new `eval-run:<run id>` with its own $0.50 cap on the meter, and all runs
+  together still draw on the $5 evals sub-budget.
+- `--force` re-reads screens that already have a recording, but only recordings made before that run started. If a
+  forced run pauses, it prints `rerun with --force-before <UTC time>`. That command re-reads only recordings older
+  than the forced run's start, so it resumes the pass instead of starting over.
 
 ### Backend interface used by gateway mode
 Everything comes from the backend package itself (contracts §3), so a read is built exactly as

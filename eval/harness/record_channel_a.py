@@ -12,15 +12,18 @@ Every live call is metered by RideMate's all-spend meter, which is never bypasse
   aborts if a call does not show up on the meter. Run it inside the backend environment:
     cd backend && uv run python ../eval/harness/record_channel_a.py --mode gateway
 
-Both modes stop at --max-usd (default and maximum $0.50, the per-run eval cap from architecture §4.2)
-using the worst-case cost of the next call. --dry-run lists what would be read and the worst-case spend,
-with no network and no token. The token is read from the environment only and never printed or written.
+Both modes pause before the next call could pass --max-usd (default and maximum $0.50, the per-run eval cap
+from architecture §4.2), judged by the worst-case cost of that call computed from the backend's own settings.
+A pause is a clean stop (exit 0): rerunning the same command resumes, because screens that already have a
+recording are skipped. --dry-run lists what would be read and the worst-case spend, with no network and no
+token. The token is read from the environment only and never printed or written.
 """
 
 from __future__ import annotations
 
 import argparse
 import hashlib
+import importlib.util
 import json
 import os
 import subprocess
@@ -32,6 +35,7 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
+from types import ModuleType
 from typing import Any, Protocol
 
 EVAL_DIR = Path(__file__).resolve().parent.parent
@@ -39,17 +43,51 @@ REPO_ROOT = EVAL_DIR.parent
 DEFAULT_LABELS = EVAL_DIR / "demo_labels.json"
 DEFAULT_OUT = EVAL_DIR / "recorded/channel_a"
 TOKEN_ENV = "RIDEMATE_ID_TOKEN"
+BACKEND_SETTINGS_FILE = REPO_ROOT / "backend/ridemate_api/settings.py"
+TIMESTAMP_FORMAT = "%Y-%m-%dT%H:%M:%SZ"  # recorded_at; ISO-8601 UTC, so strings order like the times
 
-# Worst case for one read at Muse Spark Open prices (architecture §4.10: $1.25 in / $4.25 out per 1M tokens):
-# ≤ 6,000 input tokens (masked 1080×2400 screenshot + prompt) and the 800-token output ceiling (L4), for
-# each of the two attempts the router may make (one retry inside the tap budget, architecture §4.2).
+
+def _backend_settings() -> ModuleType:
+    """The backend's settings module: the single source of prices, output ceilings and budgets (settings.py).
+
+    Gateway mode runs inside the backend environment, so this is the very module the router reads. Elsewhere (dry
+    runs, http mode, the eval tests) settings.py is loaded from this checkout; it needs only the standard library.
+    """
+    try:
+        from ridemate_api import settings
+    except ImportError:
+        pass
+    else:
+        return settings
+    name = "_ridemate_backend_settings"
+    if name in sys.modules:
+        return sys.modules[name]
+    spec = importlib.util.spec_from_file_location(name, BACKEND_SETTINGS_FILE)
+    if spec is None or spec.loader is None or not BACKEND_SETTINGS_FILE.is_file():
+        raise SystemExit(f"backend settings not found at {BACKEND_SETTINGS_FILE}")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[name] = module  # dataclasses resolve the module's annotations through sys.modules
+    spec.loader.exec_module(module)
+    return module
+
+
+_SETTINGS = _backend_settings()
+# Worst case for one read, from the backend's constants: every attempt may send up to 6,000 uncached input tokens
+# (masked 1080×2400 screenshot + prompt, above the router's own estimate) and use the whole read output ceiling
+# MAX_TOKENS_READ (L4, reasoning tokens included) at Muse Spark Open prices (architecture §4.10), and the router
+# may make two attempts (one retry inside the tap budget, architecture §4.2).
 WORST_CASE_INPUT_TOKENS = 6000
-WORST_CASE_OUTPUT_TOKENS = 800
+WORST_CASE_OUTPUT_TOKENS: int = _SETTINGS.MAX_TOKENS_READ
 WORST_CASE_ATTEMPTS = 2
-WORST_CASE_USD = round(
-    WORST_CASE_ATTEMPTS * (WORST_CASE_INPUT_TOKENS * 1.25e-6 + WORST_CASE_OUTPUT_TOKENS * 4.25e-6), 4
+PRICE_INPUT_PER_M: float = _SETTINGS.PRICE_INPUT_PER_M
+PRICE_OUTPUT_PER_M: float = _SETTINGS.PRICE_OUTPUT_PER_M
+WORST_CASE_USD = (
+    WORST_CASE_ATTEMPTS
+    * (WORST_CASE_INPUT_TOKENS * PRICE_INPUT_PER_M + WORST_CASE_OUTPUT_TOKENS * PRICE_OUTPUT_PER_M)
+    / 1_000_000
 )
-PER_RUN_CAP_USD = 0.50
+# The per-run eval cap the meter enforces on every `eval-run:<run id>` (architecture §4.2).
+PER_RUN_CAP_USD: float = _SETTINGS.SUB_BUDGET_EVAL_RUN_USD
 STOP_CODES = {
     "ai_paused",
     "quota_exhausted",
@@ -240,16 +278,39 @@ class HttpReader:
 class RunReport:
     recorded: list[str] = field(default_factory=list)
     skipped: list[str] = field(default_factory=list)
+    # A clean pause, not an error: the next call could have passed --max-usd, or --limit was reached. `left` are
+    # the screens the next run will read; screens recorded so far are skipped then, so it resumes here.
+    paused_reason: str | None = None
+    left: list[str] = field(default_factory=list)
+    # The service or meter refused (pause, quota, auth, meter bypass): an error, the run stops.
     stopped_reason: str | None = None
     spent_usd: float = 0.0
     unknown_cost_calls: int = 0
+
+
+def utc_now() -> str:
+    return datetime.now(UTC).strftime(TIMESTAMP_FORMAT)
+
+
+def needs_read(out: Path, redo_before: str | None = None) -> bool:
+    """A screen is read when it has no recording yet or, when re-recording, when its recording predates
+    `redo_before` (so a re-recording pass that paused at the cap resumes instead of starting over)."""
+    if not out.exists():
+        return True
+    if redo_before is None:
+        return False
+    try:
+        recorded_at = json.loads(out.read_text(encoding="utf-8")).get("recorded_at")
+    except (OSError, ValueError, AttributeError):
+        return True
+    return not isinstance(recorded_at, str) or recorded_at < redo_before
 
 
 def recorded_doc(job: Job, result: ReadResult) -> dict[str, Any]:
     doc: dict[str, Any] = {
         "image_sha256": job.sha256,
         "model": result.model,
-        "recorded_at": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "recorded_at": utc_now(),
         "read": result.read,
         "usage": result.usage,
         "cost_usd": result.cost_usd,
@@ -270,22 +331,35 @@ def run(
     out_dir: Path,
     max_usd: float,
     worst_case_usd: float = WORST_CASE_USD,
-    force: bool = False,
+    redo_before: str | None = None,
+    limit: int | None = None,
     dry_run: bool = False,
     log: Any = print,
 ) -> RunReport:
     report = RunReport()
+    todo: list[Job] = []
     for job in jobs:
-        out = out_dir / f"{job.sha256}.json"
-        if out.exists() and not force:
+        if needs_read(out_dir / f"{job.sha256}.json", redo_before):
+            todo.append(job)
+        else:
             report.skipped.append(job.sha256)
-            continue
-        if report.spent_usd + worst_case_usd > max_usd + 1e-9:
-            report.stopped_reason = f"budget guard: next call could exceed --max-usd {max_usd:.2f}"
+    calls = 0
+    for i, job in enumerate(todo):
+        if limit is not None and calls >= limit:
+            report.paused_reason = f"--limit {limit} reached"
+        elif report.spent_usd + worst_case_usd > max_usd + 1e-9:
+            report.paused_reason = (
+                f"budget guard: the next read could cost up to ${worst_case_usd:.4f} and pass "
+                f"--max-usd {max_usd:.2f} (spent ${report.spent_usd:.4f})"
+            )
+        if report.paused_reason:
+            report.left = [j.sha256 for j in todo[i:]]
             break
+        out = out_dir / f"{job.sha256}.json"
         image = job.image.read_bytes()
         if hashlib.sha256(image).hexdigest() != job.sha256:
             raise SystemExit(f"sha256 mismatch for {job.image}: labels are stale")
+        calls += 1
         if dry_run or reader is None:
             report.spent_usd += worst_case_usd
             report.recorded.append(job.sha256)
@@ -325,14 +399,36 @@ def main(argv: list[str] | None = None) -> int:
         help="default: eval/recorded/channel_a for the demo labels, else next to --labels",
     )
     ap.add_argument("--max-usd", type=float, default=PER_RUN_CAP_USD)
-    ap.add_argument("--limit", type=int, help="read at most N screens")
-    ap.add_argument("--force", action="store_true", help="re-read screens that already have a recording")
+    ap.add_argument("--limit", type=int, help="read at most N screens this run (the next run resumes)")
+    redo = ap.add_mutually_exclusive_group()
+    redo.add_argument(
+        "--force",
+        action="store_true",
+        help="re-read screens that already have a recording (those recorded before this run started)",
+    )
+    redo.add_argument(
+        "--force-before",
+        metavar="UTC_TIME",
+        help="re-read screens whose recording is older than UTC_TIME (YYYY-MM-DDTHH:MM:SSZ); "
+        "resumes a --force run that paused",
+    )
     ap.add_argument("--dry-run", action="store_true", help="no network: list screens and worst-case spend")
     args = ap.parse_args(argv)
 
-    if not 0 < args.max_usd <= PER_RUN_CAP_USD:
-        ap.error(f"--max-usd must be in (0, {PER_RUN_CAP_USD:.2f}] (the per-run eval cap, architecture §4.2)")
-    jobs = load_jobs(args.labels)[: args.limit]
+    if not WORST_CASE_USD - 1e-9 <= args.max_usd <= PER_RUN_CAP_USD:
+        ap.error(
+            f"--max-usd must be between ${WORST_CASE_USD:.4f} (one worst-case read) and "
+            f"${PER_RUN_CAP_USD:.2f} (the per-run eval cap, architecture §4.2)"
+        )
+    if args.limit is not None and args.limit < 1:
+        ap.error("--limit must be at least 1")
+    redo_before: str | None = utc_now() if args.force else args.force_before
+    if args.force_before is not None:
+        try:
+            datetime.strptime(args.force_before, TIMESTAMP_FORMAT)
+        except ValueError:
+            ap.error("--force-before must look like 2026-10-29T10:00:00Z (UTC)")
+    jobs = load_jobs(args.labels)
     out_dir = args.out_dir or default_out_dir(args.labels)
     check_out_dir(jobs, out_dir)
     reader: Reader | None = None
@@ -349,7 +445,13 @@ def main(argv: list[str] | None = None) -> int:
             reader = GatewayReader.from_production()
     try:
         report = run(
-            jobs, reader, out_dir=out_dir, max_usd=args.max_usd, force=args.force, dry_run=args.dry_run
+            jobs,
+            reader,
+            out_dir=out_dir,
+            max_usd=args.max_usd,
+            redo_before=redo_before,
+            limit=args.limit,
+            dry_run=args.dry_run,
         )
     finally:
         close = getattr(reader, "close", None)
@@ -365,6 +467,13 @@ def main(argv: list[str] | None = None) -> int:
     if report.stopped_reason:
         print(f"stopped: {report.stopped_reason}")
         return 2
+    if report.paused_reason:
+        resume = f"rerun with --force-before {redo_before}" if redo_before else "rerun the same command"
+        print(
+            f"paused: {report.paused_reason}. {len(report.left)} screen(s) "
+            f"{'would be ' if args.dry_run else ''}left for the next run; {resume} to resume "
+            "(screens already recorded are skipped)"
+        )
     return 0
 
 
