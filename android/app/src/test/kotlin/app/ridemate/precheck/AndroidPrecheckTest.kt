@@ -15,6 +15,8 @@ import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -188,10 +190,14 @@ class AndroidPrecheckTest {
         }
         val hint = context.getString(R.string.precheck_restricted_hint)
         compose.onAllNodesWithText(hint).assertCountEquals(2)
-        compose.onAllNodesWithText(context.getString(R.string.onb_restricted_steps)).assertCountEquals(2)
         compose.onNodeWithContentDescription("Open App info: Turn on notification access").performScrollTo().performClick()
         compose.onNodeWithContentDescription("Open App info: Floating button is off").performScrollTo().performClick()
         assertEquals(listOf(FixAction.OPEN_APP_INFO, FixAction.OPEN_APP_INFO), clicked)
+        // The step-by-step "Allow restricted settings" sits behind the card's ⓘ (redesign: no paragraphs on the card).
+        compose.onAllNodesWithText(context.getString(R.string.onb_restricted_steps), substring = true).assertCountEquals(0)
+        compose.onAllNodesWithTag(PrecheckTags.WHY)[0].performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.OnClick)
+        compose.waitForIdle()
+        compose.onNodeWithText(context.getString(R.string.onb_restricted_steps), substring = true).assertExists()
     }
 
     @Test

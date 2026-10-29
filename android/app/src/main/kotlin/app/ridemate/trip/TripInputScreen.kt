@@ -87,6 +87,8 @@ import app.ridemate.map.PinTarget
 import app.ridemate.map.RoutePreviewMap
 import app.ridemate.map.coordsText
 import app.ridemate.ui.components.InlineBanner
+import app.ridemate.ui.components.QuietButton
+import app.ridemate.ui.components.QuietStyle
 import app.ridemate.ui.components.RmTone
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.runtime.key
@@ -228,17 +230,14 @@ private fun PinPickerHost(request: PinRequest, state: TripUiState, vm: TripViewM
 @Composable
 private fun SetOnMapButton(target: PinTarget, vm: TripViewModel) {
     val description = stringResource(if (target == PinTarget.PICKUP) R.string.map_set_pickup_description else R.string.map_set_drop_description)
-    TextButton(
+    QuietButton(
+        text = stringResource(R.string.map_set_on_map),
         onClick = { vm.openPinPicker(target) },
-        modifier = Modifier
-            .heightIn(min = 48.dp)
-            .testTag(if (target == PinTarget.PICKUP) MapTags.SET_PICKUP else MapTags.SET_DROP)
-            .semantics { contentDescription = description },
-    ) {
-        Icon(Icons.Filled.PushPin, contentDescription = null)
-        Spacer(Modifier.width(8.dp))
-        Text(stringResource(R.string.map_set_on_map))
-    }
+        icon = Icons.Filled.PushPin,
+        contentDescription = description,
+        style = QuietStyle.Tonal,
+        modifier = Modifier.testTag(if (target == PinTarget.PICKUP) MapTags.SET_PICKUP else MapTags.SET_DROP),
+    )
 }
 
 @Composable

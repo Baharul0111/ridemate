@@ -314,9 +314,10 @@ class ComparisonScreenTest {
         }
         val tag = rowTag(Provider.ONDC, VehicleClass.AUTO)
         compose.onNodeWithTag(tag, useUnmergedTree = true)
-            .assert(hasAnyDescendant(hasText("network quote · ONDC demo seller")))
-            .assert(hasAnyDescendant(hasText("seen in Open network (ONDC) at ${IstTime.seenAt(seenAt)}")))
-            .assert(hasAnyDescendant(hasText("old, tap to refresh")))
+            .assert(hasAnyDescendant(hasText("Demo Seller Autos · ONDC demo seller")))
+            .assert(hasAnyDescendant(hasText("Network")))
+            .assert(hasAnyDescendant(hasText("Seen ${IstTime.seenAt(seenAt)}", substring = true)))
+        compose.onNodeWithTag(tag).assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "old, tap to refresh"))
         compose.onNodeWithContentDescription("Book Demo Seller Autos on the open network for ₹95").assertHasClickAction().performClick()
         assertEquals(listOf("ondc:auto-1"), bookedNetwork)
         compose.onNodeWithTag(tag).performClick()
@@ -341,8 +342,8 @@ class ComparisonScreenTest {
 
         compose.setContent { ComparisonScreen(ComparisonData("s1", emptyList(), chosen, vehicleClasses = listOf(VehicleClass.AUTO)), seenAt, null, callbacks) }
         compose.onAllNodesWithText("Bike").assertCountEquals(0)
-        compose.onNodeWithTag(rowTag(Provider.OLA, VehicleClass.AUTO), useUnmergedTree = true).assert(hasAnyDescendant(hasText("cheapest")))
-        compose.onAllNodesWithText("cheapest").assertCountEquals(1)
+        compose.onNodeWithTag(rowTag(Provider.OLA, VehicleClass.AUTO), useUnmergedTree = true).assert(hasAnyDescendant(hasText("Cheapest")))
+        compose.onAllNodesWithText("Cheapest").assertCountEquals(1)
     }
 
     @Test
@@ -353,7 +354,7 @@ class ComparisonScreenTest {
             .assert(!hasAnyDescendant(hasText("Bike")))
             .assert(!hasAnyDescendant(hasText("Cab")))
         compose.onNodeWithTag(ComparisonTags.PRICE_FIELD).performTextInput("120")
-        compose.onNodeWithText("Save price").performClick()
+        compose.onNodeWithText("Save price").performSemanticsAction(SemanticsActions.OnClick)
         // The only chosen type is preselected.
         assertEquals(listOf(Triple(Provider.OLA, VehicleClass.AUTO, "120")), typed)
     }

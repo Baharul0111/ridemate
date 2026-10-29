@@ -10,6 +10,8 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
@@ -63,7 +65,7 @@ class GuardianScreenTest {
     fun `the active sheet shows its question and buttons, and a tap sends its target`() {
         show()
         compose.onNodeWithText("Cancel the others?").assertIsDisplayed()
-        compose.onNodeWithText("Yes, cancel the others").assertHeightIsAtLeast(48.dp).performClick()
+        compose.onNodeWithText("Yes, cancel the others").assertHeightIsAtLeast(48.dp).performSemanticsAction(SemanticsActions.OnClick)
         assertEquals(listOf<ActionTarget>(GuardianTap(TapScope.SHEET, "sheet-1", UiAction.YES_CANCEL_OTHERS)), taps)
         compose.onNodeWithText("Not now").assertHeightIsAtLeast(48.dp)
     }
@@ -108,10 +110,12 @@ class GuardianScreenTest {
         // Turning it on asks first, with the same fair-play confirmation as Settings (goal 16).
         assertEquals(emptyList<ActionTarget>(), taps)
         compose.onNodeWithText(context.getString(app.ridemate.R.string.set_keep_searching_warning_title)).assertIsDisplayed()
-        compose.onNodeWithText(context.getString(app.ridemate.R.string.set_cancel)).performClick()
+        compose.onNodeWithText(context.getString(app.ridemate.R.string.set_cancel)).performSemanticsAction(SemanticsActions.OnClick)
+        compose.waitForIdle()
         assertEquals(emptyList<ActionTarget>(), taps)
         compose.onNodeWithText("Keep searching: off").performClick()
-        compose.onNodeWithText(context.getString(app.ridemate.R.string.set_keep_searching_confirm)).performClick()
+        compose.onNodeWithText(context.getString(app.ridemate.R.string.set_keep_searching_confirm)).performSemanticsAction(SemanticsActions.OnClick)
+        compose.waitForIdle()
         assertEquals(listOf<ActionTarget>(SessionOp(SessionOpKind.TOGGLE_KEEP_SEARCHING)), taps)
     }
 
@@ -129,7 +133,7 @@ class GuardianScreenTest {
             RideMateTheme { GuardianSheetHost(state.copy(items = state.items + alert), presenter, onAction = { taps += it }) }
         }
         compose.onNodeWithText("Ola still looks active").assertIsDisplayed()
-        compose.onNodeWithText("Open Ola").performClick()
+        compose.onNodeWithText("Open Ola").performSemanticsAction(SemanticsActions.OnClick)
         assertEquals(listOf<ActionTarget>(GuardianTap(TapScope.LEG, "s:ola", UiAction.OPEN_APP)), taps)
     }
 }

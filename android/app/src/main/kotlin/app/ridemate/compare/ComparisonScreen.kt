@@ -338,9 +338,9 @@ private fun QuoteCard(
     val bookNetwork = callbacks.onBookNetwork
     val rowId = row.rowId
     val networkBook: (() -> Unit)? =
-        if (row.provider.isNetwork && !entry.stale && bookNetwork != null && rowId != null) ({ bookNetwork(rowId) }) else null
+        if (row.provider.isNetwork && bookNetwork != null && rowId != null) ({ bookNetwork(rowId) }) else null
     val className = stringResource(FareReadingMessages.vehicleClassRes(row.vehicleClass))
-    val networkDescription = stringResource(R.string.ondc_action_book_description, label.ifBlank { app }, entry.priceText ?: className)
+    val networkDescription = stringResource(R.string.ondc_action_book_description, baseLabel.ifBlank { app }, entry.priceText ?: className)
     Column(verticalArrangement = Arrangement.spacedBy(RmSpacing.s)) {
     FareCard(
         quote = quote,

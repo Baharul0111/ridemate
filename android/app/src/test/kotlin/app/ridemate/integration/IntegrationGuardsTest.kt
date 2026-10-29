@@ -332,8 +332,9 @@ class IntegrationGuardsTest {
         val form = context.getString(R.string.compare_manual_title)
 
         ActivityScenario.launch<ComparisonActivity>(ComparisonActivity.intent(context, "s1", Provider.RAPIDO)).use {
-            compose.onNode(hasText(google) and hasClickAction()).performScrollTo().assertIsDisplayed()
-            compose.onNodeWithText(skip).performScrollTo().performClick()
+            // The redesigned sign-in step pins its buttons below the scrolling body (nothing to scroll to).
+            compose.onNode(hasText(google) and hasClickAction()).assertIsDisplayed()
+            compose.onNodeWithText(skip).performClick()
             compose.waitForIdle()
             compose.onNodeWithText(form).assertIsDisplayed()
         }
