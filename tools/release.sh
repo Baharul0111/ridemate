@@ -22,7 +22,7 @@
 #   4. aapt2 dump badging / xmltree (apkanalyzer as a fallback): the APK must not be debuggable or testOnly,
 #      and the manifest must not declare an AccessibilityService or BIND_ACCESSIBILITY_SERVICE (RideMate
 #      never acts inside other apps).
-#   5. Copies the APK to dist/RideMate-<versionName>.apk, writes dist/SHA256SUMS and dist/RELEASE_NOTES.md,
+#   5. Copies the APK to dist/RideMate-<versionName>.apk, writes dist/SHA256SUMS.txt and dist/RELEASE_NOTES.md,
 #      and re-checks the checksum file.
 #   6. Prints the `gh release create` command. With --publish (and a typed confirmation, or --yes) it runs it.
 #
@@ -296,31 +296,31 @@ main() {
   local dist="$repo/dist" name sum
   name="RideMate-${version_name}.apk"
   mkdir -p "$dist"
-  rm -f "$dist/$name" "$dist/SHA256SUMS" "$dist/RELEASE_NOTES.md"
+  rm -f "$dist/$name" "$dist/SHA256SUMS.txt" "$dist/SHA256SUMS" "$dist/RELEASE_NOTES.md"   # SHA256SUMS: the pre-.txt name
   cp "$apk" "$dist/$name"
   sum="$(sha256_of "$dist/$name")"
-  printf '%s  %s\n' "$sum" "$name" >"$dist/SHA256SUMS"
+  printf '%s  %s\n' "$sum" "$name" >"$dist/SHA256SUMS.txt"
   if command -v sha256sum >/dev/null 2>&1; then
-    (cd "$dist" && sha256sum -c SHA256SUMS >/dev/null) || die "SHA256SUMS self-check failed"
+    (cd "$dist" && sha256sum -c SHA256SUMS.txt >/dev/null) || die "SHA256SUMS.txt self-check failed"
   else
-    (cd "$dist" && shasum -a 256 -c SHA256SUMS >/dev/null) || die "SHA256SUMS self-check failed"
+    (cd "$dist" && shasum -a 256 -c SHA256SUMS.txt >/dev/null) || die "SHA256SUMS.txt self-check failed"
   fi
   cat >"$dist/RELEASE_NOTES.md" <<EOF
 RideMate ${version_name} (versionCode ${version_code}), built from commit \`${build_commit}\`.
 
 **Verify before installing**
-- APK SHA-256: \`${sum}\` (also in \`SHA256SUMS\`: \`sha256sum -c SHA256SUMS\`)
+- APK SHA-256: \`${sum}\` (also in \`SHA256SUMS.txt\`: \`sha256sum -c SHA256SUMS.txt\`)
 - Signing certificate SHA-256: \`${EXPECTED_CERT_SHA256}\`
   (\`apksigner verify --print-certs ${name}\`; the same fingerprint is in the README and in the app's About screen)
 
 Android 10 or newer. Built with Muse Spark Open. RideMate never taps or types inside Uber, Ola or Rapido.
 EOF
-  info "wrote dist/$name, dist/SHA256SUMS, dist/RELEASE_NOTES.md"
+  info "wrote dist/$name, dist/SHA256SUMS.txt, dist/RELEASE_NOTES.md"
   info "APK SHA-256: $sum"
 
   # 6. Publish (owner's go-ahead only).
   local tag="v${version_name}"
-  local -a gh_cmd=(gh release create "$tag" "dist/$name" "dist/SHA256SUMS"
+  local -a gh_cmd=(gh release create "$tag" "dist/$name" "dist/SHA256SUMS.txt"
     --repo "$GITHUB_REPO" --title "RideMate ${version_name}" --notes-file "dist/RELEASE_NOTES.md"
     --target "$commit" --latest)
   echo

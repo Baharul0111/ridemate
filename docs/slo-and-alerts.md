@@ -27,13 +27,15 @@ feature deploys and spend the time on reliability until the trend is back under 
 |---|---|
 | Read fares: tap → rows on screen | phone deadline **20 s**; p50 ≤ 6 s, p95 ≤ 10 s, p99 ≤ 20 s |
 | Voice → place candidates | p95 ≤ 6 s (on-device speech + one Muse Spark Open call) |
-| Ride-app notification → RideMate event or question | ≤ **3 s** (invariant I9); rule misses ≤ 3 s + the 6 s classifier deadline, with a question to the user as the fallback |
+| Ride-app notification → RideMate event or question | ≤ **3 s** (invariant I9); rule misses ≤ 3 s + the 10 s classifier deadline (13 s; day-1 spike, [spikes.md](spikes.md)), with a question to the user as the fallback |
 | "Show me" arrow | p95 ≤ 8 s |
 | Server cold start | ≤ 4 s |
 
 **Server deadlines** (per call): read-screen 12 s, with one retry only if ≥ 6 s remain in the tap's 20 s budget;
-place-pick and notification parse 6 s; point 9 s; ONDC outbound calls 5 s; Firestore calls on the request path 3 s.
-**Phone timeouts** = server deadline + 5 s: read-screen 20 s, parse / place-pick 11 s, point 14 s. One retry with
+place-pick and notification parse 10 s; point 12 s; ONDC outbound calls 5 s; Firestore calls on the request path 3 s.
+**Phone timeouts** = server deadline + 5 s: parse / place-pick 15 s, point 17 s (read-screen and reread share the
+tap's 20 s budget). The text-call deadlines were raised by the day-1 spike: reasoning cannot be switched off, so one
+classification takes 5–8 s ([spikes.md](spikes.md)). One retry with
 1–2 s jitter only if the remaining budget is longer than the server deadline. Circuit breaker: 5 failures in 60 s →
 open for 60 s → one test call.
 

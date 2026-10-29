@@ -190,13 +190,18 @@ class ReleaseFlowTest(unittest.TestCase):
         dist = self.repo / "dist"
         apk = dist / "RideMate-1.0.3-hackathon.apk"
         self.assertTrue(apk.is_file())
-        check = subprocess.run(["shasum", "-a", "256", "-c", "SHA256SUMS"] if shutil.which("shasum")
-                               else ["sha256sum", "-c", "SHA256SUMS"], cwd=dist, capture_output=True, text=True)
+        # The README and runbooks tell users to download and check SHA256SUMS.txt: the release must ship that name.
+        self.assertTrue((dist / "SHA256SUMS.txt").is_file())
+        self.assertFalse((dist / "SHA256SUMS").exists())
+        check = subprocess.run(["shasum", "-a", "256", "-c", "SHA256SUMS.txt"] if shutil.which("shasum")
+                               else ["sha256sum", "-c", "SHA256SUMS.txt"], cwd=dist, capture_output=True, text=True)
         self.assertEqual(check.returncode, 0, check.stdout + check.stderr)
         notes = (dist / "RELEASE_NOTES.md").read_text(encoding="utf-8")
         self.assertIn(self.git("rev-parse", "HEAD"), notes)
         self.assertIn(EXPECTED, notes)
+        self.assertIn("sha256sum -c SHA256SUMS.txt", notes)
         self.assertIn("gh release create v1.0.3-hackathon", res.stdout)
+        self.assertIn("dist/SHA256SUMS.txt", res.stdout)
         self.assertIn("GO-AHEAD", res.stdout)
         self.assertNotIn(self.PASSWORD, res.stdout + res.stderr)
         stamp = (self.repo / "android/app/build/outputs/apk/release/ridemate-release.stamp").read_text()
