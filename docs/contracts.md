@@ -16,7 +16,7 @@ Base URL: delivered to the phone by Remote Config key `api_base_url` (never hard
 | `X-Request-Id` | all `/v1/*` | UUIDv4 from the phone. **Quota** counting is idempotent on it (a retried request id is not counted twice). **Spend is not**: see below |
 | `X-Session-Id` | AI + event | Phone session id (UUID). Also groups the request's metadata audit record: one `audit` document per session |
 | `X-App-Version` | all | Android versionCode (int) |
-| `X-Tap-Deadline-Ms` | read-screen, reread (optional) | Milliseconds left of the phone's 20 s tap budget when the request is sent (§4.12). The server clamps it to 0–20000; absent or not an integer means 20000. The model call, and the decision to retry a read once (≥ 6 s must remain), are bounded by it |
+| `X-Tap-Deadline-Ms` | read-screen, reread (optional) | Milliseconds left of the phone's 20 s tap budget when the request is sent (§4.12). The server clamps it to 0–20000; absent or not an integer means 20000. The model call, and the decision to retry a read once (≥ 6 s must remain), are bounded by it. With ≥ 13 s left the first read attempt stops at (budget − 7 s), so a timed-out read is also tried once more |
 
 Retries and money. The spend meter is **not** idempotent on `X-Request-Id`: every model call the server makes is
 metered, because a timed-out or repeated call was still paid for. To keep a replayed id from buying unlimited calls
@@ -66,7 +66,9 @@ Every AI error means the same thing on the phone: **manual mode** (type the pric
 ### 1.3 Endpoints
 
 **`POST /v1/read-screen`** — Channel A. Google token, *or* any token (incl. anonymous) when the image's
-SHA-256 is in the demo allowlist. `multipart/form-data`:
+SHA-256 is in the demo allowlist. A demo image is answered from the cache, else by a live call (at most 64 live demo
+calls a day across all users, charged to the demo sub-budget and its own $0.50 daily cap, never to the public's day
+cap), else from the recorded output. `multipart/form-data`:
 - `meta` (JSON string): `{"app": "uber|ola|rapido|demo_kestrel|demo_pepper|demo_tamarind", "frame_w": 1080, "frame_h": 2400, "demo": false}`
 - `image`: JPEG or PNG, ≤ 1 MB, already masked on the phone.
 
@@ -85,13 +87,17 @@ SHA-256 is in the demo allowlist. `multipart/form-data`:
 ```
 Prices are integers in rupees. `bbox_0_1000` is the row's box on a 0–1000 grid of the image (x right, y down).
 
-**`POST /v1/reread`** — row crops for disagreeing rows, one model call. Google token (or demo allowlist per crop
-hash). multipart: `meta` = `{"app": "...", "rows": [{"row_id": "r1"}]}`, files `crop_<row_id>` (total ≤ 1 MB).
+**`POST /v1/reread`** — row crops for disagreeing rows, one model call. Google token, always (crops of demo images
+are not a demo path: the app never rereads demo frames). multipart: `meta` = `{"app": "...", "rows": [{"row_id": "r1"}]}`,
+files `crop_<row_id>` (total ≤ 1 MB).
 200: `{"rows": [{"row_id": "r1", "vehicle_class": "auto", "label_text": "Auto", "price_min": 110, "price_max": 110,
-"eta_min": 3}], "source": "live|cache|recorded", "request_id": "…"}`
+"eta_min": 3}], "source": "live", "request_id": "…"}`
 
-**`POST /v1/point`** — "Show me" grounding. Google token. multipart `meta` = `{"app": "...", "target": "cancel_button"}`,
-`image`. 200: `{"supported": true, "box_0_1000": [x0,y0,x1,y1] | null}` (`supported=false`, with no model call
+**`POST /v1/point`** — "Show me" grounding. Google token, *or* any token when the image is on the demo allowlist
+(cached like read-screen, without a recorded fallback: past the day's 64 live demo calls a miss answers 429
+`ai_paused`/`day_cap`). multipart `meta` = `{"app": "...", "target": "cancel_button"}`, `image`. `target` must be one
+of `cancel_button`, `confirm_cancel_button`, `cancel_reason` (anything else: 422 `invalid`, before any model call).
+200: `{"supported": true, "box_0_1000": [x0,y0,x1,y1] | null}` (`supported=false`, with no model call
 and no quota used, whenever Remote Config `point_supported` (§2.7) is false; the phone then hides Show me).
 
 **`POST /v1/parse-notification`** — rule-miss classifier. Google token. JSON:
@@ -135,7 +141,9 @@ device registration); marks the usage counter `erased_at` (deleted by cleanup af
 **`GET /healthz`** → `{"ok": true}`. **`GET /readyz`** → 200 `{"ok": true, "checks": {...}}` or 503.
 
 ### 1.4 ONDC (buyer app; hackathon seller is the in-process mock)
-All Google token; every confirm/cancel carries the user's `tap_id` (I1) and is checked for revocation.
+All Google token; every confirm/cancel carries the user's `tap_id` (I1) and is checked for revocation. Per user and
+IST day: 20 searches and 100 other calls (429 `rate_limited` with `resume_at_ist` past that; 503 when the count can't
+be read), so one account can't use up the shared Firestore quota.
 | Endpoint | Body | Result |
 |---|---|---|
 | `POST /v1/ondc/search` | `{"session_id","pickup":{"lat","lng"},"drop":{"lat","lng"}}` | `{"txn_id"}` |
@@ -143,7 +151,7 @@ All Google token; every confirm/cancel carries the user's `tap_id` (I1) and is c
 | `POST /v1/ondc/init` | `{"txn_id"}` | `{"ok":true}` |
 | `POST /v1/ondc/confirm` | `{"txn_id","tap_id"}` | `{"ok":true}` |
 | `POST /v1/ondc/status` | `{"txn_id"}` | `{"ok":true}` |
-| `POST /v1/ondc/cancel` | `{"txn_id","tap_id","confirm":false}` → soft cancel, fee lands in Firestore; `"confirm":true` → confirm cancel | `{"ok":true}` |
+| `POST /v1/ondc/cancel` | `{"txn_id","tap_id","confirm":false}` → soft cancel: any earlier `fee` is cleared at once (null until the seller prices this request), the new fee lands in Firestore; `"confirm":true` → confirm cancel; `{"txn_id","tap_id","keep":true}` → "Keep ride": the transaction returns to its ride state (progress reported meanwhile included) and a late quote is ignored; `{"txn_id","abandon":true}` (no tap) → the phone stopped showing a transaction with no order yet: FAILED, pickup/drop cleared. At most one of `confirm`/`keep`/`abandon` | `{"ok":true}` |
 
 Callbacks `POST /ondc/on_{search,select,init,confirm,status,cancel,update}` (signed by the seller). Mock seller
 `POST /mock-bpp/{search,select,init,confirm,status,cancel}` mounted only when `ONDC_MODE=mock`.
@@ -153,9 +161,14 @@ Firestore `ondc_txn/{txnId}` (the phone listens; owner-only reads):
 {"uid": "…", "bpp_id": "mock-bpp.ridemate", "bpp_uri": "…", "demo": true,
  "state": "SEARCHING_NET|ON_SELECT|INIT|CONFIRMED|ARRIVING|ON_TRIP|ENDED|SOFT_CANCEL|CANCEL_CONFIRMED|FAILED",
  "quotes": [{"item_id": "…", "provider_name": "Demo Seller Autos", "vehicle_class": "auto", "price": 92, "eta_min": 4}],
- "selected_item_id": null, "fee": {"amount": 0, "currency": "INR"}, "driver": {"eta_min": 4, "distance_text": "1.1 km"},
+ "selected_item_id": null, "fee": {"amount": 0, "currency": "INR"} | null, "driver": {"eta_min": 4, "distance_text": "1.1 km"},
+ "resume_state": "CONFIRMED|ARRIVING|ON_TRIP" | null, "failure_code": "expired|abandoned|…" | null,
  "created_at": "…", "updated_at": "…"}
 ```
+`fee` is null from a soft-cancel request until the seller prices it (the phone shows no fee while it is null).
+`resume_state` is the ride state "Keep ride" returns to. A transaction still before an order (`SEARCHING_NET`,
+`ON_SELECT`, `INIT`) and idle for 45 minutes is set to `FAILED` (`expired`) by the dispatcher, with `stops` and
+`quotes` cleared: pickup/drop never outlive the hour for a search nobody booked.
 
 ---------------------------------------------------------------------------------------------------------------
 

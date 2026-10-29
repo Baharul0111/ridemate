@@ -234,6 +234,8 @@ internal data class OndcTxnWire(
     @SerialName("item_id") val itemId: String? = null,
     @SerialName("tap_id") val tapId: String? = null,
     val confirm: Boolean? = null,
+    val keep: Boolean? = null,
+    val abandon: Boolean? = null,
 )
 
 @Serializable

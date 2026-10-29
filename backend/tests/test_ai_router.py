@@ -27,11 +27,19 @@ from ridemate_api.router import (
     ProviderRouter,
     TaskKind,
     TaskPolicy,
+    attempt_budget_s,
     build_providers,
     estimate_input_tokens,
     max_cost_usd,
 )
-from ridemate_api.settings import MAX_TOKENS_READ, PRICE_INPUT_PER_M, PRICE_OUTPUT_PER_M
+from ridemate_api.settings import (
+    DEADLINE_READ_S,
+    MAX_TOKENS_READ,
+    PRICE_INPUT_PER_M,
+    PRICE_OUTPUT_PER_M,
+    RETRY_HEADROOM_S,
+    RETRY_MIN_REMAINING_S,
+)
 from ridemate_api.testing import make_test_deps
 
 from .test_ai_fakes import FakeMetrics, FakeProvider, FakeRemoteConfig, FakeSpend, make_settings
@@ -109,14 +117,106 @@ async def test_missing_usage_keeps_the_whole_reservation() -> None:
     assert rig.spend.kept == ["r1"]
 
 
-async def test_timeout_keeps_reservation_and_is_never_retried() -> None:
+# Production timing: the phone's 20 s tap budget starts at the user's tap, and capture, OCR and masking use about
+# 2.5 s of it before the upload, so the server sees X-Tap-Deadline-Ms ≈ 17 500.
+PHONE_SPENT_BEFORE_UPLOAD_S = 2.5
+SERVER_TAP_REMAINING_S = 20.0 - PHONE_SPENT_BEFORE_UPLOAD_S
+
+
+def _slow_until(rig: Rig, first_timeout_s: float, second_s: float | None = None) -> None:
+    """The model hangs until the router's first-attempt deadline; the second attempt takes `second_s`."""
+    calls: list[float] = []
+
+    def on_call() -> None:
+        calls.append(rig.clock.monotonic())
+        rig.clock.advance(first_timeout_s if len(calls) == 1 else (second_s or 0.0))
+
+    rig.provider.on_call = on_call
+
+
+async def test_a_slow_model_gets_one_more_try_within_the_production_tap_budget() -> None:
     rig = Rig()
+    deadline_at = rig.clock.monotonic() + SERVER_TAP_REMAINING_S
+    first = attempt_budget_s(
+        DEFAULT_POLICIES[TaskKind.READ], attempt=1, elapsed_s=0.0, remaining_s=SERVER_TAP_REMAINING_S
+    )
+    assert first == pytest.approx(SERVER_TAP_REMAINING_S - RETRY_MIN_REMAINING_S - RETRY_HEADROOM_S)
+    _slow_until(rig, first, second_s=4.0)
+    rig.provider.script("read", ModelTimeout("slow"), OK)
+    result = await rig.read(deadline_at=deadline_at)
+    assert result.attempts == 2 and rig.provider.calls == 2
+    assert rig.spend.kept == ["r1"]  # the timed-out attempt may have been billed: kept in full
+    assert rig.spend.settled[-1][0] == "r2"
+    assert [r.request_id for r in rig.spend.reservations] == ["rid:read:1", "rid:read:2"]
+    assert rig.metrics.total("ai_retry", task="read") == 1
+
+
+async def test_two_timeouts_end_in_model_timeout_so_the_phone_offers_typing_the_price() -> None:
+    rig = Rig()
+    deadline_at = rig.clock.monotonic() + SERVER_TAP_REMAINING_S
+    first = attempt_budget_s(
+        DEFAULT_POLICIES[TaskKind.READ], attempt=1, elapsed_s=0.0, remaining_s=SERVER_TAP_REMAINING_S
+    )
+    _slow_until(rig, first, second_s=RETRY_MIN_REMAINING_S)
+    rig.provider.script("read", ModelTimeout("slow"), ModelTimeout("slow again"), OK)
+    with pytest.raises(ApiError) as err:
+        await rig.read(deadline_at=deadline_at)
+    assert (err.value.status, err.value.code) == (504, "model_timeout")  # → ManualMode(TIMEOUT) on the phone
+    assert rig.provider.calls == 2  # never a third
+    assert rig.spend.kept == ["r1", "r2"]
+    assert rig.clock.monotonic() <= deadline_at
+
+
+async def test_a_timeout_is_not_retried_when_too_little_of_the_tap_budget_is_left() -> None:
+    rig = Rig()
+    deadline_at = rig.clock.monotonic() + 9.0  # under 2 × 6 s: one attempt gets all of it
+
+    def on_call() -> None:
+        rig.clock.advance(9.0)
+
+    rig.provider.on_call = on_call
     rig.provider.script("read", ModelTimeout("slow"), OK)
     with pytest.raises(ApiError) as err:
-        await rig.read()
-    assert (err.value.status, err.value.code) == (504, "model_timeout")
-    assert rig.spend.kept == ["r1"]
-    assert rig.provider.calls == 1
+        await rig.read(deadline_at=deadline_at)
+    assert err.value.code == "model_timeout"
+    assert rig.provider.calls == 1 and rig.spend.kept == ["r1"]
+
+
+async def test_parse_timeouts_are_never_retried() -> None:
+    rig = Rig()
+    rig.provider.script("parse", ModelTimeout("slow"), {"label": "assigned"})
+    with pytest.raises(ApiError) as err:
+        await rig.parse()
+    assert err.value.code == "model_timeout"
+    assert rig.provider.calls == 1 and rig.spend.kept == ["r1"]
+
+
+@pytest.mark.parametrize(
+    ("remaining_s", "expected_s"),
+    [
+        (None, DEADLINE_READ_S),  # no tap budget known: the read's own deadline
+        (20.0, DEADLINE_READ_S),  # 20 − 7 = 13 > 12: the read deadline already leaves room
+        (
+            SERVER_TAP_REMAINING_S,
+            SERVER_TAP_REMAINING_S - 7.0,
+        ),  # production: 10.5 s, then ≥ 6 s for the retry
+        (13.0, 6.0),  # the smallest budget that still fits both attempts
+        (12.9, 12.0),  # too small for two: one attempt gets everything up to its deadline
+        (9.0, 9.0),
+    ],
+)
+def test_the_first_read_attempt_leaves_room_for_the_retry(remaining_s, expected_s) -> None:
+    budget = attempt_budget_s(
+        DEFAULT_POLICIES[TaskKind.READ], attempt=1, elapsed_s=0.0, remaining_s=remaining_s
+    )
+    assert budget == pytest.approx(expected_s)
+
+
+def test_tasks_without_retry_keep_their_whole_deadline() -> None:
+    reread = DEFAULT_POLICIES[TaskKind.REREAD]
+    assert attempt_budget_s(reread, attempt=1, elapsed_s=0.0, remaining_s=SERVER_TAP_REMAINING_S) == 12.0
+    second = attempt_budget_s(DEFAULT_POLICIES[TaskKind.READ], attempt=2, elapsed_s=11.0, remaining_s=6.5)
+    assert second == pytest.approx(6.5)
 
 
 async def test_router_deadline_cancels_a_slow_call_and_keeps_the_reservation() -> None:

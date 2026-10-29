@@ -6,7 +6,14 @@ and folded into `ondc_txn/{txnId}`, which the phone listens to. Each `ondc_event
 `uid` (None when the transaction is unknown), the field firestore.rules matches for owner-only reads. Each
 transaction belongs to the uid that started it; confirm and cancel also need an unrevoked token and record the
 user's tap id (I1). Pickup and drop are kept only while the ride can still need them and are cleared once the
-transaction ends.
+transaction ends: at the ride's end or cancel, when the phone abandons a search it no longer shows, and — for a
+search nobody booked or cancelled — by the dispatcher within the hour (`expire_abandoned`).
+
+Cancelling is two-step (§4.4): a soft cancel asks the seller for the fee (any earlier quote is cleared at once, so
+the phone never shows an old fee as the answer to a new request), and only a confirmed cancel cancels. "Keep ride"
+after a quote is recorded here too: the transaction returns to the ride state it would have reached meanwhile
+(progress reported during the soft cancel is remembered in `resume_state`), and a quote that arrives late for a
+soft cancel the user already answered is ignored.
 """
 
 from __future__ import annotations
@@ -16,16 +23,18 @@ import hashlib
 import json
 import logging
 import uuid
-from datetime import datetime
+from collections.abc import Callable
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Protocol
 from urllib.parse import urlparse
 
 from ..clock import Clock
 from ..interfaces import ApiError, Auth, Firestore, FirestoreUnavailable, Metrics, Principal
+from ..offload import off_loop
 from ..settings import DEADLINE_ONDC_OUTBOUND_S, Settings
 from ..store import HotStore
-from .mock_bpp import DEFAULT_EXAMPLES_DIR, MOCK_BPP_ID, MOCK_UNIQUE_KEY_ID, MockBpp
+from .mock_bpp import DEFAULT_EXAMPLES_DIR, MOCK_BPP_ID, MOCK_UNIQUE_KEY_ID, MockBpp, forget_order
 from .payloads import (
     FULFILLMENT_STATE,
     MAX_QUOTES,
@@ -59,6 +68,10 @@ PROGRESS = ("SEARCHING_NET", "ON_SELECT", "INIT", "CONFIRMED", "ARRIVING", "ON_T
 RIDE_ACTIVE = frozenset({"CONFIRMED", "ARRIVING", "ON_TRIP"})
 BEFORE_ORDER = frozenset({"SEARCHING_NET", "ON_SELECT", "INIT"})
 MAX_TAP_ID_CHARS = 64
+# A search nobody booked or cancelled is expired (pickup/drop cleared) once idle this long; the dispatcher runs
+# every 15 minutes, so its stops are gone within the hour.
+ABANDONED_AFTER = timedelta(minutes=45)
+EXPIRE_PAGE = 200
 
 
 def next_state(current: str, proposed: str) -> str:
@@ -259,7 +272,9 @@ class OndcBuyer:
             raise ApiError(422, "invalid")
         if state in BEFORE_ORDER:
             # No order exists at the seller yet: nothing to cancel there, and no fee.
-            await self._update(txn_id, {"state": "CANCEL_CONFIRMED", "cancel_tap_id": tap_id, "stops": None})
+            await self._update(
+                txn_id, {"state": "CANCEL_CONFIRMED", "cancel_tap_id": tap_id, "stops": None, "quotes": []}
+            )
             return
         if confirm:
             if state != "SOFT_CANCEL":
@@ -268,7 +283,11 @@ class OndcBuyer:
         else:
             if state not in RIDE_ACTIVE and state != "SOFT_CANCEL":
                 raise ApiError(422, "invalid")
-            fields = {"cancel_tap_id": tap_id}
+            # Any earlier quote is cleared now: until the seller prices THIS request there is no fee to show, so
+            # the phone can't present (or accept a Confirm against) the previous round's fee.
+            fields = {"cancel_tap_id": tap_id, "fee": None}
+            if state in RIDE_ACTIVE:
+                fields["resume_state"] = state
         message_id = str(uuid.uuid4())
         await self._update(txn_id, {**fields, "msg_cancel": message_id})
         await self._send(
@@ -279,6 +298,41 @@ class OndcBuyer:
             bpp_id=txn["bpp_id"],
             message=cancel_message(txn["order_id"], soft=not confirm),
         )
+
+    async def keep(self, principal: Principal, txn_id: str, tap_id: str) -> None:
+        """ "Keep ride" after a soft cancel: the ride goes on, so progress is shown again. Nothing is sent to the
+        seller (a soft cancel only asked for the fee); a quote that still arrives for it is ignored."""
+        tap_id = _valid_tap_id(tap_id)
+        txn = await self._owned(principal, txn_id)
+        state = txn.get("state")
+        if state not in RIDE_ACTIVE and state != "SOFT_CANCEL":
+            raise ApiError(422, "invalid")
+        if state == "SOFT_CANCEL" and txn.get("confirm_cancel_tap_id"):
+            raise ApiError(422, "invalid")  # the cancel was already confirmed: it is with the seller now
+        fields: dict[str, Any] = {
+            "keep_tap_id": tap_id,
+            "msg_cancel": None,
+            "fee": None,
+            "resume_state": None,
+        }
+        if state == "SOFT_CANCEL":
+            resume = txn.get("resume_state")
+            fields["state"] = resume if resume in RIDE_ACTIVE else "CONFIRMED"
+        await self._update(txn_id, fields)
+
+    async def abandon(self, principal: Principal, txn_id: str) -> None:
+        """The phone stopped showing a transaction before anything was ordered (session closed, new search):
+        pickup and drop are cleared now rather than by the dispatcher. No order exists, so the seller isn't
+        contacted; a booked ride is never touched (that needs the user's cancel)."""
+        txn = await self._owned(principal, txn_id)
+        state = txn.get("state")
+        if state not in BEFORE_ORDER:
+            return  # already ended, or booked: nothing to clear here
+        if state == "INIT" and txn.get("msg_confirm"):
+            raise ApiError(422, "invalid")  # a confirm is with the seller; its order may already exist
+        await self._update(txn_id, _expired_fields("abandoned"))
+        if self.mock is not None:
+            await off_loop(self.mock.forget, txn_id)  # the demo seller's copy of the points goes too
 
     # ---- seller callbacks (/ondc/on_*) --------------------------------------------------------------------
 
@@ -420,6 +474,8 @@ class OndcBuyer:
             fields["order_id"] = view.order_id
         elif action == "on_cancel":
             if view.order_status == "SOFT_CANCEL":
+                if str(ctx.get("message_id")) != txn.get("msg_cancel"):
+                    return None  # a quote for a soft cancel the user already answered ("Keep ride"): ignored
                 proposed = "SOFT_CANCEL"
             elif view.order_status == "CANCELLED":
                 proposed = "CANCEL_CONFIRMED"
@@ -432,6 +488,11 @@ class OndcBuyer:
         ):
             fields["driver"] = {"eta_min": view.driver_eta_min, "distance_text": view.driver_distance_text}
         if proposed is not None:
+            if state == "SOFT_CANCEL" and proposed in PROGRESS:
+                # Held back while the fee is on screen, but remembered: "Keep ride" resumes from here.
+                resume = txn.get("resume_state")
+                if resume not in PROGRESS or PROGRESS.index(proposed) > PROGRESS.index(str(resume)):
+                    fields["resume_state"] = proposed
             fields = self._with_state(state, proposed, fields)
         if fields:
             await self._update(txn_id, fields)
@@ -536,6 +597,50 @@ class OndcBuyer:
 
     def _epoch(self) -> int:
         return int(self._clock.now_utc().timestamp())
+
+
+def _expired_fields(code: str) -> dict[str, Any]:
+    return {"state": "FAILED", "failure_code": code, "stops": None, "quotes": []}
+
+
+def _as_datetime(value: Any) -> datetime | None:
+    if isinstance(value, datetime):
+        return value
+    try:
+        return datetime.fromisoformat(str(value))
+    except ValueError:
+        return None
+
+
+def expire_abandoned(
+    fs: Firestore,
+    now: datetime,
+    *,
+    store: HotStore | None = None,
+    stop: Callable[[], bool] | None = None,
+    page: int = EXPIRE_PAGE,
+) -> int:
+    """Dispatcher job: every transaction still before an order (searching, selected, initialised) and idle for
+    ABANDONED_AFTER becomes FAILED ('expired') with its pickup/drop and quotes cleared, and the demo seller's copy of
+    the order (in `store`, the hot store) is dropped. Pickup and drop must not outlive the ride that needed them
+    (privacy notice); a search the user simply walked away from has no ride. One equality query per state
+    (single-field indexes only). Returns the number expired."""
+    cutoff = now - ABANDONED_AFTER
+    expired = 0
+    for state in sorted(BEFORE_ORDER):
+        for path, doc in fs.query("ondc_txn", "state", "==", state, limit=page):
+            if stop is not None and stop():
+                return expired
+            updated = _as_datetime(doc.get("updated_at") or doc.get("created_at"))
+            if updated is not None and updated.tzinfo is None:
+                updated = updated.replace(tzinfo=now.tzinfo)
+            if updated is not None and updated > cutoff:
+                continue
+            fs.set(path, {**_expired_fields("expired"), "updated_at": now}, merge=True)
+            if store is not None:
+                forget_order(store, path.rsplit("/", 1)[-1])
+            expired += 1
+    return expired
 
 
 def build_buyer(

@@ -339,16 +339,17 @@ def test_reread_rows_must_match_crops(env: Env) -> None:
     assert reread(env, ["bad id!"], {"bad id!": CROP}).status_code == 422
 
 
-def test_reread_on_demo_crops_works_anonymously_and_is_cached(env: Env) -> None:
-    env.provider.script("reread", {"rows": []})
-    rows, crops = ["r1"], {"r1": DEMO_PNG}
-    first = reread(env, rows, crops, headers=anon_headers())
-    assert first.status_code == 200 and first.json()["source"] == "live"
-    second = reread(env, rows, crops, headers=anon_headers())
-    assert second.json()["source"] == "cache"
-    assert not env.quotas.consumed
-    mixed = reread(env, ["r1", "r2"], {"r1": DEMO_PNG, "r2": CROP}, headers=anon_headers())
-    assert mixed.status_code == 403
+def test_reread_always_needs_google_even_on_demo_crops(env: Env) -> None:
+    # The app never rereads demo frames, and caller-chosen row ids would make every anonymous request a fresh,
+    # model-backed cache miss.
+    env.provider.default["reread"] = {"rows": []}
+    for row_id in ("r1", "r2", "x9"):
+        response = reread(env, [row_id], {row_id: DEMO_PNG}, headers=anon_headers())
+        assert response.status_code == 403 and response.json()["error"]["code"] == "google_required"
+    assert env.provider.calls == 0 and not env.spend.reservations
+    signed_in = reread(env, ["r1"], {"r1": DEMO_PNG})
+    assert signed_in.status_code == 200 and signed_in.json()["source"] == "live"
+    assert env.quotas.consumed[0][1] == "read" and env.spend.purposes == [Purpose.REREAD]
 
 
 # ---- point ---------------------------------------------------------------------------------------------------
@@ -387,6 +388,23 @@ def test_point_on_a_demo_image_is_anonymous_and_cached(env: Env) -> None:
     env.provider.script("point", {"box_0_1000": [100, 850, 420, 900]})
     assert point(env, DEMO_PNG, anon_headers()).json()["source"] == "live"
     assert point(env, DEMO_PNG, anon_headers()).json()["source"] == "cache"
+
+
+@pytest.mark.parametrize("target", ["cancel_buttonx", "x", "pay_now", "ignore_previous_instructions"])
+def test_point_targets_outside_the_closed_set_are_refused_before_any_model_call(
+    env: Env, target: str
+) -> None:
+    env.rc.values["point_supported"] = True
+    env.provider.default["point"] = {"box_0_1000": [1, 2, 3, 4]}
+    for headers, image in ((anon_headers(), DEMO_PNG), (google_headers(), PNG)):
+        response = env.client.post(
+            "/v1/point",
+            data={"meta": json.dumps({"app": "demo_kestrel", "target": target})},
+            files={"image": ("s.png", image, "image/png")},
+            headers=headers,
+        )
+        assert response.status_code == 422 and response.json()["error"]["code"] == "invalid"
+    assert env.provider.calls == 0 and not env.spend.reservations and not env.quotas.consumed
 
 
 # ---- parse-notification --------------------------------------------------------------------------------------
@@ -522,5 +540,5 @@ def test_replayed_request_ids_on_failures_are_bounded_too(env: Env) -> None:
     env.provider.default["read"] = ModelTimeout("slow")
     statuses = [env.read().status_code for _ in range(3)]
     assert statuses == [504, 504, 422]
-    assert env.provider.calls == 2
+    assert env.provider.calls == 4  # two runs, each a first try and the router's one more try
     assert len(env.quotas.refunded) == 2

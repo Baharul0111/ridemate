@@ -45,9 +45,65 @@ def test_builds_real_platform_components_without_cloud_credentials() -> None:
     assert deps.audit is None  # nowhere to write audit records, so none are kept in the hot store
     client = TestClient(create_app(deps))
     assert client.get("/healthz").json() == {"ok": True}
-    assert client.get("/readyz").json()["ok"] is True
+    # main without Firestore is never ready: no blocklist, no audit, and the meter can't verify its history
+    ready = client.get("/readyz")
+    assert ready.status_code == 503 and ready.json()["checks"]["firestore"] is False
     body = client.get("/v1/config-check").json()
     assert body["reason"] == "signed_out" and body["min_supported_version"] == 1
+
+
+def test_without_firestore_a_missing_rollup_fails_closed_instead_of_restarting_the_meter() -> None:
+    from ridemate_api.interfaces import ApiError, Purpose
+
+    store = MemoryStore()
+    deps = build_production_deps(make_settings(), store=store, clock=FakeClock())
+    assert deps.firestore is None
+    with pytest.raises(ApiError) as err:
+        deps.spend.reserve(purpose=Purpose.READ, max_usd=0.01, principal=None, request_id="r")
+    assert (err.value.status, err.value.code) == (503, "meter_unavailable")
+    assert deps.spend.ai_status(None).reason == "meter"
+    assert store.get("spend:rollup") is None  # nothing written that would hide a lost history later
+
+
+class _FakeModalDicts:
+    """Stands in for ModalDictStore: one MemoryStore per (name, environment)."""
+
+    def __init__(self) -> None:
+        self.stores: dict[tuple[str, str | None], MemoryStore] = {}
+
+    def __call__(self, name: str, environment_name: str | None = None) -> MemoryStore:
+        return self.stores.setdefault((name, environment_name), MemoryStore())
+
+
+def test_a_dev_deployment_spends_under_mains_meter_and_its_dev_sub_budget(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from ridemate_api.interfaces import Principal, Purpose
+    from ridemate_api.settings import SUB_BUDGET_DEV_USD
+
+    dicts = _FakeModalDicts()
+    monkeypatch.setattr(deps_prod, "ModalDictStore", dicts)
+    main = dicts("ridemate-hot", "main")
+    main.put("spend:rollup", {"frozen": [], "totals": {}})  # main's meter already exists
+    dev = build_production_deps(make_settings(environment="dev"), clock=FakeClock())
+    assert dev.store is dicts.stores[("ridemate-hot", "dev")]
+    user = Principal(uid="u", provider="google.com", sub_hmac="h-u")
+    r = dev.spend.reserve(purpose=Purpose.READ, max_usd=0.25, principal=user, request_id="r1")
+    dev.spend.keep(r)
+    assert r.budgets == ("ai", "dev")  # never the public's paced app budget
+    spend_keys = [k for k in main.keys_with_prefix("spend:") if k != "spend:rollup"]
+    assert spend_keys and not dicts.stores[("ridemate-hot", "dev")].keys_with_prefix("spend:")
+    # main's own meter (the one the dispatcher watches) counts it against the one AI budget
+    main_deps = build_production_deps(make_settings(), clock=FakeClock())
+    summary = main_deps.spend.summary()
+    assert summary["ai_spent_usd"] == pytest.approx(0.25)
+    assert summary["sub_budgets"]["dev"] == {
+        "spent_usd": pytest.approx(0.25),
+        "budget_usd": SUB_BUDGET_DEV_USD,
+    }
+    assert summary["day_spent_usd"] == 0  # the public's day cap is untouched
+    # quotas and per-network buckets are shared with main too
+    assert dev.quotas._store is main and dev.ip_limiter._store is main  # type: ignore[attr-defined]
 
 
 def test_missing_hmac_key_fails_startup() -> None:

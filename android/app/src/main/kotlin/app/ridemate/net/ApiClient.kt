@@ -58,6 +58,18 @@ interface ApiClient {
     /** [confirm] = false → soft cancel (fee lands in Firestore); true → confirm the cancel. */
     suspend fun ondcCancel(txnId: String, tapId: String, confirm: Boolean): ApiResult<Unit>
 
+    /**
+     * `POST /v1/ondc/cancel {keep: true}`: the user kept the ride after seeing the fee ([tapId], I1). The server returns
+     * the transaction to its ride state, so progress shows again, and ignores a quote that still arrives for it.
+     */
+    suspend fun ondcKeepRide(txnId: String, tapId: String): ApiResult<Unit> = ApiResult.NotConfigured
+
+    /**
+     * `POST /v1/ondc/cancel {abandon: true}`: the phone no longer shows a transaction that has no order yet, so the
+     * server clears its pickup and drop now. A booked ride is never touched (the server ignores it).
+     */
+    suspend fun ondcAbandon(txnId: String): ApiResult<Unit> = ApiResult.NotConfigured
+
     /** `GET /healthz` (no auth). */
     suspend fun healthz(): ApiResult<Boolean>
 

@@ -10,7 +10,8 @@ from typing import Any
 
 import pytest
 
-from ridemate_api.demo_cache import DemoCache, DemoImage, crops_key, load_manifest
+from ridemate_api.clock import FakeClock
+from ridemate_api.demo_cache import UNREADABLE_RETRY_S, DemoCache, DemoImage, crops_key, load_manifest
 from ridemate_api.interfaces import ApiError
 from ridemate_api.store import MemoryStore
 
@@ -117,20 +118,77 @@ async def test_non_availability_errors_are_not_masked(cache: DemoCache) -> None:
     assert err.value.code == "invalid"
 
 
-async def test_unreadable_live_answers_are_not_cached(cache: DemoCache) -> None:
+async def test_unreadable_live_answers_are_cached_and_retried_at_most_hourly(tmp_path: Path) -> None:
+    clock = FakeClock()
+    cache = DemoCache(
+        store=MemoryStore(),
+        metrics=FakeMetrics(),
+        images={OTHER: DemoImage("demo_pepper", "fare_options")},
+        recorded_dir=tmp_path,
+        clock=clock,
+    )
     unreadable = {**LIVE_READ, "screen_type": "unreadable"}
     first = await cache.read(OTHER, Live(unreadable))
     assert first.source == "live"
-    second = await cache.read(OTHER, Live(LIVE_READ))
-    assert second.source == "live"
+    live = Live(LIVE_READ)
+    again = await cache.read(OTHER, live)  # the same image can't miss again and again
+    assert (again.source, again.payload["screen_type"], live.calls) == ("cache", "unreadable", 0)
+    clock.advance(UNREADABLE_RETRY_S)
+    retried = await cache.read(OTHER, live)
+    assert (retried.source, retried.payload, live.calls) == ("live", LIVE_READ, 1)
+    assert (await cache.read(OTHER, Live())).source == "cache"
 
 
-async def test_store_outage_degrades_to_live(cache: DemoCache) -> None:
+async def test_store_outage_answers_without_a_live_call(tmp_path: Path) -> None:
+    # The live-call count can't be read, so no live call is made (the spend meter is down too): the recorded
+    # output answers, and without one the request pauses.
+    write_recorded(tmp_path, SHA, RECORDED_READ)
     store = MemoryStore()
-    outage = DemoCache(store=store, metrics=FakeMetrics(), images={SHA: DemoImage("demo_kestrel", "x")})
+    outage = DemoCache(
+        store=store,
+        metrics=FakeMetrics(),
+        images={SHA: DemoImage("demo_kestrel", "x")},
+        recorded_dir=tmp_path,
+    )
     store.fail = True
-    answer = await outage.read(SHA, Live(LIVE_READ))
-    assert answer.source == "live"
+    live = Live(LIVE_READ)
+    answer = await outage.read(SHA, live)
+    assert answer.source == "recorded" and live.calls == 0
+    with pytest.raises(ApiError) as err:
+        await outage.cached_call("point", "k", live)
+    assert err.value.code == "ai_paused" and live.calls == 0
+
+
+async def test_live_demo_calls_are_capped_per_day_across_every_image_and_kind(tmp_path: Path) -> None:
+    write_recorded(tmp_path, SHA, RECORDED_READ)
+    clock = FakeClock()
+    store = MemoryStore()
+    metrics = FakeMetrics()
+
+    def container() -> DemoCache:  # every container shares the count through the hot store
+        return DemoCache(
+            store=store,
+            metrics=metrics,
+            images={SHA: DemoImage("demo_kestrel", "x")},
+            recorded_dir=tmp_path,
+            clock=clock,
+            live_per_day=3,
+        )
+
+    a, b = container(), container()
+    live = Live(*[{"box_0_1000": None}] * 3, LIVE_READ, LIVE_READ)
+    for i, cache in enumerate((a, b, a)):
+        assert (await cache.cached_call("point", f"k{i}", live)).source == "live"
+    with pytest.raises(ApiError) as err:
+        await b.cached_call("point", "k3", live)  # the 4th miss today: no model call
+    assert (err.value.status, err.value.code, err.value.reason) == (429, "ai_paused", "day_cap")
+    assert err.value.resume_at is not None
+    read = await a.read(SHA, live)  # a read past the count is answered from the recording
+    assert read.source == "recorded" and live.calls == 3
+    assert (await a.cached_call("point", "k0", live)).source == "cache"  # cached answers still flow
+    assert metrics.total("demo_live_limited") == 2
+    clock.advance(24 * 3600)  # a new IST day, a new count
+    assert (await b.read(SHA, live)).source == "live" and live.calls == 4
 
 
 async def test_reread_and_point_are_cached_by_crop_hash(cache: DemoCache) -> None:

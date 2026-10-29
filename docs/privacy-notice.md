@@ -31,7 +31,7 @@ Open) running on Modal's cloud servers in the USA.
 
 | Data | Why | Where it goes | Who processes it | How long it is kept |
 |---|---|---|---|---|
-| **Pickup and drop places**, and places you type | To open the ride apps with your route, and to suggest addresses | Your phone; Android's address lookup (Geocoder); **your destination text is sent to Modal** so the AI can pick the right place from the suggestions | Google (Geocoder), Modal | **On your phone: deleted a day after the ride (24 hours).** Not stored by RideMate's server |
+| **Pickup and drop places**, and places you type | To open the ride apps with your route, and to suggest addresses | Your phone; Android's address lookup (Geocoder); **your destination text is sent to Modal** so the AI can pick the right place from the suggestions | Google (Geocoder), Modal | **On your phone: deleted a day after the ride (24 hours).** Not stored by RideMate's server, except the pickup and drop points of an ONDC ride (next rows) |
 | **Screenshots of ride-app fare and status screens** (masked) | To read prices, times and ride status when you tap the button | Kept in your phone's memory only; the **masked** image is sent to Modal, where Muse Spark Open reads it | Modal (USA; data may be processed outside India) | **Screenshots are never stored** by RideMate, on the phone or on our server. Modal processes them under its terms and data-processing agreement |
 | **Addresses visible in uploaded screenshots** | They may appear on a ride app's screen | Masked on your phone where detected; otherwise sent with the masked image | Modal | **Processed transiently** (only while reading); not stored by RideMate |
 | **Text recognised on screen** (OCR) | The second, independent price check | Your phone only | Google ML Kit, running on your phone (it may send Google anonymous usage metrics) | For the current ride session only |
@@ -43,6 +43,7 @@ Open) running on Modal's cloud servers in the USA.
 | **Ride outcome records** (one per ride session, metadata only: which app, app version, outcome, a time bucket, Android version and simple counts such as how many prices were read; linked to a one-way code of your account; no text, no places, no prices) | To measure accuracy and reliability | Firestore | Google | **1 year**, or until you erase your account |
 | **Request metadata logs** (which server function was called, when, how long it took, the outcome and its cost, with a one-way code of your account; no text, no places, no prices, no screenshots) | Security, abuse prevention and the legal duty to keep logs | Firestore | Google | **1 year (required by law), also after you erase your account** |
 | **Crash reports** | To fix crashes. They never include screen or notification text | Firebase Crashlytics | Google | Google's default retention; the identifier is cleared when you erase |
+| **Pickup and drop points for the open ride network (ONDC)** (only when you include ONDC rides, the demo seller included) | The seller needs them to quote and run your ride | Firestore; for the demo seller also Modal's memory store | Google, Modal | **Cleared within 1 hour if you don't book**; otherwise when the ride ends or is cancelled (the demo seller's own copy of a booked demo ride expires within 7 days) |
 | **ONDC name and phone number** (only when RideMate books real rides on the ONDC network; **not collected during the hackathon demo**) | Needed by the ride seller to book your ride | Firestore | Google | 180 days |
 
 RideMate does **not** use advertising IDs, ads, marketing analytics (Firebase Analytics is switched off) or your
@@ -124,6 +125,7 @@ identifier; and signs you out. If you no longer have the app, email us and we wi
 - Request metadata logs: **1 year** (required by law), also after erasure.
 - Ride outcome records: **1 year**, or until you erase your account.
 - Your Google sign-in account: until you erase it.
+- ONDC pickup and drop points: **cleared within 1 hour** if you don't book; otherwise at the ride's end or cancel.
 - ONDC booking details (only for real ONDC rides, not during the hackathon): 180 days.
 
 ## 9. Security

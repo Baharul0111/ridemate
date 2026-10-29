@@ -416,6 +416,7 @@ def test_healthz_and_readyz() -> None:
             "routes_ai": True,
             "routes_ondc": True,
         },
+        "client_bucketed": False,  # the test client sends no X-Forwarded-For
     }
     fs_of(deps).fail = True
     r = client.get("/readyz")
@@ -427,14 +428,29 @@ def test_healthz_and_readyz() -> None:
 
 
 def test_readyz_without_firestore_and_without_settings() -> None:
+    # main needs Firestore (blocklist, audit, the spend meter's lost-Dict check): without it, never ready.
     _, client, _ = setup(firestore=None)
+    r = client.get("/readyz")
+    assert r.status_code == 503 and r.json()["checks"]["firestore"] is False
+    # a dev deployment may run without it
+    _, client, _ = setup(firestore=None, settings=make_settings(environment="dev"))
     assert client.get("/readyz").json() == {
         "ok": True,
         "checks": {"settings": True, "store": True, "routes_ai": True, "routes_ondc": True},
+        "client_bucketed": False,
     }
     _, client, _ = setup(settings=make_settings(firebase_project_id=""))
     r = client.get("/readyz")
     assert r.status_code == 503 and r.json()["checks"]["settings"] is False
+
+
+def test_readyz_tells_whether_the_request_got_a_per_network_bucket() -> None:
+    _, client, _ = setup()
+    behind_proxy = client.get("/readyz", headers={"X-Forwarded-For": "10.0.0.1, 49.36.10.10"})
+    assert behind_proxy.json()["client_bucketed"] is True
+    assert "49.36.10.10" not in behind_proxy.text  # a bool only, never the address
+    private_hop = client.get("/readyz", headers={"X-Forwarded-For": "49.36.10.10, 10.0.0.1"})
+    assert private_hop.json()["client_bucketed"] is False
 
 
 def test_readyz_reports_an_endpoint_module_that_failed_to_load(monkeypatch: pytest.MonkeyPatch) -> None:

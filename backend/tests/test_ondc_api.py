@@ -167,3 +167,101 @@ async def test_unknown_transaction_is_not_found(path: str) -> None:
             path, json={"txn_id": "00000000-0000-4000-8000-000000000000"}, headers=google_headers()
         )
         assert response.status_code == 404 and response.json()["error"]["code"] == "not_found"
+
+
+# ---- per-user daily caps, keep and abandon over HTTP -----------------------------------------------------------
+
+
+async def test_the_21st_search_of_the_day_is_refused_before_anything_is_written() -> None:
+    from ridemate_api.api.ondc import SEARCHES_PER_DAY
+
+    deps, client = build()
+    fs = deps.firestore
+    assert isinstance(fs, FakeFirestore)
+    async with client:
+        for _ in range(SEARCHES_PER_DAY):
+            ok = await client.post("/v1/ondc/search", json=SEARCH, headers=google_headers("alice"))
+            assert ok.status_code == 200
+        await drain(deps)
+        before = dict(fs.docs)
+        refused = await client.post("/v1/ondc/search", json=SEARCH, headers=google_headers("alice"))
+        assert refused.status_code == 429 and refused.json()["error"]["code"] == "rate_limited"
+        assert refused.json()["error"]["resume_at_ist"] == "00:00"
+        await drain(deps)
+        assert fs.docs == before  # no ondc_txn, no seller callback, no event
+        # the cap is per user
+        other = await client.post("/v1/ondc/search", json=SEARCH, headers=google_headers("bob"))
+        assert other.status_code == 200
+        # a new IST day, a new allowance
+        deps.clock.advance(24 * 3600)  # type: ignore[attr-defined]
+        again = await client.post("/v1/ondc/search", json=SEARCH, headers=google_headers("alice"))
+        assert again.status_code == 200
+
+
+async def test_buyer_actions_have_their_own_daily_cap(monkeypatch: pytest.MonkeyPatch) -> None:
+    from ridemate_api.api import ondc as ondc_api
+
+    monkeypatch.setattr(ondc_api, "ACTIONS_PER_DAY", 3)
+    deps, client = build()
+    async with client:
+        txn_id = (await client.post("/v1/ondc/search", json=SEARCH, headers=google_headers("alice"))).json()[
+            "txn_id"
+        ]
+        await drain(deps)
+        statuses = []
+        for _ in range(4):
+            r = await client.post("/v1/ondc/status", json={"txn_id": txn_id}, headers=google_headers("alice"))
+            statuses.append(r.status_code)
+        assert statuses == [422, 422, 422, 429]  # no order yet, but each call still counted
+
+
+async def test_a_store_outage_refuses_ondc_calls_rather_than_skipping_the_cap() -> None:
+    deps, client = build()
+    async with client:
+        deps.store.fail = True  # type: ignore[attr-defined]
+        r = await client.post("/v1/ondc/search", json=SEARCH, headers=google_headers("alice"))
+        assert r.status_code == 503
+        assert deps.firestore is not None and not deps.firestore.docs  # type: ignore[attr-defined]
+
+
+async def test_keep_ride_and_abandon_over_http() -> None:
+    deps, client = build()
+    alice = google_headers("alice")
+    async with client:
+        txn_id = (await client.post("/v1/ondc/search", json=SEARCH, headers=alice)).json()["txn_id"]
+        await drain(deps)
+        for step, body in (
+            ("select", {"txn_id": txn_id, "item_id": "demo-cab"}),
+            ("init", {"txn_id": txn_id}),
+            ("confirm", {"txn_id": txn_id, "tap_id": "tap-1"}),
+            ("cancel", {"txn_id": txn_id, "tap_id": "tap-2"}),
+        ):
+            assert (await client.post(f"/v1/ondc/{step}", json=body, headers=alice)).status_code == 200
+            await drain(deps)
+        assert deps.firestore is not None
+        assert deps.firestore.get(f"ondc_txn/{txn_id}")["state"] == "SOFT_CANCEL"
+        for bad in (
+            {"txn_id": txn_id, "keep": True},  # keep follows a tap too
+            {"txn_id": txn_id, "tap_id": "tap-3", "keep": True, "confirm": True},
+            {"txn_id": txn_id, "tap_id": "tap-3", "keep": True, "abandon": True},
+            {"txn_id": txn_id, "confirm": False},
+        ):
+            r = await client.post("/v1/ondc/cancel", json=bad, headers=alice)
+            assert r.status_code == 422, bad
+        kept = await client.post(
+            "/v1/ondc/cancel", json={"txn_id": txn_id, "tap_id": "tap-3", "keep": True}, headers=alice
+        )
+        assert kept.status_code == 200
+        txn = deps.firestore.get(f"ondc_txn/{txn_id}")
+        assert txn["state"] == "CONFIRMED" and txn["fee"] is None
+
+        searched = (await client.post("/v1/ondc/search", json=SEARCH, headers=alice)).json()["txn_id"]
+        await drain(deps)
+        gone = await client.post("/v1/ondc/cancel", json={"txn_id": searched, "abandon": True}, headers=alice)
+        assert gone.status_code == 200
+        txn = deps.firestore.get(f"ondc_txn/{searched}")
+        assert txn["state"] == "FAILED" and txn["stops"] is None
+        theft = await client.post(
+            "/v1/ondc/cancel", json={"txn_id": txn_id, "abandon": True}, headers=google_headers("mallory")
+        )
+        assert theft.status_code == 403

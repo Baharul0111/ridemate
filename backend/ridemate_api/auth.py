@@ -11,6 +11,10 @@ OWNER_EMAILS; judge = SHA-256 of the lower-cased verified email in Remote Config
 
 `check_not_revoked` asks Identity Toolkit `accounts:lookup` with the token itself and the web API key, so the
 server needs no Auth-admin role. Every network call has a 3 s deadline; blocking calls run off the event loop.
+
+The blocklist (`blocked_uids/list`) is re-read from Firestore every minute. The last list read is also kept in the
+hot store, so a container that starts while Firestore is unreadable (or a deployment whose Firestore key is
+missing, which /readyz reports) still enforces it instead of starting with nobody blocked.
 """
 
 from __future__ import annotations
@@ -37,6 +41,7 @@ from .crypto import HmacKeyring
 from .deps import get_deps
 from .interfaces import ApiError, Firestore, Principal, RemoteConfig
 from .settings import Settings
+from .store import HotStore, StoreUnavailable
 
 log = logging.getLogger(__name__)
 
@@ -52,6 +57,7 @@ MAX_CERT_MAX_AGE_S = 24 * 3600
 UNKNOWN_KID_REFETCH_S = 60.0
 BLOCKED_TTL_S = 60.0
 BLOCKED_DOC = "blocked_uids/list"
+BLOCKED_CACHE_KEY = "auth:blocked_uids"  # the last list read from Firestore: {"uids": [...], "at": iso}
 GOOGLE = "google.com"
 REVOKED_MESSAGES = ("USER_DISABLED", "TOKEN_EXPIRED", "USER_NOT_FOUND", "INVALID_ID_TOKEN")
 _MAX_AGE = re.compile(r"max-age=(\d+)")
@@ -217,12 +223,14 @@ class FirebaseAuth:
         remote_config: RemoteConfig,
         firestore: Firestore | None,
         http_client: httpx.AsyncClient | None = None,
+        store: HotStore | None = None,
     ) -> None:
         self._settings = settings
         self._keyring = keyring
         self._clock = clock
         self._rc = remote_config
         self._firestore = firestore
+        self._store = store
         self._client = http_client or httpx.AsyncClient(timeout=NETWORK_TIMEOUT_S)
         self._certs = GoogleCerts(self._client, clock)
         self._blocked = _Blocked()
@@ -331,23 +339,53 @@ class FirebaseAuth:
         return isinstance(hashes, list) and email_sha256(email) in {str(h).lower() for h in hashes}
 
     async def _is_blocked(self, principal: Principal) -> bool:
-        if self._firestore is None:
+        if self._firestore is None and self._store is None:
             return False
         now = self._clock.monotonic()
         if now - self._blocked.loaded_at >= BLOCKED_TTL_S:
-            try:
-                doc = await asyncio.to_thread(self._firestore.get, BLOCKED_DOC)
-            except Exception as e:  # noqa: BLE001 - Firestore down: keep the last list, don't fail everyone
-                log.warning("auth: blocked_uids unreadable: %s", type(e).__name__)
-                ids = self._blocked.ids
-            else:
-                raw = doc.get("uids", []) if isinstance(doc, dict) else []
-                ids = frozenset(str(u) for u in raw) if isinstance(raw, list) else frozenset()
+            ids = await asyncio.to_thread(self._load_blocked)
             self._blocked = _Blocked(ids, now)
         # Blocking by HMAC(sub) as well as by uid survives the user recreating the Firebase account, and the
         # previous key's HMAC keeps matching through a key rotation (dual read, §4.18 H5).
         ids = self._blocked.ids
         return any(i in ids for i in (principal.uid, principal.sub_hmac, principal.sub_hmac_previous) if i)
+
+    def _load_blocked(self) -> frozenset[str]:
+        """Firestore's list (copied to the hot store when it changed), else the last list any container read,
+        else the list this container already had."""
+        if self._firestore is not None:
+            try:
+                doc = self._firestore.get(BLOCKED_DOC)
+            except Exception as e:  # noqa: BLE001 - Firestore down: keep the last list, don't fail everyone
+                log.warning("auth: blocked_uids unreadable: %s", type(e).__name__)
+            else:
+                raw = doc.get("uids", []) if isinstance(doc, dict) else []
+                ids = frozenset(str(u) for u in raw) if isinstance(raw, list) else frozenset()
+                self._remember_blocked(ids)
+                return ids
+        cached = self._cached_blocked()
+        return cached if cached is not None else self._blocked.ids
+
+    def _cached_blocked(self) -> frozenset[str] | None:
+        if self._store is None:
+            return None
+        try:
+            value = self._store.get(BLOCKED_CACHE_KEY)
+        except StoreUnavailable:
+            return None
+        raw = value.get("uids") if isinstance(value, dict) else None
+        return frozenset(str(u) for u in raw) if isinstance(raw, list) else None
+
+    def _remember_blocked(self, ids: frozenset[str]) -> None:
+        if self._store is None:
+            return
+        try:
+            if self._cached_blocked() != ids:
+                self._store.put(
+                    BLOCKED_CACHE_KEY, {"uids": sorted(ids), "at": self._clock.now_utc().isoformat()}
+                )
+        except StoreUnavailable:
+            log.warning("auth: blocklist copy not kept: store unavailable")
 
 
 def _peek_kid(token: str) -> str:

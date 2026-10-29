@@ -220,9 +220,12 @@ class BodyLimitMiddleware:
 
 
 class IpLimitMiddleware:
-    """The per-IP bucket for every /v1/* request (limits.IpLimiter; idempotent if an endpoint checks again)."""
+    """The per-IP bucket for every HTTP request (limits.IpLimiter; idempotent if an endpoint checks again).
 
-    def __init__(self, app: ASGIApp, *, prefix: str = "/v1/") -> None:
+    Every path, /healthz and /readyz included: an unauthenticated request a minute is enough to keep a container
+    warm, and compute is billed whether or not the request costs a model call."""
+
+    def __init__(self, app: ASGIApp, *, prefix: str = "/") -> None:
         self.app = app
         self.prefix = prefix
 

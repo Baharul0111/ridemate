@@ -4,7 +4,8 @@ Modal's Starter plan allows 5 crons; RideMate uses exactly one, deployed only in
 15 minutes. Each run:
 - every time: metrics snapshot + hourly rollups, spend meter compaction + snapshot, metadata audit records of
   sessions that went idle (audit.py), replay of audit/events parked while the Firestore quota was gone, erasures
-  Firestore refused at request time, alert evaluation;
+  Firestore refused at request time, expiry of ONDC searches nobody booked or cancelled (their pickup/drop is
+  cleared within the hour), alert evaluation;
 - once per IST day (from a set hour): Firestore/hot-store cleanup (Spark has no TTL), the synthetic golden probe
   (one demo image read through the internal router as Purpose.PROBE, never over HTTP), billing reconciliation;
 - once per week: the drift run (Template Doctor in report mode, within the evals sub-budget);
@@ -78,6 +79,7 @@ JOBS: tuple[JobSpec, ...] = (
     JobSpec("probe", "daily", 60, time(7, 0)),
     JobSpec("reconcile", "daily", 90, time(10, 0)),  # Modal's billing data for yesterday has settled by then
     JobSpec("drift", "weekly", 240, time(4, 0)),
+    JobSpec("ondc_expire", "run", 45),
     JobSpec("alerts", "run", 60),
 )
 
@@ -757,6 +759,17 @@ async def _job_drift(run: _Run) -> dict[str, Any]:
     return dict(await run.hooks.drift(run.deps))
 
 
+async def _job_ondc_expire(run: _Run) -> dict[str, Any]:
+    if run.deps.firestore is None:
+        return {"status": "skipped", "reason": "no_firestore"}
+    from .ondc.bap import expire_abandoned
+
+    expired = await asyncio.to_thread(
+        expire_abandoned, run.deps.firestore, run.now, store=run.deps.store, stop=run.should_stop
+    )
+    return {"expired": expired}
+
+
 _JOB_FUNCS: Mapping[str, Callable[[_Run], Awaitable[Mapping[str, Any] | None]]] = {
     "metrics": _job_metrics,
     "spend_snapshot": _job_spend_snapshot,
@@ -767,6 +780,7 @@ _JOB_FUNCS: Mapping[str, Callable[[_Run], Awaitable[Mapping[str, Any] | None]]] 
     "probe": _job_probe,
     "reconcile": _job_reconcile,
     "drift": _job_drift,
+    "ondc_expire": _job_ondc_expire,
     "alerts": _job_alerts,
 }
 

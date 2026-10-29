@@ -128,7 +128,11 @@ sealed interface OndcResult {
  *   and the seller is asked for its status, while the guardian keeps reminding;
  * - any failure → the "ONDC unavailable" row with what to do next. `ondc_enabled` off blocks new searches and bookings;
  *   a booked ride can still be cancelled;
- * - [stop] ends the transaction: nothing still running for it changes the view or calls the network again;
+ * - "Keep ride" ([keepRide]) is sent to the server too, with the user's tap: the transaction returns to its ride state
+ *   (progress shows again) and a quote that still arrives for that soft cancel is ignored; the server also clears any
+ *   earlier fee as soon as a new soft cancel is requested, so an old fee is never shown as the new round's quote;
+ * - [stop] ends the transaction: nothing still running for it changes the view or calls the network again, except
+ *   that a transaction with no order yet is abandoned on the server, which clears its pickup and drop at once;
  * - [resume] re-attaches to a transaction after the process was restarted (integration persists [OndcView.txnId]).
  *
  * One ONDC leg per session. Confinement: main thread ([scope] main-confined; Firestore calls back on main).
@@ -369,9 +373,16 @@ class OndcClient(
         }
     }
 
-    /** The user kept the ride after seeing the fee (the guardian's ONDC_KEEP_RIDE); the soft cancel simply lapses. */
-    fun keepRide(legId: String) {
+    /**
+     * The user kept the ride after seeing the fee (the guardian's ONDC_KEEP_RIDE); the soft cancel simply lapses. With
+     * the user's [tapId] (I1) the server is told too, so ride progress is shown again instead of the lapsed fee.
+     */
+    fun keepRide(legId: String, tapId: TapId? = null) {
         val t = txnFor(legId) ?: return
+        val softCancelPending = t.cancelRequested || t.doc.value?.state == OndcTxnState.SOFT_CANCEL
+        if (tapId != null && softCancelPending) {
+            scope.launch { if (t.live) api.ondcKeepRide(t.txnId, tapId.value) }
+        }
         t.cancelRequested = false
         t.cancelNoAnswer = false
         t.cancelTimer?.cancel()
@@ -392,11 +403,18 @@ class OndcClient(
     fun stop() {
         searchGeneration++
         txn?.let {
+            // Nothing booked yet (or not known yet): the server clears its pickup and drop now rather than within the
+            // hour. It ignores a transaction that turns out to be booked, so a ride is never cancelled this way.
+            val abandon = it.doc.value?.state?.beforeOrder ?: true
             it.stopped.value = true
             it.listener?.close()
             it.searchTimeout?.cancel()
             it.cancelTimer?.cancel()
             it.confirmTimer?.cancel()
+            if (abandon) {
+                val txnId = it.txnId
+                scope.launch { api.ondcAbandon(txnId) }
+            }
         }
         txn = null
         _view.value = OndcView()

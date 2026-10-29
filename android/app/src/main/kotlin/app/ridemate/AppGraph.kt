@@ -27,6 +27,7 @@ import app.ridemate.data.StorageHealth
 import app.ridemate.core.guardian.GuardianEffect
 import app.ridemate.core.guardian.UserAction
 import app.ridemate.core.model.Provider
+import app.ridemate.core.state.TapId
 import app.ridemate.bubble.TapIds
 import app.ridemate.integration.CaptureDevTools
 import app.ridemate.integration.ComparisonStarter
@@ -323,7 +324,7 @@ class AppGraph(
                     mainScope.launch { ondcClient.execute(command) }
                 }
 
-                override fun keepRide(legId: String) = ondcClient.keepRide(legId)
+                override fun keepRide(legId: String, tapId: TapId?) = ondcClient.keepRide(legId, tapId)
             }
             b.compareAgain = CompareAgainHandler { sessionId ->
                 guardian.notifier.openRideMate(GuardianIntents.DESTINATION_COMPARE, sessionId)

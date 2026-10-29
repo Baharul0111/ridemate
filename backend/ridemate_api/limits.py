@@ -3,7 +3,10 @@
 `IpLimiter`: a token bucket of 60 requests/min per client IP. The client IP is the RIGHT-MOST hop of
 X-Forwarded-For, because Modal's proxy appends the address it saw; hops to its left are whatever the client sent
 and are never trusted. IPv6 clients are bucketed by /64. Without a usable header there is no trustworthy client
-address, so IP limiting is skipped and only the per-user quotas apply. Bucket keys are HMACs, not raw addresses.
+address, so IP limiting is skipped and only the per-user quotas apply. That assumption about Modal's proxy is
+watched rather than trusted: every check is counted as `ip_bucket{outcome=bucketed|unbucketed|store_down}`, and
+the dispatcher alerts (`ip_unbucketed_rate`) when too many /v1 requests carry no usable hop, which is what a proxy
+change would look like. Bucket keys are HMACs, not raw addresses.
 
 `QuotaManager`: the per-user fair share per IST day, keyed on HMAC(Google sub). Modal Dict has no atomic
 increment, so each unit is a slot claimed with put_if_absent ('quota:{hmac}:{day}:{kind}:{n}', n < limit): two
@@ -28,7 +31,7 @@ from fastapi import Request
 
 from .clock import Clock, ist_day, next_ist_midnight
 from .crypto import HmacKeyring
-from .interfaces import ApiError, Firestore, FirestoreUnavailable, Principal, QuotaKind
+from .interfaces import ApiError, Firestore, FirestoreUnavailable, Metrics, Principal, QuotaKind
 from .settings import (
     IP_BUCKET_PER_MIN,
     QUOTA_PARSES_JUDGE,
@@ -44,6 +47,7 @@ from .store import HotStore, StoreUnavailable
 log = logging.getLogger(__name__)
 
 HEAVY_FRACTION = 2 / 3
+IP_BUCKET_METRIC = "ip_bucket"  # labels: outcome (bucketed/unbucketed/store_down), scope (v1/other)
 KINDS: tuple[QuotaKind, ...] = ("read", "parse")
 SYNCED_PREFIX = "first_seen_synced:"
 _RID_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
@@ -97,6 +101,7 @@ class IpLimiter:
         *,
         per_minute: int = IP_BUCKET_PER_MIN,
         header: str = "x-forwarded-for",
+        metrics: Metrics | None = None,
     ) -> None:
         self._store = store
         self._clock = clock
@@ -104,18 +109,35 @@ class IpLimiter:
         self._capacity = float(per_minute)
         self._rate_per_s = per_minute / 60.0
         self._header = header
+        self._metrics = metrics
 
     def check(self, request: Request) -> None:
         state = request.state
         if getattr(state, "ip_checked", False):  # app middleware and an endpoint may both call this
             return
         state.ip_checked = True
+        scope = "v1" if request.url.path.startswith("/v1/") else "other"
         bucket = client_bucket(request.headers, self._header)
         if bucket is None:
+            self._count("unbucketed", scope)
             return
-        self.take(bucket)
+        applied = True  # a 429 from take() was bucketed too
+        try:
+            applied = self.take(bucket)
+        finally:
+            self._count("bucketed" if applied else "store_down", scope)
 
-    def take(self, bucket: str) -> None:
+    def _count(self, outcome: str, scope: str) -> None:
+        if self._metrics is None:
+            return
+        try:
+            self._metrics.incr(IP_BUCKET_METRIC, outcome=outcome, scope=scope)
+        except Exception:  # noqa: BLE001 - metrics must never fail a request
+            log.debug("ip bucket metric not recorded")
+
+    def take(self, bucket: str) -> bool:
+        """Takes one token from `bucket`; raises 429 rate_limited when it is empty. False when the store could
+        not be read, so the bucket was not applied (fails open: money is guarded elsewhere)."""
         key = f"ip:{self._keyring.digest(bucket, purpose='ip')[:32]}"
         now = self._clock.now_utc().timestamp()
         try:
@@ -131,11 +153,12 @@ class IpLimiter:
         except StoreUnavailable:
             # Per-IP limits are a courtesy layer; money is guarded by quotas and the spend meter, which fail closed.
             log.warning("ip limiter store unavailable; skipping")
-            return
+            return False
         if not allowed:
             raise ApiError(
                 429, "rate_limited", retry_after_s=max(1, math.ceil((1.0 - tokens) / self._rate_per_s))
             )
+        return True
 
 
 # ---- per-user quotas ---------------------------------------------------------------------------------------

@@ -67,6 +67,8 @@ class ProgrammableApiClient : ApiClient {
     override suspend fun ondcStatus(txnId: String): ApiResult<Unit> = step("status", txnId)
     override suspend fun ondcCancel(txnId: String, tapId: String, confirm: Boolean): ApiResult<Unit> =
         step(if (confirm) "cancel.confirm" else "cancel.soft", "$txnId:$tapId")
+    override suspend fun ondcKeepRide(txnId: String, tapId: String): ApiResult<Unit> = step("keep", "$txnId:$tapId")
+    override suspend fun ondcAbandon(txnId: String): ApiResult<Unit> = step("abandon", txnId)
 
     private suspend fun step(name: String, detail: String): ApiResult<Unit> {
         calls += "ondc.$name:$detail"

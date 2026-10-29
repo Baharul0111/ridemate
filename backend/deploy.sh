@@ -15,11 +15,13 @@
 #   c) Firestore '(default)' in asia-south1 if absent; rules + indexes with the Firebase CLI.
 #   d) modal deploy backend/modal_app.py to the chosen environment (the cron exists only in 'main').
 #   e) the Remote Config template, built with the web URL from (d), to the dev project first, then prod.
+#   f) post-deploy check: /readyz answers, and Modal's proxy gave this request a usable X-Forwarded-For hop
+#      (otherwise per-network limits are silently off: the script fails, see docs/spikes.md).
 #   (Modal goes before Remote Config because the template carries the URL that `modal deploy` prints.)
 set -euo pipefail
 
 usage() {
-  sed -n '2,18p' "$0" | sed 's/^# \{0,1\}//'
+  sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'
   cat <<'EOF'
 
 Options:
@@ -320,6 +322,28 @@ else
       --non-interactive)
   else
     note "prod Remote Config left unchanged for a dev deploy"
+  fi
+fi
+
+# ---- (f) post-deploy check -----------------------------------------------------------------------------------------
+# Per-network limits use the right-most X-Forwarded-For hop that Modal's proxy appends (backend/ridemate_api/limits.py)
+# and switch off silently without one. /readyz reports, as a bool, whether this very request got a bucket.
+step "(f) post-deploy check: /readyz, and a per-network bucket for this request"
+if [[ $DRY_RUN -eq 1 ]]; then
+  note "would check ${WEB_URL:-<web URL from step d>}/readyz: \"ok\": true and \"client_bucketed\": true"
+elif [[ -z "$WEB_URL" ]]; then
+  note "skipped (no web URL; set RIDEMATE_API_BASE_URL and re-run)"
+else
+  readyz="$(curl -sS --max-time 30 "$WEB_URL/readyz" || true)"
+  if ! grep -Eq '"client_bucketed": ?true' <<<"$readyz"; then
+    echo "error: $WEB_URL/readyz saw no usable client address in X-Forwarded-For, so per-network (per-IP)" \
+      "limits are OFF. Check which header Modal's proxy sets now and update limits.py (docs/spikes.md)." >&2
+    exit 1
+  fi
+  if grep -Eq '"ok": ?true' <<<"$readyz"; then
+    note "/readyz: ready, and per-network limits apply"
+  else
+    note "warning: /readyz is not ready yet (a cold start, or a missing secret): re-check in a minute"
   fi
 fi
 

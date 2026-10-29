@@ -179,8 +179,8 @@ fun interface CaptureRequester {
 fun interface OndcCommandSink {
     fun execute(command: GuardianEffect.OndcCommand)
 
-    /** The user kept the ride after seeing the network's cancellation fee (ONDC_KEEP_RIDE). */
-    fun keepRide(legId: String) = Unit
+    /** The user kept the ride after seeing the network's cancellation fee (ONDC_KEEP_RIDE), with that tap (I1). */
+    fun keepRide(legId: String, tapId: TapId? = null) = Unit
 }
 
 /** "Compare again (same trip)": the compare area reopens the trip's apps. */

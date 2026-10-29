@@ -372,3 +372,48 @@ def test_test_fire_sends_every_alert_once_labelled_test():
 def test_delivery_without_an_ops_key_still_pings_healthchecks(bad_key):
     delivery = build_delivery(make_settings(ops_sa_json=bad_key), MemoryStore())
     assert delivery._fcm_tokens is None
+
+
+# ---- credit, per-network bucketing, judging week ----------------------------------------------------------
+
+
+def test_credit_nearly_exhausted_fires_once_ai_plus_compute_reach_the_credit_minus_the_margin():
+    # AI stops itself at its budget; compute is only metered, so this is the owner's cue to stop the app.
+    assert "credit_nearly_exhausted" in names(
+        AlertInputs(T0, spend_summary={"credit_used_usd": 92.0, "credit_usd": 100.0})
+    )
+    assert names(AlertInputs(T0, spend_summary={"credit_used_usd": 91.9, "credit_usd": 100.0})) == []
+
+
+def _ip_view(bucketed: int, unbucketed: int, other_unbucketed: int = 0) -> MetricsView:
+    def record(m: DictMetrics) -> None:
+        for _ in range(bucketed):
+            m.incr("ip_bucket", outcome="bucketed", scope="v1")
+        for _ in range(unbucketed):
+            m.incr("ip_bucket", outcome="unbucketed", scope="v1")
+        for _ in range(other_unbucketed):
+            m.incr("ip_bucket", outcome="unbucketed", scope="other")
+
+    return view_of(record, settle=False)
+
+
+def test_ip_unbucketed_rate_fires_when_modals_forwarded_hop_goes_missing():
+    assert "ip_unbucketed_rate" in names(AlertInputs(T0, view=_ip_view(15, 10)))  # 40% of /v1 unbucketed
+    assert "ip_unbucketed_rate" not in names(AlertInputs(T0, view=_ip_view(40, 10)))  # exactly 20%
+    assert "ip_unbucketed_rate" not in names(AlertInputs(T0, view=_ip_view(0, 10)))  # too few requests
+    # requests outside /v1 (health checks from tools without a proxy hop) don't count
+    assert "ip_unbucketed_rate" not in names(AlertInputs(T0, view=_ip_view(30, 0, other_unbucketed=50)))
+
+
+def test_the_judging_profile_without_any_listed_judge_alerts_the_owner():
+    from ridemate_api.testing import FakeRemoteConfig
+
+    deps = make_deps(clock=FakeClock(T0))
+    for rc, fires in (
+        ({"cap_profile": "judging"}, True),
+        ({"cap_profile": "judging", "judge_allowlist": {"sha256_emails": []}}, True),
+        ({"cap_profile": "judging", "judge_allowlist": {"sha256_emails": ["ab" * 32]}}, False),
+        ({"cap_profile": "normal"}, False),
+    ):
+        deps.remote_config = FakeRemoteConfig(rc)
+        assert ("judging_allowlist_empty" in names(gather_inputs(deps, T0, None))) is fires, rc

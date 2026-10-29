@@ -29,6 +29,17 @@ SUB_BUDGET_EVAL_RUN_USD = 0.50
 SUB_BUDGET_PROBES_USD = 2.0
 SUB_BUDGET_JUDGING_USD = 15.0
 SUB_BUDGET_DEMO_USD = 3.0  # demo-image cache misses
+SUB_BUDGET_DEV_USD = 1.0  # everything a non-main deployment (the 'dev' Modal environment) spends
+
+# One credit, one meter: the spend meter, quotas and IP buckets of every deployment live in this Modal
+# environment's hot store, whichever environment the code runs in (only 'main' runs the dispatcher that compacts,
+# snapshots, reconciles and alerts on them).
+METER_ENVIRONMENT = "main"
+
+# Demo cache misses: their own small daily cap (they never draw on the public's paced day cap) and a global count
+# of live demo calls per IST day, past which demo answers come from the cache or the recorded output only.
+DEMO_DAY_CAP_USD = 0.50
+DEMO_LIVE_MISSES_PER_DAY = 64
 
 # Fair share (architecture.md §4.2 Abuse limits).
 QUOTA_READS_PER_DAY = 6
@@ -57,7 +68,11 @@ DEADLINE_POINT_S = 12.0
 DEADLINE_ONDC_OUTBOUND_S = 5.0
 DEADLINE_FIRESTORE_S = 3.0
 TAP_BUDGET_S = 20.0
+# A read gets a second attempt only while at least this much of the tap budget is left, and its first attempt is
+# cut short so that this much (plus the bookkeeping headroom below) is always left for that second attempt.
 RETRY_MIN_REMAINING_S = 6.0
+# Settling the first attempt's reservation and reserving the second are Modal Dict round trips between the two.
+RETRY_HEADROOM_S = 1.0
 
 # Output-token ceilings (L4). Reasoning tokens count against them and the endpoint cannot switch reasoning off
 # (day-1 spike, docs/spikes.md), so each ceiling leaves room for ~400–650 reasoning tokens before the answer.
@@ -113,6 +128,11 @@ class Settings:
     @property
     def ai_configured(self) -> bool:
         return bool(self.model_base_url and self.model_token_id and self.model_token_secret)
+
+    @property
+    def is_meter_environment(self) -> bool:
+        """True in 'main', the deployment the whole credit is metered and watched from."""
+        return self.environment == METER_ENVIRONMENT
 
     @classmethod
     def from_env(cls) -> Settings:

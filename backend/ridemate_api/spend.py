@@ -5,9 +5,14 @@ settle with the real usage, keep the whole reservation on a timeout, or release 
 containers' CPU/memory time (`record_compute`). Amounts are integer nano-USD, so sums are exact.
 
 Budgets (settings.py): AI $80 = app traffic (the rest) + judging $15 + evals/Template Doctor $5 (≤ $0.50 per run)
-+ probes $2 + demo cache misses $3; compute $12; margin $8. Compute that overruns its budget eats the margin
-first and only then the AI headroom, so the total never passes the $100 credit. App traffic and demo misses are
-also held to the daily pacing cap, and young or heavy accounts pause at 70% of it.
++ probes $2 + demo cache misses $3 + dev deployments $1; compute $12; margin $8. Compute that overruns its budget
+eats the margin first and only then the AI headroom, so the total never passes the $100 credit. App traffic is also
+held to the daily pacing cap, and young or heavy accounts pause at 70% of it. Demo misses have a small daily cap of
+their own (DEMO_DAY_CAP_USD), so anonymous demo traffic can never use up the public's day.
+
+One meter per credit: every deployment writes to the hot store of the 'main' Modal environment (deps_prod.py), and
+a deployment in any other environment (dev) charges everything it spends to the $1 'dev' sub-budget as well and
+is never paced, so testing in dev can neither double the AI budget nor eat the public's day cap.
 
 Storage. Modal Dict has no atomic increment, so each writer process owns a shard (MODAL_TASK_ID, else
 local-<hostname>-<pid>) and only read-modify-writes its own keys, under a per-shard lock:
@@ -54,6 +59,7 @@ from .settings import (
     BUDGET_AI_USD,
     BUDGET_COMPUTE_USD,
     BUDGET_MARGIN_USD,
+    DEMO_DAY_CAP_USD,
     JUDGING_DAY_CAP_USD,
     PACING_MULTIPLIER,
     PRICE_CACHED_INPUT_PER_M,
@@ -62,6 +68,7 @@ from .settings import (
     PRICE_MEM_PER_GIB_S,
     PRICE_OUTPUT_PER_M,
     SUB_BUDGET_DEMO_USD,
+    SUB_BUDGET_DEV_USD,
     SUB_BUDGET_EVAL_RUN_USD,
     SUB_BUDGET_EVALS_USD,
     SUB_BUDGET_JUDGING_USD,
@@ -82,6 +89,7 @@ JUDGING = "judging"
 EVALS = "evals"
 PROBES = "probes"
 DEMO = "demo"
+DEV = "dev"
 COMPUTE = "compute"
 EVAL_RUN = "evalrun-"  # + run id; one per eval / Template Doctor run
 EVAL_RUN_REQUEST_PREFIX = "eval-run:"
@@ -97,7 +105,11 @@ FS_ROLLUP_DOC = "spend_shards/rollup"
 _RESERVED_NAMES = frozenset({"frozen", "rollup", "drift_factor"})
 
 APP_BUDGET_USD = BUDGET_AI_USD - (
-    SUB_BUDGET_EVALS_USD + SUB_BUDGET_PROBES_USD + SUB_BUDGET_JUDGING_USD + SUB_BUDGET_DEMO_USD
+    SUB_BUDGET_EVALS_USD
+    + SUB_BUDGET_PROBES_USD
+    + SUB_BUDGET_JUDGING_USD
+    + SUB_BUDGET_DEMO_USD
+    + SUB_BUDGET_DEV_USD
 )
 TOTAL_CREDIT_USD = BUDGET_AI_USD + BUDGET_COMPUTE_USD + BUDGET_MARGIN_USD
 SUB_BUDGETS_USD: dict[str, float] = {
@@ -106,10 +118,12 @@ SUB_BUDGETS_USD: dict[str, float] = {
     EVALS: SUB_BUDGET_EVALS_USD,
     PROBES: SUB_BUDGET_PROBES_USD,
     DEMO: SUB_BUDGET_DEMO_USD,
+    DEV: SUB_BUDGET_DEV_USD,
 }
 APP_PURPOSES = frozenset({Purpose.READ, Purpose.REREAD, Purpose.POINT, Purpose.PARSE, Purpose.PLACE})
-PACED_PURPOSES = APP_PURPOSES | {Purpose.DEMO}
-PACED_BUDGETS = (APP, DEMO)
+# Only app traffic draws on the public's daily share; demo misses have their own daily cap (DEMO_DAY_CAP_USD).
+PACED_PURPOSES = APP_PURPOSES
+PACED_BUDGETS = (APP,)
 
 # Token prices as integer nano-USD per token ($1.25 / 1M = 1250 n$).
 _NANO_INPUT = round(PRICE_INPUT_PER_M * 1000)
@@ -257,8 +271,12 @@ class SpendMeter:
         shard: str | None = None,
         index_ttl_s: float = 30.0,
         peer_ttl_s: float = 1.0,
+        require_history: bool = False,
     ) -> None:
+        """`require_history` (production): a missing rollup is accepted as a fresh meter only after Firestore
+        confirmed there is no saved one; without Firestore the meter fails closed instead of restarting at $0."""
         self._store = store
+        self._require_history = require_history
         self._clock = clock
         self._settings = settings
         self._rc = remote_config
@@ -308,6 +326,8 @@ class SpendMeter:
                         raise _paused("day_cap", next_ist_midnight(now))
                     if self._tier_paused(purpose, principal, day_used, cap):
                         raise _paused("tier_pause", next_ist_midnight(now))
+                if DEMO in budgets and view.used(f"{DEMO}:{day}") + n > usd_to_nano(DEMO_DAY_CAP_USD):
+                    raise _paused("day_cap", next_ist_midnight(now))
                 rid = uuid.uuid4().hex
                 item = {"n": n, "budgets": list(budgets), "day": day, "at": now.timestamp()}
                 shard = self._write({}, day, add={rid: item}, shard=shard)
@@ -391,6 +411,10 @@ class SpendMeter:
             "margin_usd": BUDGET_MARGIN_USD,
             "day_cap_usd": usd(self._day_cap(view, now)),
             "day_spent_usd": usd(self._paced_day_used(view, day)),
+            "demo_day_cap_usd": DEMO_DAY_CAP_USD,
+            "demo_day_spent_usd": usd(view.used(f"{DEMO}:{day}")),
+            "credit_usd": TOTAL_CREDIT_USD,
+            "credit_used_usd": usd(view.used(f"{AI}:{LIFETIME}") + view.used(f"{COMPUTE}:{LIFETIME}")),
             "ai_day_spent_usd": usd(view.used(f"{AI}:{day}")),
             "compute_day_spent_usd": usd(view.charged.get(f"{COMPUTE}:{day}", 0)),
             "horizon_end": self.horizon_end().isoformat(),
@@ -406,16 +430,24 @@ class SpendMeter:
 
     def budgets_for(self, purpose: Purpose, principal: Principal | None, request_id: str) -> list[str]:
         if purpose in (Purpose.EVAL, Purpose.DOCTOR):
-            return [AI, EVALS, EVAL_RUN + eval_run_id(request_id)]
-        if purpose == Purpose.PROBE:
-            return [AI, PROBES]
-        if purpose == Purpose.DEMO:
-            return [AI, DEMO]
-        return [AI, JUDGING if principal is not None and principal.is_judge else APP]
+            budgets = [AI, EVALS, EVAL_RUN + eval_run_id(request_id)]
+        elif purpose == Purpose.PROBE:
+            budgets = [AI, PROBES]
+        elif not self._settings.is_meter_environment:
+            return [AI, DEV]  # a dev deployment's app and demo traffic: its own $1, never the public's share
+        elif purpose == Purpose.DEMO:
+            budgets = [AI, DEMO]
+        else:
+            budgets = [AI, JUDGING if principal is not None and principal.is_judge else APP]
+        if not self._settings.is_meter_environment:
+            budgets.append(DEV)
+        return budgets
 
-    @staticmethod
-    def _is_paced(purpose: Purpose, principal: Principal | None) -> bool:
-        """App traffic and demo misses are paced; judges, evals and probes draw on their own sub-budgets."""
+    def _is_paced(self, purpose: Purpose, principal: Principal | None) -> bool:
+        """App traffic is paced; judges, evals, probes, demo misses and dev deployments draw on their own
+        (sub-)budgets instead."""
+        if not self._settings.is_meter_environment:
+            return False
         return purpose in PACED_PURPOSES and not (principal is not None and principal.is_judge)
 
     def _tier_paused(self, purpose: Purpose, principal: Principal | None, day_used: int, cap: int) -> bool:
@@ -436,8 +468,8 @@ class SpendMeter:
 
     @staticmethod
     def _paced_day_used(view: _View, day: str) -> int:
-        """Today's spend that the pacing cap governs: app traffic and demo misses. Judges, evals and probes are
-        bounded by their own sub-budgets instead, so they never eat the public's daily share."""
+        """Today's spend that the pacing cap governs: app traffic. Judges, evals, probes, demo misses and dev
+        deployments are bounded by their own (sub-)budgets instead, so they never eat the public's daily share."""
         return sum(view.used(f"{b}:{day}") for b in PACED_BUDGETS)
 
     @staticmethod
@@ -477,7 +509,7 @@ class SpendMeter:
     def _labels(budgets: Iterable[str], day: str) -> set[str]:
         labels = {f"{b}:{LIFETIME}" for b in budgets}
         labels |= {f"{AI}:{LIFETIME}", f"{AI}:{day}", f"{COMPUTE}:{LIFETIME}"}
-        labels |= {f"{b}:{day}" for b in PACED_BUDGETS}
+        labels |= {f"{b}:{day}" for b in (*PACED_BUDGETS, DEMO)}
         return labels
 
     def _index(self) -> _Index:
@@ -507,7 +539,10 @@ class SpendMeter:
 
     def _bootstrap_rollup(self) -> dict[str, Any]:
         """No rollup in the Dict: either a fresh deployment or a lost Dict. Firestore tells them apart; if it
-        can't be asked, fail closed rather than restart the meter from zero."""
+        can't be asked (unreachable, or not configured where history is required), fail closed rather than
+        restart the meter from zero."""
+        if self._firestore is None and self._require_history:
+            raise StoreUnavailable("meter history unverifiable: Firestore not configured")
         if self._firestore is not None:
             try:
                 saved = self._firestore.get(FS_ROLLUP_DOC)

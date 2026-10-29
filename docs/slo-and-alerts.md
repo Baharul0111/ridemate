@@ -70,6 +70,9 @@ Evaluated by the dispatcher cron every 15 minutes over the recent window.
 | 10 | Key age | a service-account key is **older than 80 days** | [key-rotation](runbooks/key-rotation.md) |
 | 11 | Dead-man | no heartbeat for **15 min + 15 min grace** | [modal-down](runbooks/modal-down-or-credit-used-up.md) |
 | 12 | App crashes | Crashlytics new fatal / regressed / velocity alert | [rollback](runbooks/rollback.md) |
+| 13 | Credit nearly used (`credit_nearly_exhausted`) | the meter's AI + compute reach **$92** (the $100 credit minus the $8 margin). AI stops itself at $80; compute does not, so this is the owner's cue to `modal app stop` | [modal-down](runbooks/modal-down-or-credit-used-up.md) |
+| 14 | Per-network limits off (`ip_unbucketed_rate`) | **> 20%** of `/v1/*` requests in the last hour (≥ 20 requests) had no usable `X-Forwarded-For` hop, so the per-IP bucket skipped them (a Modal proxy change; `deploy.sh` also checks this after every deploy) | [cap-tripped](runbooks/cap-tripped-or-abuse.md), [docs/spikes.md](spikes.md#client-ip-header-per-network-limits) |
+| 15 | Judges unprotected (`judging_allowlist_empty`) | `cap_profile` = `judging` while `judge_allowlist` lists nobody | [judging-week](runbooks/judging-week.md) |
 
 ## 5. Test-fire every alert once
 
@@ -86,7 +89,7 @@ Each alert is test-fired once before submission and again before the public laun
   app and wait 30 minutes).
 - **FCM push:** Firebase console → Messaging → send a test message to the owner's FCM token; and the dispatcher's own
   test path for threshold alerts, if available in developer mode.
-- **Thresholds 1–10:** run the backend's alert-evaluation tests (`cd backend && uv run pytest -k alert`) and, once, a
+- **Thresholds 1–10 and 13–15:** run the backend's alert-evaluation tests (`cd backend && uv run pytest -k alert`) and, once, a
   real evaluation in the `dev` Modal environment with a lowered threshold.
 - **Crashlytics:** a test crash from a debug build (Firebase's "test your Crashlytics implementation" guide); confirm
   the email alert is enabled in the Firebase console's alert settings.

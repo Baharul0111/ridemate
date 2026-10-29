@@ -297,7 +297,8 @@ async def test_read_image_reads_at_most_the_limit_from_an_upload() -> None:
 # ---- IP limit --------------------------------------------------------------------------------------------
 
 
-def test_ip_limit_applies_to_v1_routes_only() -> None:
+def test_ip_limit_applies_to_every_route_health_checks_included() -> None:
+    # An unauthenticated /healthz a minute keeps a container warm: compute is spent whether or not AI is.
     _, client, _ = build()
     headers = {"X-Forwarded-For": "1.2.3.4, 49.36.10.10"}
     for _ in range(60):
@@ -305,8 +306,14 @@ def test_ip_limit_applies_to_v1_routes_only() -> None:
     r = client.get("/v1/config-check", headers=headers)
     assert r.status_code == 429 and r.json()["error"]["code"] == "rate_limited"
     assert r.json()["error"]["retry_after_s"] >= 1
-    assert client.get("/healthz", headers=headers).status_code == 200
+    for path in ("/healthz", "/readyz"):
+        limited = client.get(path, headers=headers)
+        assert limited.status_code == 429 and limited.json()["error"]["code"] == "rate_limited"
     assert client.get("/v1/config-check", headers={"X-Forwarded-For": "49.36.10.11"}).status_code == 200
+    other = {"X-Forwarded-For": "49.36.10.12"}
+    for _ in range(60):
+        assert client.get("/healthz", headers=other).status_code == 200
+    assert client.get("/healthz", headers=other).status_code == 429
 
 
 # ---- optional routers ------------------------------------------------------------------------------------

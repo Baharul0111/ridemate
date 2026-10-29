@@ -13,6 +13,9 @@ enum class OndcTxnState {
 
     val terminal: Boolean get() = this == ENDED || this == CANCEL_CONFIRMED || this == FAILED
 
+    /** No order exists at the seller yet (searching, selected, initialised). */
+    val beforeOrder: Boolean get() = this == SEARCHING_NET || this == ON_SELECT || this == INIT
+
     /** The select → init → confirm progression, for waiting on a step's callback. */
     val progress: Int
         get() = when (this) {
