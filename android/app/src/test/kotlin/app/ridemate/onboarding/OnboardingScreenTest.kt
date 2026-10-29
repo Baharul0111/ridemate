@@ -78,7 +78,12 @@ class OnboardingScreenTest {
         }
     }
 
-    private fun tap(text: String) = rule.onNodeWithText(text).performScrollTo().performClick()
+    /** Body content scrolls; the step's buttons are pinned below the scroll area, so scroll only when there is one. */
+    private fun tap(text: String) {
+        val node = rule.onNodeWithText(text)
+        runCatching { node.performScrollTo() }
+        node.performClick()
+    }
 
     /** Sheets live in their own window; semantic clicks don't depend on where Robolectric places it. */
     private fun press(description: String) =
