@@ -231,6 +231,11 @@ session left over after an app restart ends cleanly. Regression tests added; on-
   launcher, the share target and the notification listener (system-bound), plus library components guarded by
   system-only permissions; `allowBackup=false`, not debuggable, cleartext blocked; **no secrets** in the 692 packaged
   files and no hard-coded server URL (it comes from Remote Config).
+* Firestore rules CI: `firebase-tools` pinned in `firebase/tests` and the workflow simply runs `npm test` (the
+  script starts the emulator itself); 21/21 rules tests pass.
+* **Result: all 8 GitHub workflows green on `main`** (23:05 IST) — Android (unit, replay, migration, accuracy, lint,
+  debug APK, dependency graph), Backend, CodeQL, Config and eval, Firestore rules, Licence report, Repo hygiene,
+  Base image freshness.
 * **Open Dependabot PRs** (6 version-bump groups) are left for the owner to review — each would need its own tested
   release, and none is a security fix.
 
