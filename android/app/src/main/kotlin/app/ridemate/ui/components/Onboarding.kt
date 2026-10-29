@@ -39,7 +39,8 @@ import app.ridemate.R
 import app.ridemate.ui.RideMateTheme
 
 /**
- * Onboarding progress: one dot per step, the current one a wider brand pill. TalkBack reads "Step 2 of 6".
+ * Onboarding progress: one dot per step, the current one a wider brand pill (shape, not only colour), done steps
+ * brand, upcoming steps grey. TalkBack reads "Step 2 of 6".
  *
  * @param current the 0-based index of the current step.
  */
@@ -63,7 +64,9 @@ fun StepDots(count: Int, current: Int, modifier: Modifier = Modifier) {
             val active = index == step
             val width by animateDpAsState(if (active) 24.dp else 8.dp, motion.tween(), label = "dot-width")
             val color by animateColorAsState(
-                if (index <= step) colors.brand else colors.line,
+                // Upcoming dots use `outline` (≥ 3:1 on canvas and sheet), not the faint `line`, so the number of
+                // steps left is visible (WCAG 1.4.11).
+                if (index <= step) colors.brand else colors.outline,
                 motion.tween(),
                 label = "dot-color",
             )

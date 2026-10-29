@@ -130,7 +130,7 @@ fun QuietButton(
             onClick = onClick,
             enabled = enabled,
             shape = RmShapes.pill,
-            border = BorderStroke(1.dp, if (enabled) MaterialTheme.colorScheme.outline else colors.line),
+            border = BorderStroke(1.dp, if (enabled) colors.outline else colors.line),
             colors = ButtonDefaults.outlinedButtonColors(contentColor = colors.ink),
             contentPadding = padding,
             modifier = sized,

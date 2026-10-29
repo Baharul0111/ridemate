@@ -49,6 +49,11 @@ import androidx.compose.ui.unit.sp
  * `muted`, `canvas`, `sheet`, `line`, `good`, `warn`, `danger`) plus soft "container" pairs for pills, banners
  * and cards. Every container/on-container pair meets WCAG AA (4.5:1) for text; state is never shown by colour
  * alone (goal 27), the colour only reinforces an icon and a word.
+ *
+ * Two derived roles keep the spec's elevation rule ("flat cards with a 1 dp `line` border in light mode, tonal
+ * surfaces in dark"): [card] is the fill of cards, rows and tiles — `sheet` in light (with the border), one tonal
+ * step above `sheet` in dark so cards stay visible on a sheet — and [outline] draws non-text boundaries that must be
+ * seen (outlined buttons, an off switch, upcoming step dots) at ≥ 3:1 on canvas, sheet and card.
  */
 @Immutable
 data class RideMateColors(
@@ -64,7 +69,9 @@ data class RideMateColors(
     val muted: Color,
     val canvas: Color,
     val sheet: Color,
+    val card: Color,
     val line: Color,
+    val outline: Color,
     val good: Color,
     val onGood: Color,
     val goodContainer: Color,
@@ -98,7 +105,9 @@ val LightRideMateColors = RideMateColors(
     muted = Color(0xFF5C6661),
     canvas = Color(0xFFF5F7F6),
     sheet = Color(0xFFFFFFFF),
+    card = Color(0xFFFFFFFF),
     line = Color(0xFFE3E8E5),
+    outline = Color(0xFF76817C),
     good = Color(0xFF1E8E4E),
     onGood = Color(0xFFFFFFFF),
     goodContainer = Color(0xFFDDF3E5),
@@ -132,7 +141,9 @@ val DarkRideMateColors = RideMateColors(
     muted = Color(0xFFA9B4AF),
     canvas = Color(0xFF0E1110),
     sheet = Color(0xFF181C1A),
+    card = Color(0xFF242A27),
     line = Color(0xFF2A302D),
+    outline = Color(0xFF7D8883),
     good = Color(0xFF5FD08F),
     onGood = Color(0xFF00391B),
     goodContainer = Color(0xFF173A26),
@@ -145,7 +156,8 @@ val DarkRideMateColors = RideMateColors(
     onDanger = Color(0xFF5F0F0F),
     dangerContainer = Color(0xFF5C1A16),
     onDangerContainer = Color(0xFFFFDAD6),
-    neutralContainer = Color(0xFF262B29),
+    // One step above `card`, so neutral pills, icon wells, tags and tonal buttons stay visible on a card.
+    neutralContainer = Color(0xFF323936),
     onNeutralContainer = Color(0xFFDDE4E0),
     demoContainer = Color(0xFF3A2A60),
     onDemoContainer = Color(0xFFE8DDFF),
@@ -179,7 +191,7 @@ private fun RideMateColors.toLightScheme(): ColorScheme = lightColorScheme(
     onError = onDanger,
     errorContainer = dangerContainer,
     onErrorContainer = onDangerContainer,
-    outline = Color(0xFF8A9590),
+    outline = outline,
     outlineVariant = line,
     scrim = Color.Black,
     surfaceBright = sheet,
@@ -218,7 +230,7 @@ private fun RideMateColors.toDarkScheme(): ColorScheme = darkColorScheme(
     onError = onDanger,
     errorContainer = dangerContainer,
     onErrorContainer = onDangerContainer,
-    outline = Color(0xFF7D8883),
+    outline = outline,
     outlineVariant = line,
     scrim = Color.Black,
     surfaceBright = Color(0xFF2E3431),
@@ -226,7 +238,7 @@ private fun RideMateColors.toDarkScheme(): ColorScheme = darkColorScheme(
     surfaceContainerLowest = Color(0xFF0B0D0C),
     surfaceContainerLow = Color(0xFF141816),
     surfaceContainer = sheet,
-    surfaceContainerHigh = Color(0xFF202523),
+    surfaceContainerHigh = card,
     surfaceContainerHighest = Color(0xFF2A302D),
 )
 

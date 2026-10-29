@@ -24,10 +24,12 @@ import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material.icons.rounded.WarningAmber
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -186,9 +188,9 @@ fun RmPill(
 // ------------------------------------------------------------------------------------------------------- card
 
 /**
- * A flat card: 20 dp corners, 16 dp padding. [RmTone.NEUTRAL] is the `sheet` colour with a 1 dp `line` border
- * (light) or a tonal surface (dark); other tones use their soft container. Clickable when [onClick] is set
- * (then ≥ 48 dp tall and announced as a button).
+ * A flat card: 20 dp corners, 16 dp padding. [RmTone.NEUTRAL] is the `card` colour: white with a 1 dp `line`
+ * border in light, a tonal surface one step above the sheet in dark (so it stays visible on a sheet); other tones
+ * use their soft container. Clickable when [onClick] is set (then ≥ 48 dp tall and announced as a button).
  */
 @Composable
 fun RmCard(
@@ -200,7 +202,7 @@ fun RmCard(
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val colors = RideMateTheme.colors
-    val (container, contentColor) = if (tone == RmTone.NEUTRAL) colors.sheet to colors.ink else tone.colors().let { it.container to it.content }
+    val (container, contentColor) = if (tone == RmTone.NEUTRAL) colors.card to colors.ink else tone.colors().let { it.container to it.content }
     val border = if (tone == RmTone.NEUTRAL && !colors.isDark) BorderStroke(1.dp, colors.line) else null
     Surface(
         color = container,
@@ -225,21 +227,34 @@ fun RmCard(
     }
 }
 
-/** A section title above a group of rows or cards, announced as a heading. Short: 1–3 words. */
+/**
+ * A section title above a group of rows or cards, announced as a heading. Short: 1–3 words. [leading] puts a
+ * decorative glyph before the words, e.g. the Compare sections' `VehicleIcon` + "Auto" (pass the icon with
+ * `contentDescription = null`; the heading already says the word).
+ */
 @Composable
-fun RmSectionTitle(text: String, modifier: Modifier = Modifier) {
-    Text(
-        text,
-        style = MaterialTheme.typography.titleSmall,
-        color = RideMateTheme.colors.muted,
-        maxLines = 2,
-        overflow = TextOverflow.Ellipsis,
+fun RmSectionTitle(text: String, modifier: Modifier = Modifier, leading: (@Composable () -> Unit)? = null) {
+    val colors = RideMateTheme.colors
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
         modifier = modifier
             .fillMaxWidth()
             .padding(start = RmSpacing.xs, top = RmSpacing.l, bottom = RmSpacing.xs)
             .testTag(RmTags.SECTION_TITLE)
-            .semantics { heading() },
-    )
+            .semantics(mergeDescendants = true) { heading() },
+    ) {
+        if (leading != null) {
+            CompositionLocalProvider(LocalContentColor provides colors.ink) { leading() }
+            Spacer(Modifier.width(RmSpacing.s))
+        }
+        Text(
+            text,
+            style = if (leading != null) MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleSmall,
+            color = if (leading != null) colors.ink else colors.muted,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
 }
 
 /** A round tonal "icon well" (leading icon of rows, banners and cards). Decorative. */
@@ -262,7 +277,7 @@ fun IconWell(icon: ImageVector, modifier: Modifier = Modifier, tone: RmTone = Rm
 fun RmListGroup(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
     val colors = RideMateTheme.colors
     Surface(
-        color = colors.sheet,
+        color = colors.card,
         contentColor = colors.ink,
         shape = RmShapes.card,
         border = if (!colors.isDark) BorderStroke(1.dp, colors.line) else null,

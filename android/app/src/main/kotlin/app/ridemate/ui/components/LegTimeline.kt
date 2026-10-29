@@ -91,7 +91,7 @@ private fun LegRow(
         leg.proven -> stringResource(R.string.rm_leg_proven)
         else -> null
     }
-    val spoken = listOfNotNull(leg.providerName, leg.detail, stateWord, evidence).joinToString(", ")
+    val spoken = listOfNotNull(leg.provider.spokenName(leg.providerName), leg.detail, stateWord, evidence).joinToString(", ")
     Row(Modifier.fillMaxWidth()) {
         Column(
             Modifier

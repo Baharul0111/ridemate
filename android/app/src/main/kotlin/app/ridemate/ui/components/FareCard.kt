@@ -33,9 +33,10 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -92,12 +93,15 @@ data class FareQuote(
  * the largest text on the right, and its state as icon + word:
  *
  * * verified + cheapest: marigold "★ Cheapest" badge;
- * * stale: greyed, "🕑 1 min ago · Seen 10:30 AM" and a refresh icon button;
+ * * stale: grey card, muted price, "🕑 1 min ago · Seen 10:30 AM" and a refresh icon button (never colour or
+ *   transparency alone: every word on a stale card keeps AA contrast);
  * * unreadable: dashed border, "⚠ Check in app" and **no number**, optional "✎ Type price";
  * * typed by the user: "✎ You typed" tag; ONDC: "🌐 Network" tag;
  * * always the time it was seen.
  *
- * The card is one TalkBack node with a full sentence; [onClick] (open the app) makes it a button.
+ * When the phone's text is large (font scale ≥ [STACK_FONT_SCALE]) the price moves under the name, so neither the
+ * price nor the words are clipped at 200 %. The card is one TalkBack node with a full sentence (demo providers
+ * say "demo"); [onClick] (open the app) makes it a button.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -112,7 +116,9 @@ fun FareCard(
     val unreadable = quote.status == QuoteStatus.UNREADABLE
     val spoken = fareDescription(quote)
     val openLabel = stringResource(R.string.rm_open_app, quote.providerName)
-    val container = if (quote.stale) colors.neutralContainer else colors.sheet
+    val container = if (quote.stale) colors.neutralContainer else colors.card
+    val tagContainer = if (quote.stale) colors.card else colors.neutralContainer
+    val stacked = LocalDensity.current.fontScale >= STACK_FONT_SCALE
     val shape = RmShapes.card
     CompositionLocalProvider(LocalContentColor provides colors.ink) {
         Column(
@@ -128,61 +134,43 @@ fun FareCard(
                 .padding(RmSpacing.card),
             verticalArrangement = Arrangement.spacedBy(RmSpacing.s),
         ) {
-            Row(verticalAlignment = Alignment.Top, modifier = Modifier.alpha(if (quote.stale) 0.6f else 1f)) {
+            Row(verticalAlignment = Alignment.Top) {
                 ProviderAvatar(quote.provider, name = quote.providerName, contentDescription = null)
                 Spacer(Modifier.width(RmSpacing.m))
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(RmSpacing.xs)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         VehicleIcon(quote.vehicleClass, size = 20.dp, contentDescription = null)
                         Spacer(Modifier.width(6.dp))
-                        Text(quote.label, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(quote.label, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
                     }
                     FlowRow(
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                         verticalArrangement = Arrangement.spacedBy(4.dp),
                         itemVerticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Text(quote.providerName, style = MaterialTheme.typography.labelMedium, color = colors.muted, maxLines = 1)
-                        etaLabel(quote)?.let { MiniTag(it, Icons.Rounded.Schedule, RmTags.FARE_ETA) }
+                        Text(
+                            quote.providerName,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = colors.muted,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        etaLabel(quote)?.let { MiniTag(it, Icons.Rounded.Schedule, RmTags.FARE_ETA, tagContainer) }
                         when (quote.status) {
-                            QuoteStatus.USER_ENTERED -> MiniTag(stringResource(R.string.rm_entered_by_you), Icons.Rounded.Edit, RmTags.FARE_ENTERED)
-                            QuoteStatus.NETWORK -> MiniTag(stringResource(R.string.rm_network_quote), Icons.Rounded.Public, RmTags.FARE_NETWORK)
+                            QuoteStatus.USER_ENTERED ->
+                                MiniTag(stringResource(R.string.rm_entered_by_you), Icons.Rounded.Edit, RmTags.FARE_ENTERED, tagContainer)
+                            QuoteStatus.NETWORK ->
+                                MiniTag(stringResource(R.string.rm_network_quote), Icons.Rounded.Public, RmTags.FARE_NETWORK, tagContainer)
                             else -> Unit
                         }
                     }
                 }
-                Spacer(Modifier.width(RmSpacing.m))
-                Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    if (quote.showsPrice) {
-                        Text(
-                            quote.priceText!!,
-                            style = RideMateTheme.type.price,
-                            maxLines = 1,
-                            modifier = Modifier.testTag(RmTags.FARE_PRICE),
-                        )
-                    } else if (unreadable) {
-                        // Icon + words on a soft warn pill (AA contrast); no number, ever (I2).
-                        Surface(
-                            color = colors.warnContainer,
-                            contentColor = colors.onWarnContainer,
-                            shape = RmShapes.pill,
-                            modifier = Modifier.widthIn(max = 150.dp).testTag(RmTags.FARE_UNREADABLE),
-                        ) {
-                            Row(Modifier.padding(start = 8.dp, end = 10.dp, top = 4.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Rounded.WarningAmber, contentDescription = null, modifier = Modifier.size(16.dp))
-                                Spacer(Modifier.width(4.dp))
-                                Text(
-                                    stringResource(R.string.rm_check_in_app),
-                                    style = MaterialTheme.typography.labelLarge,
-                                    textAlign = TextAlign.End,
-                                    maxLines = 2,
-                                )
-                            }
-                        }
-                    }
-                    if (quote.showsCheapest) CheapestBadge()
+                if (!stacked) {
+                    Spacer(Modifier.width(RmSpacing.m))
+                    PriceBlock(quote, stacked = false)
                 }
             }
+            if (stacked) PriceBlock(quote, stacked = true, modifier = Modifier.fillMaxWidth())
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.heightIn(min = 24.dp)) {
                 if (quote.stale) {
                     Icon(Icons.Rounded.AccessTime, contentDescription = null, tint = colors.muted, modifier = Modifier.size(16.dp))
@@ -193,6 +181,7 @@ fun FareCard(
                         style = MaterialTheme.typography.labelMedium,
                         color = colors.muted,
                         maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f).testTag(RmTags.FARE_STALE),
                     )
                 } else {
@@ -200,30 +189,85 @@ fun FareCard(
                         stringResource(R.string.rm_seen_at, quote.seenAtText),
                         style = MaterialTheme.typography.labelMedium,
                         color = colors.muted,
-                        maxLines = 1,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f).testTag(RmTags.FARE_SEEN_AT),
                     )
                 }
-                if (unreadable && onTypePrice != null) {
-                    QuietButton(
-                        text = stringResource(R.string.rm_type_price),
-                        onClick = onTypePrice,
-                        icon = Icons.Rounded.Edit,
-                        style = QuietStyle.Text,
-                        modifier = Modifier.testTag(RmTags.FARE_TYPE_PRICE),
-                    )
-                }
+                if (unreadable && onTypePrice != null && !stacked) TypePriceButton(onTypePrice)
                 if (quote.stale && onRefresh != null) {
                     RmIconButton(
                         icon = Icons.Rounded.Refresh,
                         contentDescription = stringResource(R.string.rm_refresh_price, quote.providerName),
                         onClick = onRefresh,
-                        containerColor = colors.sheet,
+                        containerColor = colors.card,
                         modifier = Modifier.testTag(RmTags.FARE_REFRESH),
                     )
                 }
             }
+            // With large text the "Type price" action gets its own line instead of squeezing the seen-at time.
+            if (unreadable && onTypePrice != null && stacked) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) { TypePriceButton(onTypePrice) }
+            }
         }
+    }
+}
+
+@Composable
+private fun TypePriceButton(onClick: () -> Unit) {
+    QuietButton(
+        text = stringResource(R.string.rm_type_price),
+        onClick = onClick,
+        icon = Icons.Rounded.Edit,
+        style = QuietStyle.Text,
+        modifier = Modifier.testTag(RmTags.FARE_TYPE_PRICE),
+    )
+}
+
+/** Font scale from which a [FareCard] puts its price under the name instead of beside it. */
+const val STACK_FONT_SCALE = 1.3f
+
+/**
+ * The price column: the fare (muted on a stale card, never transparent), or "⚠ Check in app" with no number, and
+ * the Cheapest badge. Right-aligned; full width under the name when [stacked].
+ */
+@Composable
+private fun PriceBlock(quote: FareQuote, stacked: Boolean, modifier: Modifier = Modifier) {
+    val colors = RideMateTheme.colors
+    Column(modifier, horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        if (quote.showsPrice) {
+            Text(
+                quote.priceText!!,
+                style = RideMateTheme.type.price,
+                color = if (quote.stale) colors.muted else colors.ink,
+                maxLines = 1,
+                softWrap = false,
+                modifier = Modifier.testTag(RmTags.FARE_PRICE),
+            )
+        } else if (quote.status == QuoteStatus.UNREADABLE) {
+            // Icon + words on a soft warn pill (AA contrast); no number, ever (I2).
+            Surface(
+                color = colors.warnContainer,
+                contentColor = colors.onWarnContainer,
+                shape = RmShapes.pill,
+                modifier = Modifier
+                    .then(if (stacked) Modifier else Modifier.widthIn(max = 150.dp))
+                    .testTag(RmTags.FARE_UNREADABLE),
+            ) {
+                Row(Modifier.padding(start = 8.dp, end = 10.dp, top = 4.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Rounded.WarningAmber, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text(
+                        stringResource(R.string.rm_check_in_app),
+                        style = MaterialTheme.typography.labelLarge,
+                        textAlign = TextAlign.End,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+        }
+        if (quote.showsCheapest) CheapestBadge()
     }
 }
 
@@ -237,7 +281,7 @@ private fun etaLabel(quote: FareQuote): String? = when {
 /** The full sentence TalkBack reads for a fare card. Never contains a number for an unreadable quote (I2). */
 @Composable
 private fun fareDescription(quote: FareQuote): String {
-    val parts = mutableListOf(quote.providerName, quote.label)
+    val parts = mutableListOf(quote.provider.spokenName(quote.providerName), quote.label)
     parts += if (quote.showsPrice) quote.priceText!! else stringResource(R.string.rm_unreadable_cd)
     if (quote.showsCheapest) parts += stringResource(R.string.rm_cheapest)
     when (quote.status) {
@@ -254,12 +298,12 @@ private fun fareDescription(quote: FareQuote): String {
     return parts.joinToString(", ")
 }
 
-/** A tiny icon + word tag inside a card (ETA, "You typed", "Network"). */
+/** A tiny icon + word tag inside a card (ETA, "You typed", "Network"), on [container] (AA with its text). */
 @Composable
-private fun MiniTag(text: String, icon: ImageVector, tag: String) {
+private fun MiniTag(text: String, icon: ImageVector, tag: String, container: Color) {
     val colors = RideMateTheme.colors
     Surface(
-        color = colors.neutralContainer,
+        color = container,
         contentColor = colors.onNeutralContainer,
         shape = RmShapes.pill,
         modifier = Modifier.testTag(tag),
@@ -267,7 +311,7 @@ private fun MiniTag(text: String, icon: ImageVector, tag: String) {
         Row(Modifier.padding(horizontal = 8.dp, vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(icon, contentDescription = null, modifier = Modifier.size(12.dp))
             Spacer(Modifier.width(4.dp))
-            Text(text, style = MaterialTheme.typography.labelMedium, maxLines = 1)
+            Text(text, style = MaterialTheme.typography.labelMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
 }
