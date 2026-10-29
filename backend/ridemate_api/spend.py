@@ -414,7 +414,6 @@ class SpendMeter:
             "day_spent_usd": usd(self._paced_day_used(view, day)),
             "demo_day_cap_usd": DEMO_DAY_CAP_USD,
             "demo_day_spent_usd": usd(view.used(f"{DEMO}:{day}")),
-            "credit_usd": TOTAL_CREDIT_USD,
             "credit_used_usd": usd(view.used(f"{AI}:{LIFETIME}") + view.used(f"{COMPUTE}:{LIFETIME}")),
             "ai_day_spent_usd": usd(view.used(f"{AI}:{day}")),
             "compute_day_spent_usd": usd(view.charged.get(f"{COMPUTE}:{day}", 0)),

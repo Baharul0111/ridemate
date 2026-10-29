@@ -75,6 +75,14 @@ def _parse_hop(raw: str) -> ipaddress.IPv4Address | ipaddress.IPv6Address | None
     return ip
 
 
+def hop_kind(hop: str) -> str:
+    """'public', 'private' (private/loopback/reserved) or 'invalid' — for diagnostics that must not reveal addresses."""
+    ip = _parse_hop(hop)
+    if ip is None:
+        return "invalid"
+    return "public" if ip.is_global else "private"
+
+
 def client_bucket(headers: Any, header: str = "x-forwarded-for") -> str | None:
     """The rate-limit bucket for a request: the right-most forwarded hop (an IPv4 address or an IPv6 /64),
     or None when there is no trustworthy client address."""
@@ -90,6 +98,28 @@ def client_bucket(headers: Any, header: str = "x-forwarded-for") -> str | None:
     if isinstance(ip, ipaddress.IPv6Address):
         return str(ipaddress.ip_network(f"{ip}/64", strict=False))
     return str(ip)
+
+
+def _bucket_of(ip: ipaddress.IPv4Address | ipaddress.IPv6Address | None) -> str | None:
+    if ip is None or not ip.is_global:
+        return None
+    if isinstance(ip, ipaddress.IPv6Address):
+        return str(ipaddress.ip_network(f"{ip}/64", strict=False))
+    return str(ip)
+
+
+def request_bucket(request: Request, header: str = "x-forwarded-for") -> str | None:
+    """The bucket for a request. A forwarded hop wins when present; otherwise the connection peer. Modal's web proxy
+    (measured 29 Oct 2026, docs/spikes.md) strips any X-Forwarded-For the client sends and hands the app the caller's
+    own public address as the ASGI peer, so the peer is trustworthy there; a private/loopback peer is a proxy and is
+    never bucketed."""
+    bucket = client_bucket(request.headers, header)
+    if bucket is not None:
+        return bucket
+    if request.headers.get(header):
+        return None  # a forwarded chain we don't trust: don't fall back to the proxy's address
+    peer = request.client.host if request.client else None
+    return _bucket_of(_parse_hop(peer)) if peer else None
 
 
 class IpLimiter:
@@ -117,7 +147,7 @@ class IpLimiter:
             return
         state.ip_checked = True
         scope = "v1" if request.url.path.startswith("/v1/") else "other"
-        bucket = client_bucket(request.headers, self._header)
+        bucket = request_bucket(request, self._header)
         if bucket is None:
             self._count("unbucketed", scope)
             return

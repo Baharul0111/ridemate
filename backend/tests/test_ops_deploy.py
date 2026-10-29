@@ -369,7 +369,7 @@ def test_core_is_created_once_with_generated_keys_then_only_refreshed(ms, tmp_pa
     )
     create = next(c for c in cli.calls if c[:2] == ["secret", "create"])
     assert "RIDEMATE_HMAC_KEY=gen-hmac" in create and "FIREBASE_WEB_API_KEY=AIzaSECRETVALUEapikey" in create
-    assert "OWNER_EMAILS=ibaharul567@gmail.com" in create and "ONDC_MODE=mock" in create
+    assert "OWNER_EMAILS=ibaharul567@gmail.com" in create and "ONDC_MODE=off" in create
     assert "CREDIT_EXPIRY_DATE=2027-01-31" in create
 
     cli = FakeModalCli({"main": {"ridemate-core"}})

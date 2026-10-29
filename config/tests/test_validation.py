@@ -14,7 +14,7 @@ def test_all_defaults_are_valid() -> None:
 
 def test_contract_scalar_defaults() -> None:
     assert default_value("ai_reader_enabled") is True
-    assert default_value("ondc_enabled") is True
+    assert default_value("ondc_enabled") is False  # public launch: the hackathon demo seller is off
     assert default_value("demo_enabled") is True
     assert default_value("point_supported") is True  # day-1 spike (docs/spikes.md): grounding hit 3/3 cancel screens
     assert default_value("min_supported_version") == 1

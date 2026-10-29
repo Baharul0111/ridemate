@@ -43,7 +43,7 @@
     </entry>
     <entry>
         <key>ondc_enabled</key>
-        <value>true</value>
+        <value>false</value>
     </entry>
     <entry>
         <key>demo_enabled</key>

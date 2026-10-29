@@ -37,7 +37,7 @@ CORE_SECRET = "ridemate-core"  # nosec B105 - a secret name
 CORE_CONFIG_DEFAULTS: Mapping[str, str | None] = {
     "FIREBASE_PROJECT_ID": None,  # required
     "OWNER_EMAILS": OWNER_EMAILS_DEFAULT,
-    "ONDC_MODE": "mock",  # hackathon: the in-process demo seller
+    "ONDC_MODE": "off",  # public launch (29 Oct 2026): no demo seller in production; "mock" only for judging
     "BUDGET_HORIZON_START": "2026-10-28",
     "CREDIT_EXPIRY_DATE": "unknown",
 }

@@ -29,7 +29,7 @@ from ..auth import any_principal, google_principal, optional_principal
 from ..clock import ist_day, ist_hhmm, next_ist_midnight
 from ..deps import Deps, get_deps
 from ..interfaces import ApiError, Firestore, FirestoreUnavailable, Principal
-from ..limits import allow_daily, client_bucket
+from ..limits import allow_daily, hop_kind, request_bucket
 from ..store import StoreUnavailable
 
 log = logging.getLogger(__name__)
@@ -350,12 +350,25 @@ async def readyz(request: Request, deps: DepsDep) -> JSONResponse:
     routes = getattr(request.app.state, "optional_routes", {})
     checks.update({f"routes_{name}": bool(mounted) for name, mounted in routes.items()})
     ok = all(v for v in checks.values() if isinstance(v, bool))
-    # Not a readiness check: whether THIS request carried a usable client hop in X-Forwarded-For, i.e. whether
-    # per-network limits apply behind Modal's proxy. deploy.sh checks it after every deploy (a bool, never the IP).
-    bucketed = client_bucket(request.headers) is not None
+    # Not a readiness check: whether THIS request yields a usable client address (X-Forwarded-For hop or the
+    # connection peer), i.e. whether per-network limits apply behind Modal's proxy. deploy.sh checks it after every deploy (a bool, never the IP).
+    bucketed = request_bucket(request) is not None
     return JSONResponse(
-        {"ok": ok, "checks": checks, "client_bucketed": bucketed}, status_code=200 if ok else 503
+        {"ok": ok, "checks": checks, "client_bucketed": bucketed, "forwarding": forwarding_shape(request)},
+        status_code=200 if ok else 503,
     )
+
+
+def forwarding_shape(request: Request) -> dict[str, Any]:
+    """How the proxy in front of us forwards the client address — header NAMES and hop KINDS only, never an address,
+    so the per-network limiter can be pointed at the right hop after a platform change."""
+    names = sorted(
+        k for k in request.headers
+        if any(t in k for t in ("forward", "real-ip", "client-ip", "connecting-ip", "modal", "via"))
+    )
+    hops = [h for h in request.headers.get("x-forwarded-for", "").split(",") if h.strip()]
+    peer = request.client.host if request.client else None
+    return {"headers": names, "xff_hops": [hop_kind(h) for h in hops], "peer": hop_kind(peer) if peer else None}
 
 
 def _readiness(deps: Deps) -> dict[str, bool]:

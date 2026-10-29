@@ -23,8 +23,8 @@ android {
         applicationId = "in.ridemate.app"
         minSdk = 29
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0.0-hackathon"
+        versionCode = 2
+        versionName = "1.1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         // The on-phone suite runs in a fixed order (fresh-install onboarding first); see app.ridemate.e2e.DeviceTestSuite.
         // One class can still be run with -Pandroid.testInstrumentationRunnerArguments.class=<class>.

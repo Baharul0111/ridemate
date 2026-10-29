@@ -425,7 +425,8 @@ def test_healthz_and_readyz() -> None:
             "routes_ai": True,
             "routes_ondc": True,
         },
-        "client_bucketed": False,  # the test client sends no X-Forwarded-For
+        "client_bucketed": False,  # the test client sends no X-Forwarded-For and its peer ("testclient") is no address
+        "forwarding": {"headers": [], "xff_hops": [], "peer": "invalid"},
     }
     fs_of(deps).fail = True
     r = client.get("/readyz")
@@ -447,6 +448,7 @@ def test_readyz_without_firestore_and_without_settings() -> None:
         "ok": True,
         "checks": {"settings": True, "store": True, "routes_ai": True, "routes_ondc": True},
         "client_bucketed": False,
+        "forwarding": {"headers": [], "xff_hops": [], "peer": "invalid"},
     }
     _, client, _ = setup(settings=make_settings(firebase_project_id=""))
     r = client.get("/readyz")
@@ -475,3 +477,25 @@ def test_readyz_reports_an_endpoint_module_that_failed_to_load(monkeypatch: pyte
     r = client.get("/readyz")
     assert r.status_code == 503
     assert r.json()["checks"]["routes_ondc"] is False and r.json()["checks"]["routes_ai"] is True
+
+
+
+def test_request_bucket_uses_the_connection_peer_when_the_proxy_strips_forwarded_headers() -> None:
+    """Modal's proxy strips client X-Forwarded-For and passes the caller's public address as the ASGI peer
+    (measured 29 Oct 2026): that peer becomes the bucket; private peers and untrusted chains never do."""
+    from starlette.requests import Request
+
+    from ridemate_api.limits import request_bucket
+
+    def req(peer: str | None, xff: str | None = None) -> Request:
+        headers = [(b"x-forwarded-for", xff.encode())] if xff else []
+        return Request({"type": "http", "headers": headers, "client": (peer, 443) if peer else None})
+
+    assert request_bucket(req("8.8.4.4")) == "8.8.4.4"
+    assert request_bucket(req("203.0.113.9")) is None  # documentation range is not global
+    assert request_bucket(req("2001:db8:abcd:12::7")) is None  # documentation range is not global
+    assert request_bucket(req("2606:4700:4700::1111")) == "2606:4700:4700::/64"
+    assert request_bucket(req("10.0.0.5")) is None  # a private peer is a proxy, not the client
+    assert request_bucket(req(None)) is None
+    assert request_bucket(req("10.0.0.5", "198.51.100.7, 8.8.8.8")) == "8.8.8.8"  # right-most global hop wins
+    assert request_bucket(req("8.8.4.4", "8.8.8.8, 10.1.1.1")) is None  # untrusted chain: no fallback
