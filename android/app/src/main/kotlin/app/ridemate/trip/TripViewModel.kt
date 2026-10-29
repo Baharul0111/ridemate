@@ -10,6 +10,8 @@ import app.ridemate.R
 import app.ridemate.core.model.LatLng
 import app.ridemate.core.model.Provider
 import app.ridemate.launch.InstalledApps
+import app.ridemate.map.MapConfig
+import app.ridemate.map.PinTarget
 import app.ridemate.net.ApiResult
 import app.ridemate.precheck.FixAction
 import app.ridemate.precheck.PreSessionCheck
@@ -47,6 +49,8 @@ class TripDeps(
     /** The pickup label while the address of the current position is unknown ("Current location"). */
     val currentLocationLabel: String,
     val defaultVoiceLanguage: VoiceLanguage,
+    /** Remote Config `map_enabled` + `map_style_url`; off by default so a fake-built screen shows no map. */
+    val mapConfig: StateFlow<MapConfig> = MutableStateFlow(MapConfig.DISABLED),
     val io: CoroutineDispatcher = Dispatchers.IO,
     val debounceMs: Long = PlaceSearchController.DEBOUNCE_MS,
     val voiceTimeoutMs: Long = VOICE_TIMEOUT_MS,
@@ -69,6 +73,7 @@ class TripDeps(
                 precheck = graph.preSessionCheck,
                 currentLocationLabel = context.getString(R.string.trip_current_location),
                 defaultVoiceLanguage = VoiceLanguage.defaultFor(Locale.getDefault()),
+                mapConfig = graph.configRepository.mapConfig,
             )
         }
     }
@@ -91,7 +96,13 @@ sealed interface PickupState {
 
 enum class TypingReason { LOCATION_DENIED, LOCATION_UNAVAILABLE, USER_CHANGED }
 
-enum class DropSource { SEARCH, RECENT, VOICE, TYPED }
+enum class DropSource { SEARCH, RECENT, VOICE, TYPED, MAP }
+
+/**
+ * The pin picker is open for [target], starting at [start] (the place's own pin, else the pickup's). [nonce] is new
+ * for every opening, so each opening gets a fresh picker.
+ */
+data class PinRequest(val target: PinTarget, val start: LatLng?, val startLabel: String?, val nonce: Int)
 
 /** An address waiting for the user's confirmation. Nothing happens until it is confirmed. */
 data class PendingDrop(val place: TripPlace, val source: DropSource)
@@ -149,7 +160,15 @@ data class TripUiState(
     val checking: Boolean = false,
     val report: PrecheckReport? = null,
     val notice: TripNotice? = null,
+    /** The in-app map's settings (Remote Config). */
+    val map: MapConfig = MapConfig.DISABLED,
+    /** The map failed to load this session: entry points stay hidden and "Map unavailable" shows instead. */
+    val mapFailed: Boolean = false,
+    val pinRequest: PinRequest? = null,
 ) {
+    /** "Set on map" is offered: the map is switched on and has not failed. */
+    val mapAvailable: Boolean get() = map.enabled && !mapFailed
+
     val pickupPlace: TripPlace?
         get() = when (val p = pickup) {
             is PickupState.Current -> p.place
@@ -201,6 +220,9 @@ class TripViewModel(private val deps: TripDeps) : ViewModel() {
     init {
         dropSearch.state.onEach { s -> _state.update { it.copy(dropSearch = s) } }.launchIn(viewModelScope)
         pickupSearch.state.onEach { s -> _state.update { it.copy(pickupSearch = s) } }.launchIn(viewModelScope)
+        deps.mapConfig.onEach { config ->
+            _state.update { it.copy(map = config, pinRequest = if (config.enabled) it.pinRequest else null) }
+        }.launchIn(viewModelScope)
         deps.ondcEnabled.onEach { on ->
             _state.update { it.copy(ondcAvailable = on, includeOndc = it.includeOndc && on) }
         }.launchIn(viewModelScope)
@@ -345,6 +367,66 @@ class TripViewModel(private val deps: TripDeps) : ViewModel() {
     fun changeDrop() {
         stopVoice()
         _state.update { it.copy(drop = null, pending = null, report = null) }
+    }
+
+    // ---------------------------------------------------------------------------------------------------------
+    // Pin on the map
+    // ---------------------------------------------------------------------------------------------------------
+
+    private var pinNonce = 0
+
+    /** "Set on map" on the pickup or drop row: open the full-screen pin picker at that place (or the pickup). */
+    fun openPinPicker(target: PinTarget) {
+        val s = _state.value
+        if (!s.mapAvailable) return
+        stopVoice()
+        val own = if (target == PinTarget.PICKUP) s.pickupPlace else (s.drop ?: s.pending?.place)
+        val start = own?.point ?: s.pickupPlace?.point
+        val startLabel = own?.takeIf { it.point != null && it.label != deps.currentLocationLabel }?.label
+        _state.update { it.copy(pinRequest = PinRequest(target, start, startLabel, ++pinNonce)) }
+    }
+
+    /** The pin picker's dependencies: the same Geocoder and while-in-use location as the trip screen. */
+    fun pinPickerDeps(pinnedLabel: (LatLng) -> String): app.ridemate.map.PinPickerDeps =
+        app.ridemate.map.PinPickerDeps(deps.geocoder, deps.location, pinnedLabel)
+
+    fun closePinPicker() {
+        _state.update { it.copy(pinRequest = null) }
+    }
+
+    /** The map could not load (init failure, style failure, 8 s timeout): back to typing, with a banner. */
+    fun onMapUnavailable() {
+        _state.update { it.copy(mapFailed = true, pinRequest = null) }
+    }
+
+    /**
+     * "Confirm pickup / drop" on the pin picker: the exact pinned point becomes that end of the trip. Confirming on
+     * the map is the user's confirmation, so a pinned drop needs no second confirmation card.
+     */
+    fun onPinConfirmed(target: PinTarget, place: TripPlace) {
+        val point = place.point ?: return
+        val pinned = TripPlace(place.label, point)
+        when (target) {
+            PinTarget.PICKUP -> {
+                locateJob?.cancel()
+                pickupSearch.clear()
+                _state.update { it.copy(pickup = PickupState.Typed(pinned), pickupQuery = "", pinRequest = null, report = null) }
+            }
+            PinTarget.DROP -> {
+                stopVoice()
+                dropSearch.clear()
+                _state.update {
+                    it.copy(drop = pinned, pending = null, choices = emptyList(), dropQuery = "", notice = null, pinRequest = null, report = null)
+                }
+                viewModelScope.launch {
+                    val recent = withContext(deps.io) {
+                        deps.recentPlaces.add(pinned)
+                        deps.recentPlaces.recent()
+                    }
+                    _state.update { it.copy(recent = recent) }
+                }
+            }
+        }
     }
 
     fun viewOnMap(place: TripPlace) {

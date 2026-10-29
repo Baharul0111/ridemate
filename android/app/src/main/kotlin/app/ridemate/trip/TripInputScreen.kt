@@ -80,6 +80,18 @@ import app.ridemate.RideMateApp
 import app.ridemate.precheck.FixAction
 import app.ridemate.precheck.FixIntents
 import app.ridemate.precheck.PrecheckCard
+import app.ridemate.map.MapTags
+import app.ridemate.map.PinPickerScreen
+import app.ridemate.map.PinPickerViewModel
+import app.ridemate.map.PinTarget
+import app.ridemate.map.RoutePreviewMap
+import app.ridemate.map.coordsText
+import app.ridemate.ui.components.InlineBanner
+import app.ridemate.ui.components.RmTone
+import androidx.compose.material.icons.filled.PushPin
+import androidx.compose.runtime.key
+import androidx.lifecycle.viewmodel.initializer
+import androidx.lifecycle.viewmodel.viewModelFactory
 
 /** Test tags / stable ids for UI tests. */
 object TripTags {
@@ -153,6 +165,11 @@ fun TripInputScreen(
         }
     }
 
+    state.pinRequest?.let { request ->
+        PinPickerHost(request, state, viewModel, modifier)
+        return
+    }
+
     Surface(modifier = modifier.fillMaxSize()) {
         Column(
             modifier = Modifier
@@ -176,6 +193,56 @@ fun TripInputScreen(
             VehiclesSection(state, viewModel)
             CompareSection(state, viewModel, onFix)
         }
+    }
+}
+
+/** The full-screen pin picker over the trip screen; a fresh picker for every opening ([PinRequest.nonce]). */
+@Composable
+private fun PinPickerHost(request: PinRequest, state: TripUiState, vm: TripViewModel, modifier: Modifier) {
+    val context = LocalContext.current
+    val pinVm: PinPickerViewModel = viewModel(
+        key = "pin-${request.target.name}-${request.nonce}",
+        factory = viewModelFactory {
+            initializer {
+                PinPickerViewModel(
+                    deps = vm.pinPickerDeps { point -> context.getString(R.string.map_pinned_label, coordsText(point)) },
+                    target = request.target,
+                    start = request.start,
+                    startLabel = request.startLabel,
+                )
+            }
+        },
+    )
+    PinPickerScreen(
+        viewModel = pinVm,
+        config = state.map,
+        onConfirm = { place -> vm.onPinConfirmed(request.target, place) },
+        onCancel = vm::closePinPicker,
+        onUnavailable = vm::onMapUnavailable,
+        modifier = modifier,
+    )
+}
+
+@Composable
+private fun SetOnMapButton(target: PinTarget, vm: TripViewModel) {
+    val description = stringResource(if (target == PinTarget.PICKUP) R.string.map_set_pickup_description else R.string.map_set_drop_description)
+    TextButton(
+        onClick = { vm.openPinPicker(target) },
+        modifier = Modifier
+            .heightIn(min = 48.dp)
+            .testTag(if (target == PinTarget.PICKUP) MapTags.SET_PICKUP else MapTags.SET_DROP)
+            .semantics { contentDescription = description },
+    ) {
+        Icon(Icons.Filled.PushPin, contentDescription = null)
+        Spacer(Modifier.width(8.dp))
+        Text(stringResource(R.string.map_set_on_map))
+    }
+}
+
+@Composable
+private fun MapUnavailableBanner() {
+    Box(Modifier.testTag(MapTags.UNAVAILABLE)) {
+        InlineBanner(stringResource(R.string.map_unavailable), tone = RmTone.WARN)
     }
 }
 
@@ -223,7 +290,8 @@ private fun PickupSection(state: TripUiState, vm: TripViewModel, requestLocation
                     TextButton(onClick = vm::changePickup) { Text(stringResource(R.string.trip_pickup_type)) }
                 }
             }
-            is PickupState.Current -> ChosenPlaceRow(
+            is PickupState.Current -> {
+                ChosenPlaceRow(
                 icon = { Icon(Icons.Filled.MyLocation, contentDescription = null) },
                 text = if (pickup.place.label == stringResource(R.string.trip_current_location)) {
                     pickup.place.label
@@ -235,6 +303,8 @@ private fun PickupSection(state: TripUiState, vm: TripViewModel, requestLocation
                 actionDescription = stringResource(R.string.trip_pickup_change_description),
                 onAction = vm::changePickup,
             )
+                if (state.mapAvailable) SetOnMapButton(PinTarget.PICKUP, vm)
+            }
             is PickupState.Typed -> {
                 ChosenPlaceRow(
                     icon = { Icon(Icons.Filled.Place, contentDescription = null) },
@@ -244,8 +314,11 @@ private fun PickupSection(state: TripUiState, vm: TripViewModel, requestLocation
                     actionDescription = stringResource(R.string.trip_pickup_change_description),
                     onAction = vm::changePickup,
                 )
-                TextButton(onClick = vm::useCurrentLocation, modifier = Modifier.heightIn(min = 48.dp)) {
-                    Text(stringResource(R.string.trip_pickup_use_location))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextButton(onClick = vm::useCurrentLocation, modifier = Modifier.heightIn(min = 48.dp)) {
+                        Text(stringResource(R.string.trip_pickup_use_location))
+                    }
+                    if (state.mapAvailable) SetOnMapButton(PinTarget.PICKUP, vm)
                 }
             }
             is PickupState.Typing -> {
@@ -267,10 +340,13 @@ private fun PickupSection(state: TripUiState, vm: TripViewModel, requestLocation
                     onRetry = vm::retryPickupSearch,
                     onUseTyped = vm::usePickupAsTyped,
                 )
-                TextButton(onClick = vm::useCurrentLocation, modifier = Modifier.heightIn(min = 48.dp)) {
-                    Icon(Icons.Filled.MyLocation, contentDescription = null)
-                    Spacer(Modifier.width(8.dp))
-                    Text(stringResource(R.string.trip_pickup_use_location))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextButton(onClick = vm::useCurrentLocation, modifier = Modifier.heightIn(min = 48.dp)) {
+                        Icon(Icons.Filled.MyLocation, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text(stringResource(R.string.trip_pickup_use_location))
+                    }
+                    if (state.mapAvailable) SetOnMapButton(PinTarget.PICKUP, vm)
                 }
             }
         }
@@ -325,11 +401,37 @@ private fun DropSection(state: TripUiState, vm: TripViewModel, startVoice: () ->
                     actionDescription = stringResource(R.string.trip_drop_change_description),
                     onAction = vm::changeDrop,
                 )
-                ViewOnMapButton(drop, vm)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    ViewOnMapButton(drop, vm)
+                    if (state.mapAvailable) SetOnMapButton(PinTarget.DROP, vm)
+                }
                 if (!drop.hasPoint) Text(stringResource(R.string.trip_drop_no_pin), style = MaterialTheme.typography.bodySmall)
+                val from = state.pickupPlace
+                val a = from?.point
+                val b = drop.point
+                if (a != null && b != null) {
+                    if (state.mapAvailable) {
+                        key(a, b) {
+                            RoutePreviewMap(
+                                config = state.map,
+                                pickup = a,
+                                drop = b,
+                                pickupLabel = from.label,
+                                dropLabel = drop.label,
+                                onAdjust = { vm.openPinPicker(PinTarget.DROP) },
+                            )
+                        }
+                    } else {
+                        MapUnavailableBanner()
+                    }
+                }
             }
             pending != null -> ConfirmCard(pending, vm)
-            else -> DropSearchArea(state, vm, startVoice)
+            else -> {
+                if (state.mapFailed) MapUnavailableBanner()
+                DropSearchArea(state, vm, startVoice)
+                if (state.mapAvailable) SetOnMapButton(PinTarget.DROP, vm)
+            }
         }
     }
 }

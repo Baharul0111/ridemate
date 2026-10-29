@@ -55,6 +55,7 @@ class TripViewModelTest {
     private val api = PlacePickApi { ApiResult.Ok(PlacePickResponse("c2")) }
     private val apps = FakeInstalledApps()
     private val ondc = MutableStateFlow(true)
+    private val map = MutableStateFlow(app.ridemate.map.MapConfig.DEFAULT)
     private val probes = PreSessionCheckTest.FakeProbes()
     private lateinit var recent: RecentPlacesStore
 
@@ -82,6 +83,7 @@ class TripViewModelTest {
                 precheck = PreSessionCheck(probes, { null }, clock, io = dispatcher),
                 currentLocationLabel = "Current location",
                 defaultVoiceLanguage = VoiceLanguage.ENGLISH,
+                mapConfig = map,
                 io = dispatcher,
             ),
         )
@@ -634,5 +636,74 @@ class TripViewModelTest {
         assertNull(vm.state.value.drop)
         assertNull(vm.state.value.report)
         assertFalse(vm.state.value.canCompare)
+    }
+
+    // ---- pin on the map --------------------------------------------------------------------------------------
+
+    @Test
+    fun `set on map for the drop and pickup puts the exact pinned coordinates in the plan`() = runTest(dispatcher) {
+        val (vm, events) = viewModel()
+        assertTrue(vm.state.value.mapAvailable)
+
+        vm.openPinPicker(app.ridemate.map.PinTarget.PICKUP)
+        val pickupRequest = vm.state.value.pinRequest!!
+        assertEquals(app.ridemate.map.PinTarget.PICKUP, pickupRequest.target)
+        assertEquals(FakeLocation.HERE, pickupRequest.start)
+        val pinnedPickup = LatLng(26.503311, 90.976042)
+        vm.onPinConfirmed(app.ridemate.map.PinTarget.PICKUP, TripPlace("Gate 2, Barpeta Road", pinnedPickup))
+        assertNull(vm.state.value.pinRequest)
+
+        vm.openPinPicker(app.ridemate.map.PinTarget.DROP)
+        val dropRequest = vm.state.value.pinRequest!!
+        assertEquals(pinnedPickup, dropRequest.start)
+        assertTrue(dropRequest.nonce > pickupRequest.nonce)
+        val pinnedDrop = LatLng(26.512345, 90.998765)
+        vm.onPinConfirmed(app.ridemate.map.PinTarget.DROP, TripPlace("Pinned location (26.51235, 90.99877)", pinnedDrop))
+        advanceUntilIdle()
+
+        val plan = vm.currentPlan()!!
+        assertEquals(pinnedPickup, plan.pickup.point)
+        assertEquals(pinnedDrop, plan.drop.point)
+        assertEquals("Gate 2, Barpeta Road", plan.pickup.label)
+        assertNull(vm.state.value.pending)
+        assertTrue(vm.state.value.recent.any { it.point == pinnedDrop })
+        vm.compare()
+        advanceUntilIdle()
+        val start = events.filterIsInstance<TripEvent.StartComparison>().single()
+        assertEquals(pinnedDrop, start.plan.drop.point)
+        assertEquals(pinnedPickup, start.plan.pickup.point)
+    }
+
+    @Test
+    fun `map switched off offers no pin picker and the trip still works typed`() = runTest(dispatcher) {
+        map.value = app.ridemate.map.MapConfig.DISABLED
+        val (vm, _) = viewModel()
+        assertFalse(vm.state.value.mapAvailable)
+        vm.openPinPicker(app.ridemate.map.PinTarget.DROP)
+        assertNull(vm.state.value.pinRequest)
+        confirmFirstSuggestion(vm)
+        assertNotNull(vm.currentPlan())
+    }
+
+    @Test
+    fun `a map that fails to load closes the picker and leaves typing`() = runTest(dispatcher) {
+        val (vm, _) = viewModel()
+        vm.openPinPicker(app.ridemate.map.PinTarget.DROP)
+        vm.onMapUnavailable()
+        assertNull(vm.state.value.pinRequest)
+        assertTrue(vm.state.value.mapFailed)
+        assertFalse(vm.state.value.mapAvailable)
+        confirmFirstSuggestion(vm)
+        assertNotNull(vm.currentPlan())
+    }
+
+    @Test
+    fun `cancelling the picker changes nothing`() = runTest(dispatcher) {
+        val (vm, _) = viewModel()
+        val before = vm.state.value.pickup
+        vm.openPinPicker(app.ridemate.map.PinTarget.PICKUP)
+        vm.closePinPicker()
+        assertNull(vm.state.value.pinRequest)
+        assertEquals(before, vm.state.value.pickup)
     }
 }

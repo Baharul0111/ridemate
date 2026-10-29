@@ -20,7 +20,7 @@ class LocalizedStringsTest {
 
     @Test
     fun `english and hindi files match key for key and placeholder for placeholder`() {
-        for (area in listOf("trip", "launch", "precheck")) {
+        for (area in listOf("trip", "launch", "precheck", "map")) {
             val en = strings(File(res, "values/strings_$area.xml"))
             val hi = strings(File(res, "values-hi/strings_$area.xml"))
             assertTrue("$area has strings", en.isNotEmpty())

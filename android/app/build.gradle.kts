@@ -147,6 +147,7 @@ dependencies {
     implementation(libs.play.services.location)
     implementation(libs.mlkit.text.latin)
     implementation(libs.mlkit.text.devanagari)
+    implementation(libs.maplibre.android)
 
     testImplementation(libs.junit)
     testImplementation(libs.robolectric)

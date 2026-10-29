@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="map_set_on_map">Set on map</string>
+    <string name="map_set_pickup_description">Set the pickup on the map</string>
+    <string name="map_set_drop_description">Set the drop on the map</string>
+    <string name="map_title_pickup">Pin your pickup</string>
+    <string name="map_title_drop">Pin your drop</string>
+    <string name="map_hint">Move the map to put the pin on the exact spot</string>
+    <string name="map_confirm_pickup">Confirm pickup</string>
+    <string name="map_confirm_drop">Confirm drop</string>
+    <string name="map_confirm_pickup_description">Confirm pickup at %1$s</string>
+    <string name="map_confirm_drop_description">Confirm drop at %1$s</string>
+    <string name="map_back">Back to the trip</string>
+    <string name="map_my_location">Move the map to my location</string>
+    <string name="map_resolving">Finding the address…</string>
+    <string name="map_no_address">No address for this spot. The exact pin is still used.</string>
+    <string name="map_pinned_label">Pinned location (%1$s)</string>
+    <string name="map_pin_description">Pin at the centre of the map</string>
+    <string name="map_view_description">Map. Drag to move the pin.</string>
+    <string name="map_unavailable">Map unavailable · type the address</string>
+    <string name="map_type_address">Type the address</string>
+    <string name="map_location_denied">Location is off for RideMate, so the map can\'t find you. Move the map by hand.</string>
+    <string name="map_location_unavailable">Couldn\'t find your location. Move the map by hand.</string>
+    <string name="map_route_description">Route map from %1$s to %2$s. Tap to adjust the drop on the map.</string>
+    <string name="map_route_adjust">Tap the map to adjust</string>
+    <string name="map_attribution_note">Map © OpenFreeMap, data © OpenStreetMap contributors</string>
+</resources>
