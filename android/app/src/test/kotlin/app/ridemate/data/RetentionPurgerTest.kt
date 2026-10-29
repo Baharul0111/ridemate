@@ -13,6 +13,8 @@ import app.ridemate.testing.FakeClock
 import app.ridemate.testing.TestData
 import app.ridemate.testing.TestRideMateApp
 import app.ridemate.testing.TestSeams
+import app.ridemate.trip.RecentPlacesStore
+import app.ridemate.trip.TripPlace
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -123,11 +125,11 @@ class RetentionPurgerTest {
         WorkManagerTestInitHelper.initializeTestWorkManager(context)
         val app = context as TestRideMateApp
         val graph = RideMateApp.graph(context)
-        val prefs = context.getSharedPreferences(app.ridemate.trip.RecentPlacesStore.PREFS_NAME, Context.MODE_PRIVATE)
+        val prefs = context.getSharedPreferences(RecentPlacesStore.PREFS_NAME, Context.MODE_PRIVATE)
         prefs.edit().clear().commit()
-        graph.recentPlaces.add(app.ridemate.trip.TripPlace("Paltan Bazaar, Guwahati", null))
+        graph.recentPlaces.add(TripPlace("Paltan Bazaar, Guwahati", null))
         app.fakes.clock.advance(1 * hour)
-        graph.recentPlaces.add(app.ridemate.trip.TripPlace("LGBI Airport", null))
+        graph.recentPlaces.add(TripPlace("LGBI Airport", null))
         // The phone sits unused for a day: nothing reads the store (a read would purge it by itself).
         app.fakes.clock.advance(24 * hour - 30 * 60_000L)
         val before = prefs.getString("recent", null).orEmpty()
