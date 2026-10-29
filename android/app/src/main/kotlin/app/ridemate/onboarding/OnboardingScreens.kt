@@ -598,7 +598,8 @@ private fun HealthCheckStep(progress: Progress?, state: OnboardingUiState, actio
     OnbPage(
         progress = progress,
         hero = Hero.ALL_SET,
-        heroHeight = 140.dp,
+        // Once there is a result, the hero shrinks so the result sits above the fold.
+        heroHeight = if (result == null) 140.dp else 72.dp,
         title = title,
         subtitle = stringResource(R.string.onb_health_sub),
         onWhy = { why = true },
