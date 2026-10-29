@@ -11,6 +11,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Assume.assumeTrue
 import org.junit.Test
 
 class FareParserTest {
@@ -207,6 +208,51 @@ class FareParserTest {
 
         val conflicting = FrameBuilder().line(100, 380, 56, "4", "min", "away").line(100, 900, 56, "7", "min", "away").build()
         assertNull(parser.parse(conflicting).driverEta)
+    }
+
+    @Test
+    fun `bundled real-app parsers read the Hindi rupee marker and Hindi driver distances`() {
+        val bundled = TestConfigs.bundledFareParsers()
+        assumeTrue("config/remote_config/fare_parsers.json not found", bundled != null)
+        for (app in Provider.LIVE_APPS) {
+            val p = FareParser.forApp(bundled!!, app, 1)!!
+            val fares = p.parse(
+                fareScreen(
+                    listOf(
+                        RowSpec("ऑटो", "रु १२०", eta = "३ मिनट"),
+                        RowSpec("बाइक", "रु. 85", eta = "2 मिनट"),
+                        RowSpec("कैब", "रू २१०", eta = "५ मिनट"),
+                    ),
+                    header = null,
+                ),
+            )
+            assertEquals(app.name, listOf(120, 85, 210), fares.rows.map { it.price!!.amount.min })
+            assertEquals(app.name, listOf(VehicleClass.AUTO, VehicleClass.BIKE, VehicleClass.CAB_ECONOMY), fares.rows.map { it.vehicleClass })
+            assertEquals(app.name, listOf(3, 2, 5), fares.rows.map { it.eta!!.value })
+            assertTrue(app.name, p.looksLikeFareScreen(fareScreen(listOf(RowSpec("ऑटो", "रु १२०")), header = null)))
+
+            // A split marker token ("रु" then "१२०") joins its amount, as "₹" "120" does.
+            val split = FrameBuilder().line(150, 420, 40, "ऑटो").line(800, 416, 48, "रु", "१२०").build()
+            assertEquals(app.name, 120, p.parse(split).rows.single().price!!.amount.min)
+
+            val driver = p.parse(
+                FrameBuilder()
+                    .line(100, 380, 56, "कैप्टन", "५", "मिनट", "दूर")
+                    .line(100, 450, 36, "१.२", "किमी", "दूर")
+                    .build(),
+            )
+            assertEquals(app.name, 5, driver.driverEta!!.value)
+            assertEquals(app.name, 1200, driver.driverDistance!!.value)
+            val metres = p.parse(FrameBuilder().line(100, 450, 36, "८००", "मी", "दूर").build())
+            assertEquals(app.name, 800, metres.driverDistance!!.value)
+
+            // Words ending in रु / रू are no rupee marker, and minutes are never metres.
+            val notPrices = p.parse(
+                FrameBuilder().line(100, 300, 40, "राइड", "शुरू", "5", "मिनट", "में", "दूर").line(100, 380, 40, "गुरु", "3").build(),
+            )
+            assertTrue(app.name, notPrices.rows.none { it.price != null })
+            assertNull(app.name, notPrices.driverDistance)
+        }
     }
 
     @Test

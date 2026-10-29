@@ -44,7 +44,8 @@ Judging is over, and Baharul wants to share a public link with real users.
 1. **Server settings for launch:**
    - `ONDC_MODE=off` in `ridemate-core` (the mock routes are then not mounted), and Remote Config `ondc_enabled` =
      `false` (ONDC hidden in the app).
-   - `cap_profile` = `normal`; `judge_allowlist` empty; `min_containers=0` in `backend/modal_app.py`.
+   - `cap_profile` = `normal`; Firestore `server_config/judge_allowlist` `sha256_emails` empty; `min_containers=0` in
+     `backend/modal_app.py`.
    - Caps as designed: fair share 6 reads + 10 parses per user per day, 3 reads for young accounts, daily pacing cap,
      tiers at 70% / 100%.
    - Deploy: `./backend/deploy.sh`, then `curl -fsS "$RIDEMATE_API/readyz"`.

@@ -44,7 +44,39 @@ def test_price_token_pattern_reads_indian_formats(pkg: str, token: str, expected
 
 
 @pytest.mark.parametrize("pkg", ALL_PACKAGES)
-@pytest.mark.parametrize("text", ["2 hours 5 min", "4 seats", "Auto", "3 min", "OTP 4719"])
+@pytest.mark.parametrize(
+    "text, expected",
+    [
+        ("रु १२०", "रु १२०"),
+        ("रु. 85", "रु. 85"),
+        ("रू 99", "रू 99"),
+        ("रु110–130", "रु110–130"),
+        ("₹110 - रु130", "₹110 - रु130"),
+        ("किराया: रु १२०", "रु १२०"),
+    ],
+)
+def test_price_token_pattern_reads_the_hindi_rupee_marker(pkg: str, text: str, expected: str) -> None:
+    """A Hindi-localised ride app shows रु (or रू) where English shows ₹ or Rs; RupeeParser accepts both."""
+    m = compile_re2(parser(pkg)["price_token_pattern"]).search(text)
+    # Mid-line, the marker's guard takes the separator before it; the phone's tokens start at the marker.
+    assert m and m.group(0).strip(" :") == expected
+
+
+@pytest.mark.parametrize("pkg", ALL_PACKAGES)
+@pytest.mark.parametrize(
+    "text",
+    [
+        "2 hours 5 min",
+        "4 seats",
+        "Auto",
+        "3 min",
+        "OTP 4719",
+        # Words that end in रु / रू are not a rupee marker before a number.
+        "राइड शुरू 5 मिनट में",
+        "गुरु 3",
+        "2 hrs 15",
+    ],
+)
 def test_price_token_pattern_ignores_non_prices(pkg: str, text: str) -> None:
     assert compile_re2(parser(pkg)["price_token_pattern"]).search(text) is None
 
@@ -64,6 +96,29 @@ def test_distance_pattern_reads_km_and_m_but_not_minutes(pkg: str) -> None:
     assert rx.search("1.6 km from pickup").groups() == ("1.6", "km")
     assert rx.search("800 m away").groups() == ("800", "m")
     assert rx.search("5 min away") is None
+
+
+@pytest.mark.parametrize("pkg", ALL_PACKAGES)
+@pytest.mark.parametrize(
+    "text, groups",
+    [
+        ("१.२ किमी दूर", ("१.२", "किमी")),
+        ("कैप्टन 1.2 किमी दूर हैं", ("1.2", "किमी")),
+        ("८०० मी दूर", ("८००", "मी")),
+        ("800 मी", ("800", "मी")),
+        ("2.5 कि.मी. दूर", ("2.5", "कि.मी.")),
+    ],
+)
+def test_distance_pattern_reads_hindi_units(pkg: str, text: str, groups: tuple[str, str]) -> None:
+    m = compile_re2(parser(pkg)["driver_distance_pattern"]).search(text)
+    assert m and m.groups() == groups
+
+
+@pytest.mark.parametrize("pkg", ALL_PACKAGES)
+@pytest.mark.parametrize("text", ["5 मिनट दूर", "2 मील", "800 मीटर दूर"])
+def test_distance_pattern_never_reads_minutes_or_other_hindi_words_as_metres(pkg: str, text: str) -> None:
+    """मिनट (minutes) is not मी, and मी must end the word: मील / मीटर fall to "see in app", never a wrong number."""
+    assert compile_re2(parser(pkg)["driver_distance_pattern"]).search(text) is None
 
 
 @pytest.mark.parametrize(

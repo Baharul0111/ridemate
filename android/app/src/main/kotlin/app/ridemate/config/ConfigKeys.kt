@@ -16,6 +16,9 @@ object ConfigKeys {
     const val ONDC_ENABLED = "ondc_enabled"
     const val DEMO_ENABLED = "demo_enabled"
 
+    /** Opt-in better-ride offers ("Keep searching", goal 16); false stops them in open sessions and hides the toggle. */
+    const val BETTER_RIDE_ENABLED = "better_ride_enabled"
+
     /** Whether `/v1/point` grounding ("Show me") is served (day-1 spike: true). */
     const val POINT_SUPPORTED = "point_supported"
     const val MODEL_ROUTE = "model_route"
@@ -26,15 +29,13 @@ object ConfigKeys {
     const val BUDGET_HORIZON_DAYS = "budget_horizon_days"
     const val BUDGET_HORIZON_START = "budget_horizon_start"
     const val API_BASE_URL = "api_base_url"
-    const val JUDGE_ALLOWLIST = "judge_allowlist"
-    const val OWNER_EMAILS_SHA256 = "owner_emails_sha256"
 
     /** `reader_enabled_uber` / `_ola` / `_rapido`. */
     fun readerEnabled(provider: Provider): String = "reader_enabled_${provider.wireId}"
 
     /** Keys watched by the real-time listener and exposed as StateFlows. */
     val KILL_SWITCHES: Set<String> =
-        setOf(AI_READER_ENABLED, ONDC_ENABLED, DEMO_ENABLED) + Provider.LIVE_APPS.map { readerEnabled(it) }
+        setOf(AI_READER_ENABLED, ONDC_ENABLED, DEMO_ENABLED, BETTER_RIDE_ENABLED) + Provider.LIVE_APPS.map { readerEnabled(it) }
 }
 
 /**
@@ -47,6 +48,7 @@ object BuiltInDefaults {
         Provider.LIVE_APPS.forEach { put(ConfigKeys.readerEnabled(it), "true") }
         put(ConfigKeys.ONDC_ENABLED, "true")
         put(ConfigKeys.DEMO_ENABLED, "true")
+        put(ConfigKeys.BETTER_RIDE_ENABLED, "true")
         put(ConfigKeys.POINT_SUPPORTED, "true")
         put(ConfigKeys.MODEL_ROUTE, """{"schema":"1.0","read":"modal_spark_open","parse":"modal_spark_open"}""")
         put(
@@ -60,8 +62,6 @@ object BuiltInDefaults {
         put(ConfigKeys.BUDGET_HORIZON_DAYS, "90")
         put(ConfigKeys.BUDGET_HORIZON_START, "2026-10-28")
         put(ConfigKeys.API_BASE_URL, "")
-        put(ConfigKeys.JUDGE_ALLOWLIST, """{"schema":"1.0","sha256_emails":[]}""")
-        put(ConfigKeys.OWNER_EMAILS_SHA256, "[]")
     }
 }
 
@@ -81,6 +81,8 @@ data class KillSwitches(
     val readerEnabled: Map<Provider, Boolean> = Provider.LIVE_APPS.associateWith { true },
     val ondcEnabled: Boolean = true,
     val demoEnabled: Boolean = true,
+    /** Opt-in better-ride offers ("Keep searching") for live sessions; demo sessions follow [demoEnabled]. */
+    val betterRideEnabled: Boolean = true,
 ) {
     /** Whether fare reading may run for [provider] (demo providers follow `demo_enabled`, ONDC `ondc_enabled`). */
     fun readerEnabledFor(provider: Provider): Boolean = when {

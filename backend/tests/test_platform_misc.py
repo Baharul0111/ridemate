@@ -365,6 +365,15 @@ def test_config_check_budget_only_for_owners() -> None:
     assert check(client, auth.google("pleb"))["budget"] is None
 
 
+def test_config_check_tells_only_the_owner_that_they_are_the_owner() -> None:
+    """The phone ships no owner list (contracts §2.7): developer mode and owner alerts follow `is_owner`."""
+    _, client, auth = setup()
+    assert check(client, auth.google("boss", owner=True))["is_owner"] is True
+    assert check(client, auth.google("pleb"))["is_owner"] is False
+    assert check(client, auth.anonymous())["is_owner"] is False
+    assert check(client)["is_owner"] is False
+
+
 def test_config_check_rejects_a_bad_token() -> None:
     _, client, _ = setup()
     r = client.get("/v1/config-check", headers=bearer("forged"))

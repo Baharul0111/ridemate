@@ -9,14 +9,11 @@ import org.junit.Test
 import java.time.LocalDate
 
 class ScalarConfigTest {
-    private val hashA = "a".repeat(64)
-    private val hashB = "0123456789abcdef".repeat(4)
-
     @Test
     fun `defaults follow contracts 2_7`() {
         val d = ScalarConfig.from(emptyMap())
         assertEquals(ScalarConfig(), d)
-        assertTrue(d.aiReaderEnabled && d.ondcEnabled && d.demoEnabled)
+        assertTrue(d.aiReaderEnabled && d.ondcEnabled && d.demoEnabled && d.betterRideEnabled)
         assertEquals(1L, d.minSupportedVersion)
         assertEquals(CapProfile.NORMAL, d.capProfile)
         assertNull(d.creditExpiryDate)
@@ -42,8 +39,7 @@ class ScalarConfigTest {
                 ScalarKeys.BUDGET_HORIZON_DAYS to "60",
                 ScalarKeys.BUDGET_HORIZON_START to "2026-11-01",
                 ScalarKeys.API_BASE_URL to "https://ridemate-api.modal.run",
-                ScalarKeys.JUDGE_ALLOWLIST to """{"schema":"1.0","sha256_emails":["$hashA"]}""",
-                ScalarKeys.OWNER_EMAILS_SHA256 to """["${hashB.uppercase()}"]""",
+                ScalarKeys.BETTER_RIDE_ENABLED to "false",
             ),
         )
         assertTrue(c.aiReaderEnabledFor(Provider.UBER))
@@ -58,8 +54,7 @@ class ScalarConfigTest {
         assertEquals(60, c.budgetHorizonDays)
         assertEquals(LocalDate.of(2026, 11, 1), c.budgetHorizonStart)
         assertEquals("https://ridemate-api.modal.run", c.apiBaseUrl)
-        assertEquals(setOf(hashA), c.judgeAllowlistSha256)
-        assertEquals(setOf(hashB), c.ownerEmailsSha256)
+        assertFalse(c.betterRideEnabled)
         assertFalse(ScalarConfig.from(mapOf(ScalarKeys.AI_READER_ENABLED to "false")).aiReaderEnabledFor(Provider.UBER))
     }
 
@@ -75,8 +70,7 @@ class ScalarConfigTest {
                 ScalarKeys.CREDIT_EXPIRY_DATE to "unknown",
                 ScalarKeys.BUDGET_HORIZON_DAYS to "lots",
                 ScalarKeys.API_BASE_URL to "http://plain-http.example",
-                ScalarKeys.JUDGE_ALLOWLIST to """{"schema":"1.0","sha256_emails":["not-a-hash"]}""",
-                ScalarKeys.OWNER_EMAILS_SHA256 to "{",
+                ScalarKeys.BETTER_RIDE_ENABLED to "perhaps",
                 ScalarKeys.DEMO_ENABLED to "false",
             ),
         )

@@ -177,11 +177,28 @@ async def test_owner_is_a_verified_email_in_owner_emails(env: Env) -> None:
     assert not (await env.verify(env.minter.mint(email=TEST_OWNER_EMAIL, email_verified=False))).is_owner
 
 
-async def test_judge_is_sha256_of_email_in_remote_config_allowlist(env: Env) -> None:
-    env.rc.set("judge_allowlist", judge_allowlist("Judge@Hackathon.dev"))
+async def test_judge_is_sha256_of_email_in_the_server_only_firestore_allowlist(env: Env) -> None:
+    env.firestore.set("server_config/judge_allowlist", judge_allowlist("Judge@Hackathon.dev"))
     assert (await env.verify(env.minter.mint(email="judge@hackathon.dev"))).is_judge
     assert not (await env.verify(env.minter.mint(email="someone@else.dev"))).is_judge
     assert not (await env.verify(env.minter.mint(email="judge@hackathon.dev", email_verified=False))).is_judge
+
+
+async def test_remote_config_never_makes_a_judge(env: Env) -> None:
+    """The client template is readable by every install: a judge list there must have no effect."""
+    env.rc.set("judge_allowlist", judge_allowlist("judge@hackathon.dev"))
+    assert not (await env.verify(env.minter.mint(email="judge@hackathon.dev"))).is_judge
+
+
+async def test_judge_allowlist_is_cached_for_60_seconds_and_survives_a_firestore_outage(env: Env) -> None:
+    assert not (await env.verify(env.minter.mint(email="judge@hackathon.dev"))).is_judge
+    env.firestore.set("server_config/judge_allowlist", judge_allowlist("judge@hackathon.dev"))
+    assert not (await env.verify(env.minter.mint(email="judge@hackathon.dev"))).is_judge  # cached empty list
+    env.clock.advance(61)
+    assert (await env.verify(env.minter.mint(email="judge@hackathon.dev"))).is_judge
+    env.firestore.fail = True
+    env.clock.advance(61)
+    assert (await env.verify(env.minter.mint(email="judge@hackathon.dev"))).is_judge  # last good list kept
 
 
 async def test_blocked_uids_are_refused_and_cached_for_60_seconds(env: Env) -> None:

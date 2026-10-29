@@ -122,7 +122,7 @@ class GoldenAndDevModelTest {
 
     private val owner = AuthState.Google("owner@example.com", "Owner", null, "o")
     private val clock = FakeClock()
-    private val gate = DeveloperModeGate(InMemoryKeyValueStore(), MutableStateFlow(owner), { setOf(OwnerEmails.hash("owner@example.com")) }, clock)
+    private val gate = DeveloperModeGate(InMemoryKeyValueStore(), MutableStateFlow(owner), { state -> (state as? AuthState.Google)?.uid == "o" }, clock)
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
     private val recorder = mutableListOf<RecorderPostEntity>()
 

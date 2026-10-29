@@ -57,6 +57,6 @@ class BundledConfigTest {
     }
 
     private companion object {
-        val JSON_SCALARS = listOf(ScalarKeys.MODEL_ROUTE, ScalarKeys.LATEST_VERSION, ScalarKeys.JUDGE_ALLOWLIST, ScalarKeys.OWNER_EMAILS_SHA256)
+        val JSON_SCALARS = listOf(ScalarKeys.MODEL_ROUTE, ScalarKeys.LATEST_VERSION)
     }
 }

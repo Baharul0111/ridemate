@@ -65,6 +65,7 @@ import app.ridemate.demo.DemoController
 import app.ridemate.demo.DemoFareReader
 import app.ridemate.messaging.FirebaseFcmTokenSource
 import app.ridemate.messaging.OwnerAccess
+import app.ridemate.messaging.ServerOwnerStatus
 import app.ridemate.messaging.OwnerAlertNotifier
 import app.ridemate.messaging.OwnerMessaging
 import app.ridemate.messaging.OwnerSignInWatcher
@@ -85,6 +86,7 @@ import app.ridemate.precheck.PreSessionCheck
 import app.ridemate.trip.RecentPlacesStore
 import app.ridemate.ui.AppShell
 import app.ridemate.ui.FeatureBindings
+import app.ridemate.ui.SharedPrefsKeyValueStore
 import app.ridemate.session.GuardianModule
 import app.ridemate.session.GuardianRuntime
 import app.ridemate.session.SessionBindings
@@ -98,6 +100,8 @@ import app.ridemate.watch.RideWatchStatus
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
@@ -264,6 +268,7 @@ class AppGraph(
     init {
         localWipers.add(LocalDataWiper { recentPlaces.clear() })
         localWipers.add(LocalDataWiper { ondcTxnMemory.clear() })
+        localWipers.add(LocalDataWiper { serverOwnerStatus.clear() })
     }
 
     // ---- fare reading (bubble, capture, OCR + masking, Read fares, comparison list) ----
@@ -462,12 +467,16 @@ class AppGraph(
         OndcTxnMemory(app.getSharedPreferences(OndcTxnMemory.PREFS_NAME, Context.MODE_PRIVATE))
     }
 
-    /** Whether the signed-in user is the owner (`owner_emails_sha256`; fails closed). */
+    /** The server's answer to "is the signed-in Google account the owner?" (`/v1/config-check`; no list on the phone). */
+    val serverOwnerStatus: ServerOwnerStatus by lazy {
+        ServerOwnerStatus(SharedPrefsKeyValueStore(app, ServerOwnerStatus.PREFS_NAME), { authGateway.state.value }) {
+            apiClient.configCheck()
+        }
+    }
+
+    /** Whether the signed-in user is the owner, as the server confirmed it (fails closed). */
     val ownerAccess: OwnerAccess by lazy {
-        OwnerAccess(
-            authState = { authGateway.state.value },
-            ownerEmailHashes = { OwnerAccess.parseHashes(configRepository.string(ConfigKeys.OWNER_EMAILS_SHA256)) },
-        )
+        OwnerAccess(authState = { authGateway.state.value }, isOwnerAccount = serverOwnerStatus::isOwner)
     }
 
     /** Owner alert pushes and the owner's FCM token registration ([app.ridemate.messaging.OwnerMessagingService]). */
@@ -518,7 +527,14 @@ class AppGraph(
             }
         }
 
-        appScope.launch { ownerSignInWatcher.run(authGateway.state, configRepository.epoch) }
+        appScope.launch {
+            // Ask the server whether this Google account is the owner at sign-in and whenever Remote Config activates
+            // (the API URL may only arrive then); offline keeps the last answer.
+            combine(authGateway.state, configRepository.epoch) { state, _ -> state }.collectLatest { state ->
+                if (state is AuthState.Google) serverOwnerStatus.refresh()
+            }
+        }
+        appScope.launch { ownerSignInWatcher.run(authGateway.state, serverOwnerStatus.confirmedOwnerUid) }
 
         appScope.launch {
             authGateway.state.collect { state ->

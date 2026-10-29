@@ -40,6 +40,7 @@ BUILTIN_DEFAULTS: Mapping[str, Any] = {
     "reader_enabled_rapido": True,
     "ondc_enabled": True,
     "demo_enabled": True,
+    "better_ride_enabled": True,
     "point_supported": False,  # the day-1 spike decides whether /v1/point grounding is served
     "model_route": {"schema": "1.0", "read": "modal_spark_open", "parse": "modal_spark_open"},
     "latest_version": {
@@ -55,8 +56,6 @@ BUILTIN_DEFAULTS: Mapping[str, Any] = {
     "budget_horizon_days": 90,
     "budget_horizon_start": "2026-10-28",
     "api_base_url": "",
-    "judge_allowlist": {"schema": "1.0", "sha256_emails": []},
-    "owner_emails_sha256": [],
 }
 # JSON-valued keys whose bundled default file holds exactly that key's payload.
 JSON_KEYS: frozenset[str] = frozenset(
@@ -69,8 +68,6 @@ JSON_KEYS: frozenset[str] = frozenset(
         "launch_templates",
         "model_route",
         "latest_version",
-        "judge_allowlist",
-        "owner_emails_sha256",
     }
 )
 

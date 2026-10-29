@@ -42,8 +42,8 @@ data class ConfigInfo(
  * - Nothing waits for the network: [start] and [refreshInBackground] launch `fetchAndActivate` (5 s fetch
  *   timeout) and return at once; every read is answered from what is active right now, the last-good cache or the
  *   bundled default. Never await a fetch before a session.
- * - Kill switches (`ai_reader_enabled`, `reader_enabled_<app>`, `ondc_enabled`, `demo_enabled`) are StateFlows
- *   updated by the real-time listener within seconds of a console change.
+ * - Kill switches (`ai_reader_enabled`, `reader_enabled_<app>`, `ondc_enabled`, `demo_enabled`,
+ *   `better_ride_enabled`) are StateFlows updated by the real-time listener within seconds of a console change.
  * - JSON payloads go through [resolve] (or [raw] + core `resolveLayered`): a remote payload is used only if it
  *   parses with a supported schema major; the last-good cache is written only when a validator accepted it.
  * - [epoch] increases after every activation so consumers re-resolve their payloads.
@@ -74,6 +74,11 @@ class ConfigRepository(
 
     private val _demoEnabled = MutableStateFlow(true)
     val demoEnabled: StateFlow<Boolean> = _demoEnabled.asStateFlow()
+
+    private val _betterRideEnabled = MutableStateFlow(true)
+
+    /** `better_ride_enabled`: the opt-in better-ride offers ("Keep searching") may run. */
+    val betterRideEnabled: StateFlow<Boolean> = _betterRideEnabled.asStateFlow()
 
     private val readerFlows: Map<Provider, MutableStateFlow<Boolean>> = Provider.LIVE_APPS.associateWith { MutableStateFlow(true) }
 
@@ -155,11 +160,13 @@ class ConfigRepository(
             readerEnabled = Provider.LIVE_APPS.associateWith { boolean(ConfigKeys.readerEnabled(it), true) },
             ondcEnabled = boolean(ConfigKeys.ONDC_ENABLED, true),
             demoEnabled = boolean(ConfigKeys.DEMO_ENABLED, true),
+            betterRideEnabled = boolean(ConfigKeys.BETTER_RIDE_ENABLED, true),
         )
         _killSwitches.value = switches
         _aiReaderEnabled.value = switches.aiReaderEnabled
         _ondcEnabled.value = switches.ondcEnabled
         _demoEnabled.value = switches.demoEnabled
+        _betterRideEnabled.value = switches.betterRideEnabled
         readerFlows.forEach { (provider, flow) -> flow.value = switches.readerEnabledFor(provider) }
         _epoch.update { it + 1 }
     }

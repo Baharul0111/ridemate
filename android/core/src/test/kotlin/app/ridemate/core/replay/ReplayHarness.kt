@@ -80,6 +80,8 @@ class ReplayHarness(
     val classifier: FakeClassifier? = FakeClassifier(),
     private val masker: TextMasker = TextMasker.NONE,
     startTicker: Boolean = true,
+    /** A Try-the-demo session: demo providers only, and RideWatch reads the demo packages. */
+    private val demo: Boolean = false,
 ) {
     val clock = SchedulerClock(test.testScheduler)
     val fees = RuleBasedFeeEstimator(FeeRules.parse(FEE_RULES_JSON), stateCode = "AS")
@@ -95,7 +97,7 @@ class ReplayHarness(
 
     init {
         listen(guardian)
-        guardian.startSession(SESSION, providers, keepSearching)
+        guardian.startSession(SESSION, providers, keepSearching, demo)
         if (startTicker) startTicker()
     }
 
@@ -108,7 +110,10 @@ class ReplayHarness(
 
     private fun newPipeline() = RideWatchPipeline(
         clock, test.backgroundScope, guardian, guardian, { templates }, classifier, masker,
-    ).also { guardian.ongoingNotifications = it }
+    ).also {
+        guardian.ongoingNotifications = it
+        it.demoSessionActive = demo
+    }
 
     fun startTicker() {
         ticker?.cancel()

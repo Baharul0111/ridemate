@@ -519,6 +519,47 @@ class GuardianRuntimeTest {
     }
 
     @Test
+    fun `remote better_ride_enabled off - live sessions stop keeping searching and the toggle is hidden`() = runBlocking {
+        val r = rig()
+        r.startSession(Provider.UBER, Provider.RAPIDO, keepSearching = true)
+        assertTrue(r.ui.keepSearching && r.ui.keepSearchingAvailable)
+
+        // Switched off mid-session: within one step the open session no longer keeps searching.
+        r.config.betterRide.value = false
+        r.idle()
+        r.idle()
+        assertFalse(r.ui.keepSearching)
+        assertFalse(r.ui.keepSearchingAvailable)
+        // The toggle can't turn it back on while the switch is off.
+        r.runtime.perform(SessionOp(SessionOpKind.TOGGLE_KEEP_SEARCHING))
+        r.idle()
+        assertFalse(r.ui.keepSearching)
+        assertFalse(r.keepSearching.enabled)
+
+        // A new live comparison asked with keep-searching starts without it while the switch is off.
+        r.startSession(Provider.UBER, Provider.OLA, keepSearching = true, id = "s-2")
+        assertEquals("s-2", r.ui.sessionId)
+        assertFalse(r.ui.keepSearching)
+        assertFalse(r.ui.keepSearchingAvailable)
+
+        // Back on: the toggle shows again (the open session keeps its own setting).
+        r.config.betterRide.value = true
+        r.idle()
+        r.idle()
+        assertTrue(r.ui.keepSearchingAvailable)
+        assertFalse(r.ui.keepSearching)
+    }
+
+    @Test
+    fun `remote better_ride_enabled leaves Try the demo's keep-searching walk alone`() = runBlocking {
+        val r = rig()
+        r.config.betterRide.value = false
+        r.idle()
+        r.startSession(Provider.DEMO_KESTREL, Provider.DEMO_TAMARIND, keepSearching = true, demo = true)
+        assertTrue(r.ui.demo && r.ui.keepSearching && r.ui.keepSearchingAvailable)
+    }
+
+    @Test
     fun `after an erase the guardian still knows which ride posts are in the shade`() = runBlocking {
         val r = rig()
         // A connected listener; a re-read finds the shade empty.

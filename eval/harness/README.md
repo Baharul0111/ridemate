@@ -7,10 +7,21 @@ None of these scripts runs in CI against a live service. They make no model call
 
 It reads every screen in a labels file (default `eval/demo_labels.json`, or a golden `labels.json`). Each image
 is checked against its labelled SHA-256. The result is written in the contracts §6 shape, plus `source`,
-`request_id` and `latency_ms`:
+`request_id`, `latency_ms` and `wall_ms`:
 - for the demo labels, into `eval/recorded/channel_a/<sha256>.json`;
 - for any other labels file, by default into `recorded/channel_a/` next to that file. The script refuses to write
   reads of private screens (outside the repo, or gitignored) into any path git would track (L6).
+
+Two timings, never mixed up:
+- `latency_ms` is **server-side model time**: in gateway mode the router's own timing of the model call (the figure
+  its 12 s deadline, the 20 s tap budget and the 15 s read-p95 alert are about); in http mode the API's `latency_ms`.
+  It is left out when the server did not report one.
+- `wall_ms` is this script's wall time for the whole call. From a laptop in gateway mode it includes the Modal Dict
+  reservation and settlement round trips, so 45–60 s here is normal and says nothing about model speed.
+
+The 16 demo recordings of 2026-10-28 (gateway mode) predate this split: their old `latency_ms` was wall time, so it
+now sits in `wall_ms` and they carry no `latency_ms`. Judge read latency from `ai_model_latency_ms` metrics or
+`docs/spikes.md` (6.9 s), not from those files.
 
 | Mode | How | Metering |
 |---|---|---|

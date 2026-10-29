@@ -23,7 +23,7 @@ def test_contract_scalar_defaults() -> None:
     assert default_value("budget_horizon_days") == 90
     assert default_value("budget_horizon_start") == "2026-10-28"
     assert default_value("api_base_url") == ""
-    assert default_value("owner_emails_sha256") == []
+    assert default_value("better_ride_enabled") is True
     assert default_value("model_route") == {
         "schema": "1.0",
         "read": "modal_spark_open",

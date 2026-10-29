@@ -2,7 +2,6 @@
 """Assemble the Firebase Remote Config REST template and the APK-bundled defaults.
 
   uv run --project eval python config/build_template.py --api-base-url https://…modal.run [--out FILE]
-      [--owner-email-sha256 HEX ...]
   uv run --project eval python config/build_template.py --bundled-only
 
 Writes config/remoteconfig.template.json (or --out) with api_base_url set, and always rewrites
@@ -24,20 +23,13 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--api-base-url", help="https base URL of the deployed ridemate-api web app")
     ap.add_argument("--out", type=Path, default=TEMPLATE_PATH, help="template output path")
-    ap.add_argument(
-        "--owner-email-sha256",
-        action="append",
-        default=[],
-        metavar="HEX",
-        help="SHA-256 of a lower-cased owner email (repeatable); published only in the template",
-    )
     ap.add_argument("--bundled-only", action="store_true", help="only rewrite the APK-bundled defaults")
     args = ap.parse_args(argv)
 
     if not args.bundled_only and not args.api_base_url:
         ap.error("--api-base-url is required unless --bundled-only")
     try:
-        template = None if args.bundled_only else build_template(args.api_base_url, args.owner_email_sha256)
+        template = None if args.bundled_only else build_template(args.api_base_url)
         written = write_bundled()
         if template is not None:
             write_template(template, args.out)

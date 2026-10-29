@@ -103,13 +103,16 @@ fun SettingsScreen(state: SettingsState, versionName: String, actions: SettingsA
         SectionHeader(stringResource(R.string.set_section_language))
         LanguagePicker(state.language, actions.setLanguage)
 
-        SectionHeader(stringResource(R.string.set_section_rides))
-        ToggleRow(
-            title = stringResource(R.string.set_keep_searching),
-            checked = state.keepSearching,
-            onCheckedChange = actions.setKeepSearching,
-            summary = stringResource(R.string.set_keep_searching_summary),
-        )
+        // Remote Config `better_ride_enabled` off: the whole opt-in is hidden (goal 22).
+        if (state.keepSearchingAvailable) {
+            SectionHeader(stringResource(R.string.set_section_rides))
+            ToggleRow(
+                title = stringResource(R.string.set_keep_searching),
+                checked = state.keepSearching,
+                onCheckedChange = actions.setKeepSearching,
+                summary = stringResource(R.string.set_keep_searching_summary),
+            )
+        }
 
         SectionHeader(stringResource(R.string.set_section_status))
         Text(stringResource(R.string.set_status_body), style = MaterialTheme.typography.bodyMedium)
@@ -131,7 +134,7 @@ fun SettingsScreen(state: SettingsState, versionName: String, actions: SettingsA
         Spacer(Modifier.size(16.dp))
     }
     EraseDialogHost(state.eraseDialog, actions)
-    if (state.keepSearchingWarning) KeepSearchingWarning(actions.confirmKeepSearching, actions.dismissKeepSearching)
+    if (state.keepSearchingWarning && state.keepSearchingAvailable) KeepSearchingWarning(actions.confirmKeepSearching, actions.dismissKeepSearching)
 }
 
 /** English / हिन्दी (and "phone's language"), each a radio row read with its own name. */

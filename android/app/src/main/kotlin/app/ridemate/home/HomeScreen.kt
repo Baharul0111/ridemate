@@ -260,6 +260,7 @@ fun KillSwitchStatusList(switches: KillSwitches, modifier: Modifier = Modifier) 
         Provider.LIVE_APPS.forEach { add(stringResource(R.string.home_switch_reader, it.displayName) to switches.readerEnabledFor(it)) }
         add(stringResource(R.string.home_switch_ondc) to switches.ondcEnabled)
         add(stringResource(R.string.home_switch_demo) to switches.demoEnabled)
+        add(stringResource(R.string.home_switch_better_ride) to switches.betterRideEnabled)
     }
     FlowRow(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         rows.forEach { (label, enabled) ->

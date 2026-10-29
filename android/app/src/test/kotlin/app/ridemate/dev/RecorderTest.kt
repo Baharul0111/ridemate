@@ -35,7 +35,7 @@ class RecorderTest {
     private lateinit var db: RideMateDb
     private val auth = MutableStateFlow<AuthState>(AuthState.Google("owner@example.com", "Owner", null, "o"))
     private val clock = FakeClock()
-    private val gate = DeveloperModeGate(InMemoryKeyValueStore(), auth, { setOf(OwnerEmails.hash("owner@example.com")) }, clock)
+    private val gate = DeveloperModeGate(InMemoryKeyValueStore(), auth, { state -> (state as? AuthState.Google)?.uid == "o" }, clock)
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
 
     @Before

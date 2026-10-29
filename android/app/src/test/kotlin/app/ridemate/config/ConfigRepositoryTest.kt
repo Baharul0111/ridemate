@@ -108,6 +108,7 @@ class ConfigRepositoryTest {
         backend.fetched[ConfigKeys.readerEnabled(Provider.OLA)] = "false"
         backend.fetched[ConfigKeys.ONDC_ENABLED] = "false"
         backend.fetched[ConfigKeys.DEMO_ENABLED] = "false"
+        backend.fetched[ConfigKeys.BETTER_RIDE_ENABLED] = "false"
         backend.publishUpdate(setOf(ConfigKeys.AI_READER_ENABLED))
 
         withTimeout(5_000) { repo.aiReaderEnabled.first { !it } }
@@ -118,6 +119,9 @@ class ConfigRepositoryTest {
         assertFalse(repo.readerEnabled(Provider.DEMO_KESTREL).value)
         assertFalse(repo.readerEnabled(Provider.ONDC).value)
         assertFalse(repo.killSwitches.value.readerEnabledFor(Provider.OLA))
+        assertFalse(repo.betterRideEnabled.value)
+        assertFalse(repo.killSwitches.value.betterRideEnabled)
+        assertTrue(ConfigKeys.BETTER_RIDE_ENABLED in ConfigKeys.KILL_SWITCHES)
     }
 
     @Test

@@ -76,6 +76,12 @@
       "type": "string"
     },
     "latency_ms": {
+      "description": "Server-side model time: the router's timing of the model call (gateway mode) or the API's own latency_ms (http mode). Never the harness's wall time.",
+      "type": "integer",
+      "minimum": 0
+    },
+    "wall_ms": {
+      "description": "The recording harness's wall time for the whole call (network, Modal Dict reservation and settlement included). Not a model latency.",
       "type": "integer",
       "minimum": 0
     },

@@ -3,11 +3,12 @@ package app.ridemate.core.config
 import app.ridemate.core.model.Provider
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.builtins.ListSerializer
-import kotlinx.serialization.builtins.serializer
 import java.time.LocalDate
 
-/** Remote Config scalar key names (contracts §2.7). */
+/**
+ * Remote Config scalar key names (contracts §2.7). There are no identity lists among them: judges and owners stay on
+ * the server (every install can fetch the client template), and the phone learns "owner" from `/v1/config-check`.
+ */
 object ScalarKeys {
     const val AI_READER_ENABLED = "ai_reader_enabled"
     const val READER_ENABLED_UBER = "reader_enabled_uber"
@@ -15,6 +16,7 @@ object ScalarKeys {
     const val READER_ENABLED_RAPIDO = "reader_enabled_rapido"
     const val ONDC_ENABLED = "ondc_enabled"
     const val DEMO_ENABLED = "demo_enabled"
+    const val BETTER_RIDE_ENABLED = "better_ride_enabled"
     const val MODEL_ROUTE = "model_route"
     const val LATEST_VERSION = "latest_version"
     const val MIN_SUPPORTED_VERSION = "min_supported_version"
@@ -23,8 +25,6 @@ object ScalarKeys {
     const val BUDGET_HORIZON_DAYS = "budget_horizon_days"
     const val BUDGET_HORIZON_START = "budget_horizon_start"
     const val API_BASE_URL = "api_base_url"
-    const val JUDGE_ALLOWLIST = "judge_allowlist"
-    const val OWNER_EMAILS_SHA256 = "owner_emails_sha256"
 }
 
 enum class CapProfile { NORMAL, JUDGING }
@@ -41,12 +41,6 @@ data class LatestVersion(
     val sha256: String = "",
 )
 
-@Serializable
-data class JudgeAllowlist(
-    val schema: String,
-    @SerialName("sha256_emails") val sha256Emails: List<String> = emptyList(),
-)
-
 /**
  * Typed view of the scalar keys. Every value falls back to its contracts §2.7 default on its own when missing or
  * malformed, so one bad key never takes the others down; JSON values are schema-major checked.
@@ -58,6 +52,8 @@ data class ScalarConfig(
     val readerEnabledRapido: Boolean = true,
     val ondcEnabled: Boolean = true,
     val demoEnabled: Boolean = true,
+    /** Opt-in better-ride offers ("Keep searching") may run; false is the remote kill switch. */
+    val betterRideEnabled: Boolean = true,
     val modelRoute: ModelRoute? = null,
     val latestVersion: LatestVersion? = null,
     val minSupportedVersion: Long = 1,
@@ -68,8 +64,6 @@ data class ScalarConfig(
     val budgetHorizonStart: LocalDate = DEFAULT_HORIZON_START,
     /** Empty until set at deploy; AI calls are impossible without it. */
     val apiBaseUrl: String = "",
-    val judgeAllowlistSha256: Set<String> = emptySet(),
-    val ownerEmailsSha256: Set<String> = emptySet(),
 ) {
     /** Kill switches (§4.2 Config): AI reading for a ride app needs both the global and the per-app switch. */
     fun aiReaderEnabledFor(app: Provider): Boolean = aiReaderEnabled && when (app) {
@@ -81,7 +75,6 @@ data class ScalarConfig(
 
     companion object {
         val DEFAULT_HORIZON_START: LocalDate = LocalDate.of(2026, 10, 28)
-        private val SHA256_HEX = Regex("^[0-9a-f]{64}$")
         private val TRUE = setOf("true", "1", "yes", "on")
         private val FALSE = setOf("false", "0", "no", "off")
 
@@ -105,6 +98,7 @@ data class ScalarConfig(
                 readerEnabledRapido = bool(ScalarKeys.READER_ENABLED_RAPIDO, d.readerEnabledRapido),
                 ondcEnabled = bool(ScalarKeys.ONDC_ENABLED, d.ondcEnabled),
                 demoEnabled = bool(ScalarKeys.DEMO_ENABLED, d.demoEnabled),
+                betterRideEnabled = bool(ScalarKeys.BETTER_RIDE_ENABLED, d.betterRideEnabled),
                 modelRoute = json(ScalarKeys.MODEL_ROUTE) { decodeFareSidePayload(it, ModelRoute.serializer()) },
                 latestVersion = json(ScalarKeys.LATEST_VERSION) {
                     decodeFareSidePayload(it, LatestVersion.serializer()).also { v ->
@@ -122,19 +116,9 @@ data class ScalarConfig(
                     ?.takeIf { it in 1..3650 } ?: d.budgetHorizonDays,
                 budgetHorizonStart = values[ScalarKeys.BUDGET_HORIZON_START]?.let(::dateOrNull) ?: d.budgetHorizonStart,
                 apiBaseUrl = values[ScalarKeys.API_BASE_URL]?.trim()?.takeIf { it.startsWith("https://") } ?: d.apiBaseUrl,
-                judgeAllowlistSha256 = json(ScalarKeys.JUDGE_ALLOWLIST) {
-                    decodeFareSidePayload(it, JudgeAllowlist.serializer()).sha256Emails.hashes()
-                } ?: emptySet(),
-                ownerEmailsSha256 = json(ScalarKeys.OWNER_EMAILS_SHA256) {
-                    ConfigJson.decodeFromString(ListSerializer(String.serializer()), it).hashes()
-                } ?: emptySet(),
             )
         }
 
         private fun dateOrNull(text: String): LocalDate? = runCatching { LocalDate.parse(text.trim()) }.getOrNull()
-
-        /** Lower-cased SHA-256 hex digests; a list with any malformed entry is rejected as a whole. */
-        private fun List<String>.hashes(): Set<String> = map { it.trim().lowercase() }
-            .also { list -> require(list.all { SHA256_HEX.matches(it) }) { "malformed sha256 list" } }.toSet()
     }
 }

@@ -5,7 +5,6 @@ import app.ridemate.dev.DevExports
 import app.ridemate.dev.DeveloperModeGate
 import app.ridemate.dev.FirebaseOwnerPushTokens
 import app.ridemate.dev.GoldenStore
-import app.ridemate.dev.OwnerEmails
 import app.ridemate.dev.OwnerPushTokens
 import app.ridemate.dev.RecorderSink
 import app.ridemate.dev.RoomRecorderSink
@@ -54,8 +53,9 @@ class AppShell(private val graph: AppGraph) {
         DeveloperModeGate(
             store = SharedPrefsKeyValueStore(context, PREFS_DEV),
             auth = graph.authGateway.state,
-            ownerHashes = { OwnerEmails.hashesFrom(graph.configRepository) },
+            isOwnerAccount = { state -> graph.serverOwnerStatus.isOwner(state) },
             clock = graph.clock,
+            ownerChanges = graph.serverOwnerStatus.confirmedOwnerUid,
         )
     }
 

@@ -447,7 +447,7 @@ def _unverified_claims(token: str) -> dict[str, Any]:
 
 
 def judge_allowlist(*emails: str) -> dict[str, Any]:
-    """A Remote Config `judge_allowlist` value for these emails."""
+    """The server-only Firestore document `server_config/judge_allowlist` for these emails."""
     return {
         "schema": "1.0",
         "sha256_emails": [hashlib.sha256(e.strip().lower().encode()).hexdigest() for e in emails],

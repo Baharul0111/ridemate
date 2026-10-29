@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 
-from ridemate_config.keys import DEFAULTS_DIR, KEYS, KEYS_BY_NAME, REPO_ROOT, SCHEMAS_DIR
+from ridemate_config.keys import DEFAULTS_DIR, KEYS, KEYS_BY_NAME, REPO_ROOT, SCHEMAS_DIR, SERVER_ONLY_KEYS
 
 
 def contract_keys() -> set[str]:
@@ -22,7 +22,7 @@ def contract_keys() -> set[str]:
 
 def test_contract_parser_sees_known_keys() -> None:
     keys = contract_keys()
-    assert {"notification_templates", "launch_templates", "reader_enabled_ola", "owner_emails_sha256"} <= keys
+    assert {"notification_templates", "launch_templates", "reader_enabled_ola", "better_ride_enabled"} <= keys
 
 
 def test_every_contract_key_present() -> None:
@@ -43,6 +43,7 @@ def test_value_types_match_contract_table() -> None:
         "reader_enabled_uber": "BOOLEAN",
         "ondc_enabled": "BOOLEAN",
         "demo_enabled": "BOOLEAN",
+        "better_ride_enabled": "BOOLEAN",
         "point_supported": "BOOLEAN",
         "min_supported_version": "NUMBER",
         "budget_horizon_days": "NUMBER",
@@ -52,9 +53,16 @@ def test_value_types_match_contract_table() -> None:
         "api_base_url": "STRING",
         "model_route": "JSON",
         "latest_version": "JSON",
-        "judge_allowlist": "JSON",
-        "owner_emails_sha256": "JSON",
         "notification_templates": "JSON",
     }
     for name, value_type in expected.items():
         assert KEYS_BY_NAME[name].value_type == value_type, name
+
+
+def test_identity_lists_are_never_client_config() -> None:
+    """Every install can fetch the client template: judge, tester and owner identities must not be in it."""
+    assert not SERVER_ONLY_KEYS & set(KEYS_BY_NAME)
+    assert not SERVER_ONLY_KEYS & contract_keys()
+    for key in SERVER_ONLY_KEYS:
+        assert not (DEFAULTS_DIR / f"{key}.json").exists()
+        assert not (SCHEMAS_DIR / f"{key}.schema.json").exists()

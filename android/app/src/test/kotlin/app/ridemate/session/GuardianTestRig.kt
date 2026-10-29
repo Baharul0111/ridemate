@@ -48,6 +48,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.robolectric.Shadows.shadowOf
@@ -69,6 +71,10 @@ class AssetGuardianConfig(private val appContext: Context) : GuardianConfigSourc
     override fun templates(): NotificationTemplatesConfig = templates
     override fun feeRules(): FeeRules = fees
     override fun cancelSteps(provider: Provider): List<CancelStep> = cards.cardFor(provider.packageName)?.stepsFor("en").orEmpty()
+
+    /** Remote Config `better_ride_enabled`, flipped by tests. */
+    val betterRide = MutableStateFlow(true)
+    override val betterRideEnabled: StateFlow<Boolean> get() = betterRide
 
     companion object {
         /** The bundled payloads keyed by Remote Config key, for [app.ridemate.testing.TestSeams.bundled]. */

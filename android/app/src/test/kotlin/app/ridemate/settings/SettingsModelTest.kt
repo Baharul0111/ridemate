@@ -22,6 +22,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
@@ -38,11 +40,14 @@ class SettingsModelTest {
     private val graph = app.graph
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
 
-    private fun model(language: LanguageController = DefaultLanguageController(FakeLocaleBackend(), graph.appShell.settingsStore)) =
+    private fun model(
+        language: LanguageController = DefaultLanguageController(FakeLocaleBackend(), graph.appShell.settingsStore),
+        killSwitches: StateFlow<KillSwitches> = graph.configRepository.killSwitches,
+    ) =
         SettingsModel(
             store = graph.appShell.settingsStore,
             language = language,
-            killSwitches = graph.configRepository.killSwitches,
+            killSwitches = killSwitches,
             eraseStatus = graph.eraseUseCase.status,
             erase = { graph.eraseUseCase.erase() },
             auth = graph.authGateway,
@@ -97,6 +102,22 @@ class SettingsModelTest {
         assertFalse(settings.state.value.keepSearchingWarning)
         settings.setKeepSearching(false)
         assertFalse(graph.appShell.settingsStore.keepSearchingDefault.value)
+    }
+
+    @Test
+    fun `remote better_ride_enabled off hides keep searching and it cannot be turned on`() {
+        val switches = MutableStateFlow(KillSwitches(betterRideEnabled = false))
+        val settings = model(killSwitches = switches)
+        assertFalse(settings.state.value.keepSearchingAvailable)
+        settings.setKeepSearching(true)
+        assertFalse("no warning, nothing to confirm", settings.state.value.keepSearchingWarning)
+        settings.confirmKeepSearching()
+        assertFalse(graph.appShell.settingsStore.keepSearchingDefault.value)
+
+        switches.value = KillSwitches()
+        assertTrue(settings.state.value.keepSearchingAvailable)
+        settings.setKeepSearching(true)
+        assertTrue(settings.state.value.keepSearchingWarning)
     }
 
     @Test

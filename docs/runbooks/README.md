@@ -67,14 +67,35 @@ Kill switches and other live settings are Remote Config parameters in the main F
 | `reader_enabled_uber`, `reader_enabled_ola`, `reader_enabled_rapido` | Fare reading off for one app only. Opening that app and watching its notifications stay on |
 | `ondc_enabled` | ONDC hidden in the app |
 | `demo_enabled` | Try the demo hidden |
+| `better_ride_enabled` | Better-ride offers ("Keep searching") off: open live sessions stop offering a switch (as when the current driver is 2 minutes away), extra searching bookings get "Cancel the others?", and the toggle disappears from Settings and the guardian screen |
 | `cap_profile` | `normal` or `judging` (judging: $3/day cap, young-account tier on, judge allowlist on) |
-| `judge_allowlist` | SHA-256 of lower-cased judge emails who get 20 reads/day |
 | `model_route` | Which provider the server uses for reading and parsing |
 | `latest_version`, `min_supported_version` | Update prompts |
 
 **Fastest way (works from a phone browser):** Firebase console → project `ridemate` → **Remote Config** → click
 the parameter → change the value → **Save** → **Publish changes**. Phones listen for kill switches in real time and pick
 the change up within about a minute.
+
+**Never put emails or email hashes in Remote Config.** Every install can download the client template, and an unsalted
+hash can be checked against guessed emails. The judge allowlist is the Firestore document
+`server_config/judge_allowlist` ([how](cap-tripped-or-abuse.md#judges-are-being-cut-off)); owners are the
+`OWNER_EMAILS` secret, and the app asks `/v1/config-check` whether the signed-in account is the owner. If an older
+template still has `judge_allowlist` or `owner_emails_sha256` parameters, delete them and publish.
+
+### Unverified real-app payloads
+
+`notification_templates`, `cancel_cards`, `fee_rules` and the Hindi/English `fare_parsers` entries for Uber, Ola and
+Rapido were written from general knowledge, not from recorded screens or notifications. Until you record them, treat
+every real-app detection, cancel proof, cancel step and fee window (goal items 9–15) as **unverified for that app**; only
+the demo providers' payloads match recorded screens. In particular, with `ongoing_channel_ids` and `redacted` still
+empty, the "+60 s ride still live?" check and Android 15's redacted ongoing posts cannot be recognised, so expect more
+"Is your captain still coming?" prompts on those apps.
+
+To verify an app: developer mode → Recorder on → take real searching, assigned, arriving, driver-cancelled, no-drivers,
+cancelled and ended rides in that app → export. Then set the real regexes, `eta`/`dist`/`plate` groups, `redacted`
+templates, `ongoing_channel_ids`, cancel steps, cancelled keywords and fee windows through Remote Config; add the masked
+samples to `config/tests/test_patterns.py` and `BundledTemplatesPipelineTest`; and change that app's `notes` entry to
+start with `verified against Recorder export <date>` (`config/README.md`).
 
 **From the terminal:**
 

@@ -44,6 +44,7 @@
     <string name="home_switch_reader">%1$s पढ़ना</string>
     <string name="home_switch_ondc">ओपन नेटवर्क (ONDC)</string>
     <string name="home_switch_demo">डेमो</string>
+    <string name="home_switch_better_ride">बेहतर राइड के सुझाव</string>
 
     <string name="home_issue_listener_title">RideMate राइड ऐप्स की सूचनाएँ नहीं देख पा रहा</string>
     <string name="home_issue_listener_body">सूचना-पहुँच के बिना RideMate नहीं जान सकता कि ड्राइवर ने राइड कब स्वीकार की, इसलिए वह अतिरिक्त बुकिंग रद्द करने की याद नहीं दिला सकता।</string>

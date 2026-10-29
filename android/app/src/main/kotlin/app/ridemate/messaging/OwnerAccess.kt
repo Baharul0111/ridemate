@@ -1,44 +1,87 @@
 package app.ridemate.messaging
 
 import app.ridemate.auth.AuthState
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonPrimitive
-import java.security.MessageDigest
-import java.util.Locale
+import app.ridemate.net.ApiResult
+import app.ridemate.net.ConfigCheckResponse
+import app.ridemate.ui.KeyValueStore
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 
 /**
- * Who the owner is: a Google-signed-in user whose lower-cased email's SHA-256 is in Remote Config
- * `owner_emails_sha256` (contracts §2.7), the list that enables developer mode. Anonymous and signed-out users are
- * never the owner; the email itself never leaves the phone (only its hash is compared, locally).
+ * Who the owner is, as the server says (contracts §1.3, §2.7). `/v1/config-check` answers `is_owner` for the signed-in
+ * Google account: the server compares the verified email with its own `OWNER_EMAILS` secret. The phone ships no owner
+ * list, so no install can learn or test-guess the owner's email from Remote Config or the APK.
+ *
+ * The last answer is remembered for that Google uid only, so developer mode and owner alerts keep working offline.
+ * Any other account, an anonymous user or a signed-out phone is never the owner, and nothing but a server answer for
+ * the account that is still signed in changes what is remembered (fails closed).
+ */
+class ServerOwnerStatus(
+    private val store: KeyValueStore,
+    private val authState: () -> AuthState,
+    private val configCheck: suspend () -> ApiResult<ConfigCheckResponse>,
+) {
+    private val ownerUid = MutableStateFlow(store.get(K_OWNER_UID)?.takeIf { it.isNotBlank() })
+
+    /** The Google uid the server last confirmed as the owner, or null; owner-only work re-checks when it changes. */
+    val confirmedOwnerUid: StateFlow<String?> = ownerUid.asStateFlow()
+
+    /** True when [state] is the Google account the server confirmed as the owner. */
+    fun isOwner(state: AuthState): Boolean {
+        val uid = googleUid(state) ?: return false
+        return uid == ownerUid.value
+    }
+
+    /**
+     * Asks `/v1/config-check` about the signed-in Google account and remembers the answer. Offline, a server error or an
+     * account change during the call leave the last answer as it was.
+     */
+    suspend fun refresh() {
+        val uid = googleUid(authState()) ?: return
+        val body = configCheck().getOrNull() ?: return
+        if (googleUid(authState()) != uid) return
+        record(uid, body.isOwner)
+    }
+
+    /** Records the server's answer for [uid]: a "no" for another account never clears the owner's entry. */
+    fun record(uid: String, isOwner: Boolean) {
+        val current = ownerUid.value
+        val next = when {
+            isOwner -> uid
+            current == uid -> null
+            else -> current
+        }
+        if (next == current) return
+        store.put(K_OWNER_UID, next)
+        ownerUid.value = next
+    }
+
+    /** Erase: forget the owner confirmation. */
+    fun clear() {
+        store.put(K_OWNER_UID, null)
+        ownerUid.value = null
+    }
+
+    private fun googleUid(state: AuthState): String? = (state as? AuthState.Google)?.uid?.takeIf { it.isNotBlank() }
+
+    companion object {
+        const val PREFS_NAME = "ridemate_owner"
+        private const val K_OWNER_UID = "server_confirmed_owner_uid"
+    }
+}
+
+/**
+ * Whether the signed-in user is the owner, for owner alerts and the owner's FCM token: true only for the Google account
+ * the server confirmed ([ServerOwnerStatus]). Anonymous and signed-out users are never the owner.
  */
 class OwnerAccess(
     private val authState: () -> AuthState,
-    private val ownerEmailHashes: () -> Set<String>,
+    private val isOwnerAccount: (AuthState) -> Boolean,
 ) {
     /** True when the signed-in user is the owner (developer mode enabled for them). */
     fun isOwner(): Boolean {
-        val google = authState() as? AuthState.Google ?: return false
-        val email = google.email?.trim()?.takeIf { it.isNotEmpty() } ?: return false
-        val hashes = ownerEmailHashes()
-        return hashes.isNotEmpty() && emailHash(email) in hashes
-    }
-
-    companion object {
-        private val SHA256_HEX = Regex("^[0-9a-f]{64}$")
-        private val JSON = Json { ignoreUnknownKeys = true }
-
-        /** SHA-256 hex of the lower-cased, trimmed email (the format of `owner_emails_sha256`). */
-        fun emailHash(email: String): String =
-            MessageDigest.getInstance("SHA-256").digest(email.trim().lowercase(Locale.ROOT).toByteArray(Charsets.UTF_8))
-                .joinToString("") { "%02x".format(it) }
-
-        /** Parses the bare JSON list of `owner_emails_sha256`; anything malformed yields no owners (fail closed). */
-        fun parseHashes(raw: String?): Set<String> {
-            val array = runCatching { JSON.parseToJsonElement(raw.orEmpty().trim()) as? JsonArray }.getOrNull() ?: return emptySet()
-            return array.mapNotNull { (it as? JsonPrimitive)?.takeIf { p -> p.isString }?.content?.trim()?.lowercase(Locale.ROOT) }
-                .filter { SHA256_HEX.matches(it) }
-                .toSet()
-        }
+        val state = authState() as? AuthState.Google ?: return false
+        return runCatching { isOwnerAccount(state) }.getOrDefault(false)
     }
 }
