@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Hero: demo. A practice screen with a play button, three made-up ride companies and a lab-flask tag. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="240dp" android:height="160dp"
+    android:viewportWidth="240" android:viewportHeight="160">
+    <path android:fillColor="@color/rm_illo_bg"
+        android:pathData="M50,84a70,70 0 1,0 140,0a70,70 0 1,0 -140,0z" />
+    <!-- Practice screen -->
+    <path android:fillColor="@color/rm_illo_sheet" android:strokeColor="@color/rm_illo_line" android:strokeWidth="2"
+        android:pathData="M76,32h88a16,16 0 0,1 16,16v64a16,16 0 0,1 -16,16h-88a16,16 0 0,1 -16,-16v-64a16,16 0 0,1 16,-16z" />
+    <path android:fillColor="@color/rm_illo_brand"
+        android:pathData="M98,70a22,22 0 1,0 44,0a22,22 0 1,0 -44,0z" />
+    <path android:fillColor="@color/rm_illo_sheet"
+        android:pathData="M114,59L134,70L114,81Z" />
+    <!-- Three made-up companies -->
+    <path android:fillColor="@color/rm_illo_brand_soft"
+        android:pathData="M88,108a8,8 0 1,0 16,0a8,8 0 1,0 -16,0z" />
+    <path android:fillColor="@color/rm_illo_accent"
+        android:pathData="M112,108a8,8 0 1,0 16,0a8,8 0 1,0 -16,0z" />
+    <path android:fillColor="@color/rm_illo_muted"
+        android:pathData="M136,108a8,8 0 1,0 16,0a8,8 0 1,0 -16,0z" />
+    <!-- Flask tag -->
+    <path android:fillColor="@color/rm_illo_accent"
+        android:pathData="M46,36a14,14 0 1,0 28,0a14,14 0 1,0 -28,0z" />
+    <path android:fillColor="@color/rm_illo_ink"
+        android:pathData="M55,27h10v2h-2v5l5,9c0.6,1.1 -0.2,2 -1.3,2h-13.4c-1.1,0 -1.9,-0.9 -1.3,-2l5,-9v-5h-2z" />
+    <!-- Dots -->
+    <path android:fillColor="@color/rm_illo_brand"
+        android:pathData="M185,40a3,3 0 1,0 6,0a3,3 0 1,0 -6,0z" />
+    <path android:fillColor="@color/rm_illo_brand_soft"
+        android:pathData="M186,120a4,4 0 1,0 8,0a4,4 0 1,0 -8,0z" />
+</vector>

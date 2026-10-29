@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- RideMate in-house glyph: auto-rickshaw, side view facing right: rounded canopy over open sides, a short
+     nose and a small front wheel on a fork ahead of the body (24 dp grid). Tinted by the caller. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp" android:height="24dp"
+    android:viewportWidth="24" android:viewportHeight="24">
+    <!-- Canopy and body, with the passenger and driver openings cut out -->
+    <path android:fillColor="#FF000000" android:fillType="evenOdd"
+        android:pathData="M2.5,15.5V7.5C2.5,5.6 4.1,4 6,4H14C16.5,4 18.5,5.8 19,8.2L19.8,12.2C19.9,12.8 19.5,13.3 18.9,13.3H14.5L13.5,15.5H9.8a2.8,2.8 0 0,0 -5.6,0ZM4.5,10.8V7.8C4.5,6.8 5.3,6 6.3,6H11V10.8ZM12.5,6H14C15.6,6 16.8,7.1 17.1,8.6L17.5,10.8H12.5Z" />
+    <!-- Front fork -->
+    <path android:strokeColor="#FF000000" android:strokeWidth="1.6" android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M18.2,13L19.4,16.4" />
+    <!-- Wheels: big rear, small front -->
+    <path android:fillColor="#FF000000" android:fillType="evenOdd"
+        android:pathData="M4.7,16.4a2.3,2.3 0 1,0 4.6,0a2.3,2.3 0 1,0 -4.6,0zM6,16.4a1,1 0 1,1 2,0a1,1 0 1,1 -2,0zM17.4,16.6a2,2 0 1,0 4,0a2,2 0 1,0 -4,0zM18.6,16.6a0.8,0.8 0 1,1 1.6,0a0.8,0.8 0 1,1 -1.6,0z" />
+</vector>

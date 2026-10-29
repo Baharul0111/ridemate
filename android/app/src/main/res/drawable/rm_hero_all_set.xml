@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Hero: all set. A big tick with a soft ring and confetti. In-house art. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="240dp" android:height="160dp"
+    android:viewportWidth="240" android:viewportHeight="160">
+    <path android:fillColor="@color/rm_illo_bg"
+        android:pathData="M50,84a70,70 0 1,0 140,0a70,70 0 1,0 -140,0z" />
+    <path android:strokeColor="@color/rm_illo_brand_soft" android:strokeWidth="3" android:fillColor="#00000000"
+        android:pathData="M68,84a52,52 0 1,0 104,0a52,52 0 1,0 -104,0z" />
+    <path android:fillColor="@color/rm_illo_good"
+        android:pathData="M80,84a40,40 0 1,0 80,0a40,40 0 1,0 -80,0z" />
+    <path android:strokeColor="@color/rm_illo_sheet" android:strokeWidth="9" android:strokeLineCap="round"
+        android:strokeLineJoin="round" android:fillColor="#00000000"
+        android:pathData="M101,85L115,99L141,70" />
+    <!-- Confetti -->
+    <path android:fillColor="@color/rm_illo_accent"
+        android:pathData="M60,40l8,-3l2,6l-8,3zM179.5,112a4,4 0 1,0 8,0a4,4 0 1,0 -8,0zM89,140a3,3 0 1,0 6,0a3,3 0 1,0 -6,0zM41.5,76a2.5,2.5 0 1,0 5,0a2.5,2.5 0 1,0 -5,0z" />
+    <path android:fillColor="@color/rm_illo_brand"
+        android:pathData="M176,36l6,4l-4,6l-6,-4zM147,26a3,3 0 1,0 6,0a3,3 0 1,0 -6,0zM193.5,74a2.5,2.5 0 1,0 5,0a2.5,2.5 0 1,0 -5,0z" />
+    <path android:fillColor="@color/rm_illo_brand_soft"
+        android:pathData="M53,108a3,3 0 1,0 6,0a3,3 0 1,0 -6,0z" />
+</vector>

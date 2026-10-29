@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- RideMate in-house glyph: cab (sedan), side view facing right (24 dp grid). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp" android:height="24dp"
+    android:viewportWidth="24" android:viewportHeight="24">
+    <!-- Body with two windows cut out -->
+    <path android:fillColor="#FF000000" android:fillType="evenOdd"
+        android:pathData="M22,15.5V12.8C22,12 21.5,11.5 20.7,11.4L17.5,11L15,7.8C14.6,7.3 14,7 13.3,7H8.5C7.8,7 7.2,7.3 6.8,7.9L4.8,11L3.4,11.3C2.6,11.5 2,12.2 2,13V15.5H4.1a3,3 0 0,1 5.8,0H14.1a3,3 0 0,1 5.8,0ZM14.6,10.6L13,8.6H11.2V10.6ZM9.8,8.6H8.7C8.4,8.6 8.1,8.8 8,9L7,10.6H9.8Z" />
+    <!-- Wheels -->
+    <path android:fillColor="#FF000000" android:fillType="evenOdd"
+        android:pathData="M4.7,16.4a2.3,2.3 0 1,0 4.6,0a2.3,2.3 0 1,0 -4.6,0zM6,16.4a1,1 0 1,1 2,0a1,1 0 1,1 -2,0zM14.7,16.4a2.3,2.3 0 1,0 4.6,0a2.3,2.3 0 1,0 -4.6,0zM16,16.4a1,1 0 1,1 2,0a1,1 0 1,1 -2,0z" />
+</vector>

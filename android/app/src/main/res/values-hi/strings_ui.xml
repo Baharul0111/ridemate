@@ -16,4 +16,60 @@
 
     <string name="ui_update_required_title">RideMate अपडेट करें</string>
     <string name="ui_update_required_body">यह संस्करण अब किराए की तुलना या राइड पर सुरक्षित नज़र नहीं रख सकता। RideMate इस्तेमाल करते रहने के लिए नीचे से अपडेट डाउनलोड करें। तब तक आपकी गोपनीयता सेटिंग्स उपलब्ध रहेंगी।</string>
+
+    <!-- डिज़ाइन सिस्टम के हिस्से: छोटे, सीधे शब्द। -->
+    <string name="rm_where_to">कहाँ जाना है?</string>
+    <string name="rm_where_to_cd">मंज़िल खोजें</string>
+    <string name="rm_voice_search">बोलकर बताएँ</string>
+    <string name="rm_pickup">कहाँ से</string>
+    <string name="rm_drop">कहाँ तक</string>
+    <string name="rm_pickup_cd">कहाँ से: %1$s</string>
+    <string name="rm_drop_cd">कहाँ तक: %1$s</string>
+    <string name="rm_edit_place">बदलें</string>
+
+    <string name="rm_cheapest">सबसे सस्ता</string>
+    <string name="rm_check_in_app">ऐप में देखें</string>
+    <string name="rm_unreadable_cd">किराया पढ़ा नहीं जा सका। ऐप में देखें</string>
+    <string name="rm_entered_by_you">आपने लिखा</string>
+    <string name="rm_network_quote">नेटवर्क</string>
+    <string name="rm_seen_at">%1$s पर देखा</string>
+    <plurals name="rm_minutes_ago">
+        <item quantity="one">%d मिनट पहले</item>
+        <item quantity="other">%d मिनट पहले</item>
+    </plurals>
+    <string name="rm_old_price">पुराना किराया</string>
+    <string name="rm_refresh_price">%1$s का किराया फिर पढ़ें</string>
+    <string name="rm_type_price">किराया लिखें</string>
+    <string name="rm_open_app">%1$s खोलें</string>
+    <string name="rm_eta_min">%1$d मिनट</string>
+    <string name="rm_eta_cd">%1$d मिनट में पिकअप</string>
+
+    <string name="rm_vehicle_bike">बाइक</string>
+    <string name="rm_vehicle_auto">ऑटो</string>
+    <string name="rm_vehicle_cab">कैब</string>
+    <string name="rm_vehicle_cab_premium">प्रीमियम</string>
+    <string name="rm_vehicle_cab_xl">बड़ी कैब</string>
+    <string name="rm_vehicle_other">अन्य</string>
+    <string name="rm_provider_demo_cd">%1$s, डेमो</string>
+
+    <string name="rm_state_not_booked">बुक नहीं</string>
+    <string name="rm_state_searching">खोज जारी</string>
+    <string name="rm_state_check_app">ऐप देखें</string>
+    <string name="rm_state_driver_coming">ड्राइवर आ रहा है</string>
+    <string name="rm_state_on_trip">सफ़र जारी</string>
+    <string name="rm_state_cancelling">रद्द हो रहा है</string>
+    <string name="rm_state_cancelled">रद्द हो गया</string>
+    <string name="rm_state_driver_cancelled">ड्राइवर ने रद्द किया</string>
+    <string name="rm_state_ended">सफ़र पूरा</string>
+    <string name="rm_state_closed">राइड नहीं मिली</string>
+
+    <string name="rm_leg_proven">पक्का हुआ</string>
+    <string name="rm_leg_not_proven">अभी पक्का नहीं</string>
+
+    <string name="rm_why">क्यों?</string>
+    <string name="rm_close">बंद करें</string>
+    <string name="rm_dismiss">हटाएँ</string>
+    <string name="rm_step_of">%2$d में से चरण %1$d</string>
+    <string name="rm_offline">ऑफ़लाइन</string>
+    <string name="rm_retry">फिर कोशिश करें</string>
 </resources>

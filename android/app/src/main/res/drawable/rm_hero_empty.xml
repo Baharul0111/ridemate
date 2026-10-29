@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Hero: empty state. A small map, a dotted route from a start dot to a pin, and a magnifier. In-house art. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="240dp" android:height="160dp"
+    android:viewportWidth="240" android:viewportHeight="160">
+    <path android:fillColor="@color/rm_illo_bg"
+        android:pathData="M50,84a70,70 0 1,0 140,0a70,70 0 1,0 -140,0z" />
+    <!-- Map -->
+    <path android:fillColor="@color/rm_illo_sheet" android:strokeColor="@color/rm_illo_line" android:strokeWidth="2"
+        android:pathData="M70,36h100a14,14 0 0,1 14,14v68a14,14 0 0,1 -14,14h-100a14,14 0 0,1 -14,-14v-68a14,14 0 0,1 14,-14z" />
+    <path android:strokeColor="@color/rm_illo_line" android:strokeWidth="4" android:fillColor="#00000000"
+        android:pathData="M57,70H183M104,37V131M162,37V131" />
+    <!-- Dotted route -->
+    <path android:fillColor="@color/rm_illo_brand_soft"
+        android:pathData="M87.5,110a2.5,2.5 0 1,0 5,0a2.5,2.5 0 1,0 -5,0zM96.5,104a2.5,2.5 0 1,0 5,0a2.5,2.5 0 1,0 -5,0zM104.5,97a2.5,2.5 0 1,0 5,0a2.5,2.5 0 1,0 -5,0zM113.5,92a2.5,2.5 0 1,0 5,0a2.5,2.5 0 1,0 -5,0zM123.5,89a2.5,2.5 0 1,0 5,0a2.5,2.5 0 1,0 -5,0zM132.5,86a2.5,2.5 0 1,0 5,0a2.5,2.5 0 1,0 -5,0zM140.5,82a2.5,2.5 0 1,0 5,0a2.5,2.5 0 1,0 -5,0z" />
+    <!-- Start dot -->
+    <path android:fillColor="@color/rm_illo_brand" android:fillType="evenOdd"
+        android:pathData="M74,112a6,6 0 1,0 12,0a6,6 0 1,0 -12,0zM77.5,112a2.5,2.5 0 1,1 5,0a2.5,2.5 0 1,1 -5,0z" />
+    <!-- Pin -->
+    <path android:fillColor="@color/rm_illo_brand" android:fillType="evenOdd"
+        android:pathData="M152,36c-8.8,0 -16,7.2 -16,16c0,12 16,28 16,28s16,-16 16,-28c0,-8.8 -7.2,-16 -16,-16zM146,52a6,6 0 1,1 12,0a6,6 0 1,1 -12,0z" />
+    <!-- Magnifier -->
+    <path android:strokeColor="@color/rm_illo_accent" android:strokeWidth="5" android:fillColor="#00000000"
+        android:pathData="M168,118a12,12 0 1,0 24,0a12,12 0 1,0 -24,0z" />
+    <path android:strokeColor="@color/rm_illo_accent" android:strokeWidth="6" android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M189,127L197,135" />
+</vector>

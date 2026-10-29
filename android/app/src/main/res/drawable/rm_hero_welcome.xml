@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Hero: welcome. A phone listing fares, the cheapest one starred, a cab and an auto waiting. In-house art. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="240dp" android:height="160dp"
+    android:viewportWidth="240" android:viewportHeight="160">
+    <path android:fillColor="@color/rm_illo_bg"
+        android:pathData="M50,84a70,70 0 1,0 140,0a70,70 0 1,0 -140,0z" />
+    <path android:fillColor="@color/rm_illo_line"
+        android:pathData="M38,140h164a2,2 0 0,1 0,4h-164a2,2 0 0,1 0,-4z" />
+    <!-- Phone -->
+    <path android:fillColor="@color/rm_illo_ink"
+        android:pathData="M96,16h48a12,12 0 0,1 12,12v104a12,12 0 0,1 -12,12h-48a12,12 0 0,1 -12,-12v-104a12,12 0 0,1 12,-12z" />
+    <path android:fillColor="@color/rm_illo_sheet"
+        android:pathData="M95,26h50a6,6 0 0,1 6,6v98a6,6 0 0,1 -6,6h-50a6,6 0 0,1 -6,-6v-98a6,6 0 0,1 6,-6z" />
+    <!-- Fare cards: the first is the cheapest -->
+    <path android:fillColor="@color/rm_illo_bg" android:strokeColor="@color/rm_illo_brand" android:strokeWidth="1.5"
+        android:pathData="M99,36h42a4,4 0 0,1 4,4v14a4,4 0 0,1 -4,4h-42a4,4 0 0,1 -4,-4v-14a4,4 0 0,1 4,-4z" />
+    <path android:fillColor="@color/rm_illo_line"
+        android:pathData="M99,64h42a4,4 0 0,1 4,4v14a4,4 0 0,1 -4,4h-42a4,4 0 0,1 -4,-4v-14a4,4 0 0,1 4,-4z" />
+    <path android:fillColor="@color/rm_illo_line"
+        android:pathData="M99,92h42a4,4 0 0,1 4,4v14a4,4 0 0,1 -4,4h-42a4,4 0 0,1 -4,-4v-14a4,4 0 0,1 4,-4z" />
+    <path android:fillColor="@color/rm_illo_brand"
+        android:pathData="M99,47a4,4 0 1,0 8,0a4,4 0 1,0 -8,0z" />
+    <path android:fillColor="@color/rm_illo_muted"
+        android:pathData="M99,75a4,4 0 1,0 8,0a4,4 0 1,0 -8,0zM99,103a4,4 0 1,0 8,0a4,4 0 1,0 -8,0z" />
+    <path android:fillColor="@color/rm_illo_muted"
+        android:pathData="M111.5,45h11a1.5,1.5 0 0,1 0,3h-11a1.5,1.5 0 0,1 0,-3zM111.5,73h11a1.5,1.5 0 0,1 0,3h-11a1.5,1.5 0 0,1 0,-3zM111.5,101h11a1.5,1.5 0 0,1 0,3h-11a1.5,1.5 0 0,1 0,-3z" />
+    <path android:fillColor="@color/rm_illo_brand"
+        android:pathData="M129,43h10a2,2 0 0,1 2,2v4a2,2 0 0,1 -2,2h-10a2,2 0 0,1 -2,-2v-4a2,2 0 0,1 2,-2z" />
+    <path android:fillColor="@color/rm_illo_muted"
+        android:pathData="M129,71h10a2,2 0 0,1 2,2v4a2,2 0 0,1 -2,2h-10a2,2 0 0,1 -2,-2v-4a2,2 0 0,1 2,-2zM129,99h10a2,2 0 0,1 2,2v4a2,2 0 0,1 -2,2h-10a2,2 0 0,1 -2,-2v-4a2,2 0 0,1 2,-2z" />
+    <!-- Cheapest star -->
+    <path android:fillColor="@color/rm_illo_accent"
+        android:pathData="M138,34a8,8 0 1,0 16,0a8,8 0 1,0 -16,0z" />
+    <path android:fillColor="@color/rm_illo_sheet"
+        android:pathData="M146,29.5L147.12,32.46L150.28,32.61L147.81,34.59L148.65,37.64L146,35.9L143.35,37.64L144.19,34.59L141.72,32.61L144.88,32.46Z" />
+    <!-- Cab, left -->
+    <group android:translateX="28" android:translateY="98" android:scaleX="2.2" android:scaleY="2.2">
+        <path android:fillColor="@color/rm_illo_brand" android:fillType="evenOdd"
+            android:pathData="M22,15.5V12.8C22,12 21.5,11.5 20.7,11.4L17.5,11L15,7.8C14.6,7.3 14,7 13.3,7H8.5C7.8,7 7.2,7.3 6.8,7.9L4.8,11L3.4,11.3C2.6,11.5 2,12.2 2,13V15.5H4.1a3,3 0 0,1 5.8,0H14.1a3,3 0 0,1 5.8,0ZM14.6,10.6L13,8.6H11.2V10.6ZM9.8,8.6H8.7C8.4,8.6 8.1,8.8 8,9L7,10.6H9.8Z" />
+        <path android:fillColor="@color/rm_illo_ink"
+            android:pathData="M4.7,16.4a2.3,2.3 0 1,0 4.6,0a2.3,2.3 0 1,0 -4.6,0zM14.7,16.4a2.3,2.3 0 1,0 4.6,0a2.3,2.3 0 1,0 -4.6,0z" />
+    </group>
+    <!-- Auto, right -->
+    <group android:translateX="160" android:translateY="102" android:scaleX="2" android:scaleY="2">
+        <path android:fillColor="@color/rm_illo_accent" android:fillType="evenOdd"
+            android:pathData="M2.5,15.5V7.5C2.5,5.6 4.1,4 6,4H14C16.5,4 18.5,5.8 19,8.2L19.8,12.2C19.9,12.8 19.5,13.3 18.9,13.3H14.5L13.5,15.5H9.8a2.8,2.8 0 0,0 -5.6,0ZM4.5,10.8V7.8C4.5,6.8 5.3,6 6.3,6H11V10.8ZM12.5,6H14C15.6,6 16.8,7.1 17.1,8.6L17.5,10.8H12.5Z" />
+        <path android:strokeColor="@color/rm_illo_accent" android:strokeWidth="1.6" android:strokeLineCap="round"
+            android:fillColor="#00000000"
+            android:pathData="M18.2,13L19.4,16.4" />
+        <path android:fillColor="@color/rm_illo_ink"
+            android:pathData="M4.7,16.4a2.3,2.3 0 1,0 4.6,0a2.3,2.3 0 1,0 -4.6,0zM17.4,16.6a2,2 0 1,0 4,0a2,2 0 1,0 -4,0z" />
+    </group>
+    <!-- Sparkle dots -->
+    <path android:fillColor="@color/rm_illo_accent"
+        android:pathData="M57,40a3,3 0 1,0 6,0a3,3 0 1,0 -6,0zM187.5,30a2.5,2.5 0 1,0 5,0a2.5,2.5 0 1,0 -5,0z" />
+    <path android:fillColor="@color/rm_illo_brand_soft"
+        android:pathData="M182,52a4,4 0 1,0 8,0a4,4 0 1,0 -8,0z" />
+</vector>
