@@ -596,6 +596,68 @@ class GuardianFlowsReplayTest {
     }
 
     @Test
+    fun `remote better_ride_enabled off - the open better-ride sheet closes and the searching booking is offered for cancelling`() = runTest {
+        val h = keepSearchingWith(this, keptEta = 12)
+        h.post(UBER, "u1", Text.uberAssigned(eta = 5))
+        val better = h.effectsOf<GuardianEffect.BetterRideSheet>().single()
+        assertEquals(UiKey.SHEET_BETTER_RIDE, better.key)
+
+        val mark = h.mark()
+        h.guardian.stopKeepSearching()
+        assertFalse(h.guardian.state.session!!.keepSearching)
+        assertTrue(h.guardian.state.session!!.betterRideStopped)
+        assertEquals(GuardianEffect.SheetWithdrawn(better.sheetId, UiKey.SHEET_CLOSED), h.effectsOf<GuardianEffect.SheetWithdrawn>(mark).single())
+        // The switch offered on the closed sheet does nothing now; nothing was cancelled or switched without a tap.
+        h.act(UserAction.AnswerSheet(better.sheetId, SheetChoice.SWITCH, h.tap()))
+        assertTrue(h.guardian.state.switches.isEmpty())
+        assertEquals(LegRole.KEPT, h.record(Provider.RAPIDO).role)
+        assertTrue(h.effectsOf<GuardianEffect.OpenApp>().isEmpty())
+        assertClean(h)
+
+        // Switched off while the candidate still searches: it is offered for cancelling, and its later driver is a
+        // second-driver sheet with no switch (as after the §4.8 stop rule).
+        val early = keepSearchingWith(this, keptEta = 12)
+        val before = early.mark()
+        early.guardian.stopKeepSearching()
+        val offer = early.effectsOf<GuardianEffect.DriverSheet>(before).single()
+        assertEquals(UiKey.SHEET_CANCEL_OTHERS, offer.key)
+        assertEquals(listOf(Provider.UBER), offer.others.map { it.provider })
+        early.post(UBER, "u1", Text.uberAssigned(eta = 2))
+        val late = early.effectsOf<GuardianEffect.BetterRideSheet>().single()
+        assertEquals(UiKey.SHEET_SECOND_DRIVER, late.key)
+        assertFalse(UiAction.SWITCH in late.actions)
+        assertClean(early)
+    }
+
+    @Test
+    fun `remote better_ride_enabled off - an open cancel-others sheet loses Keep searching, and a stale tap on it is refused`() = runTest {
+        val h = ReplayHarness(this, providers = listOf(Provider.UBER, Provider.RAPIDO), keepSearching = true)
+        h.book(Provider.UBER, Provider.RAPIDO)
+        h.post(UBER, "u1", Text.uberSearching)
+        h.post(RAPIDO, "r1", Text.rapidoAssigned(eta = 8))
+        val sheet = h.effectsOf<GuardianEffect.DriverSheet>().single()
+        assertTrue(UiAction.KEEP_SEARCHING in sheet.actions)
+
+        val mark = h.mark()
+        h.guardian.stopKeepSearching()
+        val refreshed = h.effectsOf<GuardianEffect.DriverSheet>(mark).single()
+        assertEquals("the same sheet, re-rendered", sheet.sheetId, refreshed.sheetId)
+        assertEquals(listOf(UiAction.YES_CANCEL_OTHERS, UiAction.NOT_NOW), refreshed.actions)
+
+        h.act(UserAction.AnswerSheet(sheet.sheetId, SheetChoice.KEEP_SEARCHING, h.tap()))
+        assertEquals("a Keep searching tap from the old notification is refused", LegRole.NONE, h.record(Provider.UBER).role)
+        assertTrue(h.guardian.state.sheets.any { it.sheetId == sheet.sheetId })
+        h.yes()
+        assertEquals(RideState.CANCEL_GUIDED, h.state(Provider.UBER))
+        assertClean(h)
+
+        // Sessions that never kept searching are untouched.
+        val plain = ReplayHarness(this, providers = listOf(Provider.UBER, Provider.RAPIDO))
+        assertTrue(plain.guardian.stopKeepSearching().isEmpty())
+        assertFalse(plain.guardian.state.session!!.keepSearching)
+    }
+
+    @Test
     fun `better ride alerts stop once the current driver is 2 min away, and the rest are offered for cancelling`() = runTest {
         val h = keepSearchingWith(this, keptEta = 4)
         h.advance(119_000)

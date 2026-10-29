@@ -14,8 +14,9 @@ import org.junit.Test
 class OwnerTokenRegistrarTest {
     private val ownerEmail = "Baharul.Owner@Example.com"
     private var auth: AuthState = AuthState.SignedOut
-    private var hashes: Set<String> = setOf(OwnerAccess.emailHash("baharul.owner@example.com"))
-    private val owner = OwnerAccess({ auth }, { hashes })
+    /** The Google uid the server confirmed as the owner (`/v1/config-check` `is_owner`). */
+    private var serverOwnerUid: String? = "uid-1"
+    private val owner = OwnerAccess({ auth }, { state -> (state as? AuthState.Google)?.uid == serverOwnerUid })
     private val api = ProgrammableApiClient()
     private var currentToken: String? = "fcm-current"
     private val registrar = OwnerTokenRegistrar(api, owner) { currentToken }
@@ -29,13 +30,14 @@ class OwnerTokenRegistrarTest {
     }
 
     @Test
-    fun `nobody else's token is sent - signed out, anonymous, another Google account, no owner list`() = runTest {
+    fun `nobody else's token is sent - signed out, anonymous, another Google account, no server confirmation`() = runTest {
         val notOwners = listOf(
             AuthState.SignedOut,
             AuthState.Anonymous("anon-1"),
             AuthState.Google("rider@example.com", "Rider", null, "uid-2"),
             AuthState.Google(null, "No email", null, "uid-3"),
-            AuthState.Google("  ", "Blank", null, "uid-4"),
+            // The owner's email on another account is not the owner: only the server's answer for this uid counts.
+            AuthState.Google(ownerEmail, "Copy", null, "uid-4"),
         )
         for (state in notOwners) {
             auth = state
@@ -44,7 +46,7 @@ class OwnerTokenRegistrarTest {
             assertEquals(TokenRegistration.NOT_OWNER, registrar.registerCurrentToken())
         }
         auth = AuthState.Google(ownerEmail, "Baharul", null, "uid-1")
-        hashes = emptySet()
+        serverOwnerUid = null
         assertEquals(TokenRegistration.NOT_OWNER, registrar.onNewToken("fcm"))
         assertTrue(api.ownerTokens.isEmpty())
         assertTrue(api.calls.isEmpty())
@@ -85,15 +87,9 @@ class OwnerTokenRegistrarTest {
     }
 
     @Test
-    fun `owner hashes parse from Remote Config and fail closed`() {
-        val hash = OwnerAccess.emailHash("owner@example.com")
-        assertEquals(64, hash.length)
-        assertEquals(hash, OwnerAccess.emailHash("  OWNER@example.COM "))
-        assertEquals(setOf(hash), OwnerAccess.parseHashes("[\"$hash\", \"${hash.uppercase()}\"]"))
-        assertEquals(setOf(hash), OwnerAccess.parseHashes("[\"$hash\", \"not-a-hash\", 7, null]"))
-        assertEquals(emptySet<String>(), OwnerAccess.parseHashes("[]"))
-        assertEquals(emptySet<String>(), OwnerAccess.parseHashes("{\"schema\": \"1.0\"}"))
-        assertEquals(emptySet<String>(), OwnerAccess.parseHashes("not json"))
-        assertEquals(emptySet<String>(), OwnerAccess.parseHashes(null))
+    fun `a throwing owner check fails closed`() = runTest {
+        auth = AuthState.Google(ownerEmail, "Baharul", null, "uid-1")
+        val broken = OwnerAccess({ auth }, { error("status unreadable") })
+        assertFalse(broken.isOwner())
     }
 }

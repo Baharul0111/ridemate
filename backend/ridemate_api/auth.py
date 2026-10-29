@@ -7,7 +7,10 @@ auth_time sane, a non-empty sub.
 
 Quotas are keyed on HMAC of the Google account's own `sub` (firebase.identities["google.com"][0]), not on the
 Firebase uid, so erasing and recreating the Firebase account doesn't reset them. Owner = a verified email in
-OWNER_EMAILS; judge = SHA-256 of the lower-cased verified email in Remote Config `judge_allowlist`.
+OWNER_EMAILS; judge = SHA-256 of the lower-cased verified email in the Firestore document
+`server_config/judge_allowlist`. Neither list is Remote Config: every install can fetch the client template, and an
+unsalted email hash can be checked against guessed emails (contracts §2.7). firestore.rules denies clients that
+document, so only this server's service account reads it.
 
 `check_not_revoked` asks Identity Toolkit `accounts:lookup` with the token itself and the web API key, so the
 server needs no Auth-admin role. Every network call has a 3 s deadline; blocking calls run off the event loop.
@@ -58,6 +61,8 @@ UNKNOWN_KID_REFETCH_S = 60.0
 BLOCKED_TTL_S = 60.0
 BLOCKED_DOC = "blocked_uids/list"
 BLOCKED_CACHE_KEY = "auth:blocked_uids"  # the last list read from Firestore: {"uids": [...], "at": iso}
+JUDGE_ALLOWLIST_TTL_S = 60.0
+JUDGE_ALLOWLIST_DOC = "server_config/judge_allowlist"
 GOOGLE = "google.com"
 REVOKED_MESSAGES = ("USER_DISABLED", "TOKEN_EXPIRED", "USER_NOT_FOUND", "INVALID_ID_TOKEN")
 _MAX_AGE = re.compile(r"max-age=(\d+)")
@@ -213,6 +218,12 @@ class _Blocked:
     loaded_at: float = float("-inf")
 
 
+@dataclass
+class _Judges:
+    hashes: frozenset[str] = frozenset()
+    loaded_at: float = float("-inf")
+
+
 class FirebaseAuth:
     def __init__(
         self,
@@ -234,6 +245,7 @@ class FirebaseAuth:
         self._client = http_client or httpx.AsyncClient(timeout=NETWORK_TIMEOUT_S)
         self._certs = GoogleCerts(self._client, clock)
         self._blocked = _Blocked()
+        self._judges = _Judges()
         self._owner_emails = frozenset(e.strip().lower() for e in settings.owner_emails if e.strip())
 
     # ---- interfaces.Auth -----------------------------------------------------------------------------------
@@ -310,7 +322,7 @@ class FirebaseAuth:
         email = claims.get("email")
         email = email.strip().lower() if isinstance(email, str) and email.strip() else None
         verified = bool(claims.get("email_verified")) and email is not None
-        # The previous key's grace window is recorded in the hot store and the judge list is Remote Config:
+        # The previous key's grace window is recorded in the hot store and the judge list is a Firestore document:
         # both may block, so they are looked up off the event loop.
         sub_hmac_previous, is_judge = await asyncio.to_thread(
             self._lookups, sub, purpose, email if verified else None
@@ -334,9 +346,26 @@ class FirebaseAuth:
         return previous, verified_email is not None and self._is_judge(verified_email)
 
     def _is_judge(self, email: str) -> bool:
-        allowlist = self._rc.get_json("judge_allowlist", {})
-        hashes = allowlist.get("sha256_emails", []) if isinstance(allowlist, dict) else []
-        return isinstance(hashes, list) and email_sha256(email) in {str(h).lower() for h in hashes}
+        return email_sha256(email) in self._judge_hashes()
+
+    def _judge_hashes(self) -> frozenset[str]:
+        """`server_config/judge_allowlist` `{"schema": "1.0", "sha256_emails": [...]}`, cached for 60 s. Without
+        Firestore nobody is a judge; while Firestore is down the last list read stays in force."""
+        if self._firestore is None:
+            return frozenset()
+        now = self._clock.monotonic()
+        if now - self._judges.loaded_at < JUDGE_ALLOWLIST_TTL_S:
+            return self._judges.hashes
+        try:
+            doc = self._firestore.get(JUDGE_ALLOWLIST_DOC)
+        except Exception as e:  # noqa: BLE001 - Firestore down: keep the last list, don't fail the request
+            log.warning("auth: judge allowlist unreadable: %s", type(e).__name__)
+            hashes = self._judges.hashes
+        else:
+            raw = doc.get("sha256_emails", []) if isinstance(doc, dict) else []
+            hashes = frozenset(str(h).strip().lower() for h in raw) if isinstance(raw, list) else frozenset()
+        self._judges = _Judges(hashes, now)
+        return hashes
 
     async def _is_blocked(self, principal: Principal) -> bool:
         if self._firestore is None and self._store is None:

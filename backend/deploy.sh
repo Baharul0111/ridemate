@@ -303,15 +303,10 @@ elif [[ -z "$WEB_URL" && $DRY_RUN -eq 0 ]]; then
   step "(e) Remote Config: skipped (no web URL; set RIDEMATE_API_BASE_URL and re-run)"
 else
   step "(e) Remote Config template: dev project first, then prod"
-  owner_hashes=()
-  IFS=',' read -r -a owner_list <<<"${OWNER_EMAILS:-$OWNER_EMAILS_DEFAULT}"
-  for email in "${owner_list[@]}"; do
-    email="$(printf '%s' "$email" | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')"
-    [[ -n "$email" ]] || continue
-    owner_hashes+=(--owner-email-sha256 "$(printf '%s' "$email" | shasum -a 256 | cut -d' ' -f1)")
-  done
+  # The template carries no identity list (contracts §2.7): owners stay in the OWNER_EMAILS secret and the phone asks
+  # /v1/config-check; judges/testers are the server-only Firestore doc server_config/judge_allowlist.
   run uv run --project "$REPO_DIR/eval" --frozen --quiet python "$RC_BUILDER" \
-    --api-base-url "${WEB_URL:-<web URL from step d>}" "${owner_hashes[@]+"${owner_hashes[@]}"}"
+    --api-base-url "${WEB_URL:-<web URL from step d>}"
   # The Firebase CLI only reads files inside the firebase/ project directory.
   run cp "$REPO_DIR/config/remoteconfig.template.json" "$REPO_DIR/firebase/remoteconfig.template.json"
   # The CLI resolves the template path against the working directory, so deploy from inside firebase/.

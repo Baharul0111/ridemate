@@ -12,6 +12,9 @@ import app.ridemate.core.guardian.FeeQuery
 import app.ridemate.core.guardian.FeeRules
 import app.ridemate.core.guardian.RuleBasedFeeEstimator
 import app.ridemate.core.model.Provider
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 
 /** The Remote Config payloads the guardian runs on (contracts §2.1, §2.4, §2.5). */
 interface GuardianConfigSource {
@@ -20,7 +23,15 @@ interface GuardianConfigSource {
 
     /** [provider]'s cancel steps in the UI language (English fallback); empty when the app has no card. */
     fun cancelSteps(provider: Provider): List<CancelStep>
+
+    /**
+     * Remote Config `better_ride_enabled` (goal 22): false stops better-ride offers in live sessions and hides the
+     * "Keep searching" toggle. Demo sessions follow `demo_enabled` instead.
+     */
+    val betterRideEnabled: StateFlow<Boolean> get() = BETTER_RIDE_ALWAYS_ON
 }
+
+private val BETTER_RIDE_ALWAYS_ON: StateFlow<Boolean> = MutableStateFlow(true).asStateFlow()
 
 /**
  * [GuardianConfigSource] over [ConfigRepository]: each payload is resolved remote → last-good → bundled (core
@@ -58,6 +69,8 @@ class RemoteGuardianConfig(
 
     override fun cancelSteps(provider: Provider): List<CancelStep> =
         current().cards?.cardFor(provider.packageName)?.stepsFor(language()).orEmpty()
+
+    override val betterRideEnabled: StateFlow<Boolean> get() = config.betterRideEnabled
 }
 
 /** Core's rule-based fee estimator over the latest `fee_rules` (rebuilt only when the payload changes). */

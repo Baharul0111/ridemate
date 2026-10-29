@@ -190,6 +190,12 @@ class GuardianRuntime(
         scope.launch { restore() }
         scope.launch {
             restoredSignal.await()
+            // Remote `better_ride_enabled` (goal 22): turning it off stops the open live session's better-ride offers
+            // within seconds; either way the UI re-evaluates whether the "Keep searching" toggle shows.
+            config.betterRideEnabled.collect { on -> enqueue { if (!on) stopLiveKeepSearching() } }
+        }
+        scope.launch {
+            restoredSignal.await()
             // M7: if the service went away while the guardian still needs it (it stopped just as a new session
             // started, or Android stopped it), bring it back at once rather than at the next guardian step.
             sessionActivity.active.drop(1).collect { active ->
@@ -449,7 +455,9 @@ class GuardianRuntime(
         }
         val providers = spec.providers.distinct().filter { it.isDemo == demo && (!demo || !it.isNetwork) }
         require(providers.isNotEmpty()) { "a session needs at least one provider" }
-        g.startSession(spec.sessionId, providers, spec.keepSearching, demo)
+        // Remote `better_ride_enabled` off: live sessions start without keep-searching (the demo has its own switch).
+        val keepSearching = spec.keepSearching && (demo || config.betterRideEnabled.value)
+        g.startSession(spec.sessionId, providers, keepSearching, demo)
         pipeline.demoSessionActive = demo
         pipeline.onSessionStarted()
         startRefused = false
@@ -498,10 +506,18 @@ class GuardianRuntime(
         val g = guardian
         val session = g.state.session?.takeIf { !it.closed }
         val value = !(session?.keepSearching ?: keepSearchingPreference.enabled)
+        // While `better_ride_enabled` is off remotely it can only be turned off (the toggle is hidden as well).
+        if (value && session?.demo != true && !config.betterRideEnabled.value) return@enqueue
         keepSearchingPreference.enabled = value
         if (session == null || g.state.legs.values.any { it.leg.isBooked }) return@enqueue
         // Same session, same legs (ids, states and the user's earlier taps stay as they are).
         g.state.session = session.copy(keepSearching = value)
+    }
+
+    /** `better_ride_enabled` went off: the open live session stops keeping searching (core [Guardian.stopKeepSearching]). */
+    private fun stopLiveKeepSearching() {
+        val session = guardian.state.session ?: return
+        if (!session.demo) guardian.stopKeepSearching()
     }
 
     private suspend fun restore() {
@@ -681,6 +697,7 @@ class GuardianRuntime(
         if (g.state.session?.closed != false) stopRequested = false
         val stopBlocked = stopRequested && g.needsForegroundService
         ui = GuardianUiReducer.reconcile(ui, g.state, clock.elapsedRealtimeMs(), clock.wallMs(), nextReminderWallMs(g.state), stopBlocked)
+            .let { it.copy(keepSearchingAvailable = it.demo || config.betterRideEnabled.value) }
         _ui.value = ui
         try {
             notifier.sync(publishedUi, ui)

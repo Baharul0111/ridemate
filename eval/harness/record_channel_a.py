@@ -91,11 +91,16 @@ class ReadResult:
     model: str
     source: str
     request_id: str
-    latency_ms: int
+    # Server-side time: the model call as the router timed it (gateway) or the API's own `latency_ms` (http). None
+    # when the server did not say. Never the harness's wall time, which includes the laptop's network and Modal
+    # Dict round trips (a 45-60 s wall time is not a 45-60 s model read).
+    latency_ms: int | None
     usage: dict[str, int] | None
     cost_usd: float | None
     # What this call cost the run's budget, when more than `cost_usd` is known (e.g. a retried first attempt).
     charged_usd: float | None = None
+    # The harness's own wall time for the whole call, kept apart from latency_ms.
+    wall_ms: int | None = None
 
     @property
     def run_charge(self) -> float | None:
@@ -218,14 +223,16 @@ class HttpReader:
             raise StopRun(f"read-screen refused: {code}")
         after = self._ai_spent()
         cost = round(max(after - before, 0.0), 6) if before is not None and after is not None else None
+        server_ms = payload.get("latency_ms")
         return ReadResult(
             read=payload["read"],
             model=payload.get("model", ""),
             source=payload.get("source", "live"),
             request_id=payload.get("request_id", ""),
-            latency_ms=int(payload.get("latency_ms") or (time.monotonic() - started) * 1000),
+            latency_ms=int(server_ms) if isinstance(server_ms, int | float) and server_ms >= 0 else None,
             usage=None,
             cost_usd=cost,
+            wall_ms=int((time.monotonic() - started) * 1000),
         )
 
 
@@ -239,7 +246,7 @@ class RunReport:
 
 
 def recorded_doc(job: Job, result: ReadResult) -> dict[str, Any]:
-    return {
+    doc: dict[str, Any] = {
         "image_sha256": job.sha256,
         "model": result.model,
         "recorded_at": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -248,8 +255,12 @@ def recorded_doc(job: Job, result: ReadResult) -> dict[str, Any]:
         "cost_usd": result.cost_usd,
         "source": result.source,
         "request_id": result.request_id,
-        "latency_ms": result.latency_ms,
     }
+    if result.latency_ms is not None:
+        doc["latency_ms"] = result.latency_ms
+    if result.wall_ms is not None:
+        doc["wall_ms"] = result.wall_ms
+    return doc
 
 
 def run(
@@ -297,7 +308,9 @@ def run(
             json.dumps(recorded_doc(job, result), ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
         )
         report.recorded.append(job.sha256)
-        log(f"recorded {job.sha256[:12]} source={result.source} latency={result.latency_ms}ms")
+        log(
+            f"recorded {job.sha256[:12]} source={result.source} model={result.latency_ms}ms wall={result.wall_ms}ms"
+        )
     return report
 
 

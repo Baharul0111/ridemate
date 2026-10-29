@@ -60,14 +60,17 @@ or an obviously fake account in Firebase console → **Authentication → Users*
 - If needed, keep AI off until the next day's pacing; do **not** raise any limit.
 
 ### Judges are being cut off
-- Add judges to the **judge allowlist** (20 reads/day): Remote Config parameter `judge_allowlist`, a JSON list of the
-  SHA-256 of each judge's **lower-cased** email:
+- Add judges to the **judge allowlist** (20 reads/day). It is the Firestore document
+  `server_config/judge_allowlist`, which no phone can read (never Remote Config: every install can download that, and
+  a hash can be checked against guessed emails). Hash each judge's **lower-cased** email:
 
   ```bash
   printf '%s' 'Judge.Name@Example.com' | tr '[:upper:]' '[:lower:]' | shasum -a 256 | cut -d' ' -f1
   ```
 
-  Put the hash in `{"schema":"1.0","sha256_emails":["<hash>", ...]}` and publish.
+  Firebase console → project `ridemate` → **Firestore Database** → collection `server_config` → document
+  `judge_allowlist` → field `schema` (string) = `1.0` and field `sha256_emails` (array of strings) = the hashes → **Save**.
+  The server picks the change up within a minute.
 - Make sure `cap_profile` = `judging` during judging week (see [judging-week.md](judging-week.md)).
 - Remind judges that **Try the demo** needs no sign-in and no AI budget.
 

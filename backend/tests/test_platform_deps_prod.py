@@ -128,7 +128,9 @@ def test_missing_optional_modules_degrade_to_defaults(monkeypatch: pytest.Monkey
     assert isinstance(deps.metrics, NullMetrics)
     assert deps.firestore is None and deps.router is None and deps.demo_cache is None and deps.ondc is None
     assert deps.remote_config.get_bool("ai_reader_enabled", True) is True
-    assert deps.remote_config.get_json("judge_allowlist", {}) == {}
+    assert (
+        deps.remote_config.get_json("judge_allowlist", {}) == {}
+    )  # never a Remote Config key (contracts §2.7)
 
 
 def test_a_broken_optional_module_is_contained(monkeypatch: pytest.MonkeyPatch) -> None:

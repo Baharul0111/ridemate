@@ -72,6 +72,7 @@ object ProblemReport {
         Provider.LIVE_APPS.forEach { add("reader_${it.wireId}: ${input.killSwitches.readerEnabledFor(it)}") }
         add("ondc_enabled: ${input.killSwitches.ondcEnabled}")
         add("demo_enabled: ${input.killSwitches.demoEnabled}")
+        add("better_ride_enabled: ${input.killSwitches.betterRideEnabled}")
         AppPermission.entries.forEach { add("permission_${it.name.lowercase()}: ${if (input.permissions[it] == true) "GRANTED" else "DENIED"}") }
         add("update_available: ${input.update.available}")
         add("below_min_supported: ${input.update.belowMinSupported}")

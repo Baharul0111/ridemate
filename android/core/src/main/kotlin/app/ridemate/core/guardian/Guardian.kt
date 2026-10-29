@@ -151,6 +151,25 @@ class Guardian(
         schedule.value++
     }
 
+    /**
+     * Remote Config `better_ride_enabled` went off (goal 22): this session stops keeping searching. Better-ride offers end
+     * as under the §4.8 stop rule (open better-ride sheets close, and a booking still searching under "Keep searching"
+     * gets "Cancel the others?"), an open "Cancel the others?" loses its Keep searching button, and a lost kept leg no
+     * longer re-arms the offers. Bookings, roles already chosen by a tap and every other sheet stay as they are.
+     */
+    fun stopKeepSearching(): List<GuardianEffect> = step {
+        val session = s.session?.takeIf { it.keepSearching && !it.closed } ?: return@step
+        stopBetterRide(UiKey.SHEET_CLOSED)
+        s.session = session.copy(keepSearching = false)
+        for (sheet in s.sheets.filter { it.kind == SheetKind.CANCEL_OTHERS && UiAction.KEEP_SEARCHING in it.actions }) {
+            val updated = sheet.copy(actions = sheet.actions - UiAction.KEEP_SEARCHING)
+            s.sheets[s.sheets.indexOf(sheet)] = updated
+            val subjects = updated.bindings.mapNotNull { leg(it.legId) }
+            val others = activeLegs().filter { o -> subjects.none { it === o } && o.leg.isBooked && !o.leg.state.isTerminal && !o.dismissed }
+            emit(driverSheetEffect(updated, subjects, others))
+        }
+    }
+
     fun markOpened(legId: String): List<GuardianEffect> = step { leg(legId)?.let { apply(it, Lifecycle(LifecycleStep.OPENED)) } }
 
     fun markQuoted(legId: String): List<GuardianEffect> = step { leg(legId)?.let { apply(it, Lifecycle(LifecycleStep.QUOTED)) } }
@@ -285,7 +304,7 @@ class Guardian(
                         startChain(rec, a.tapId)
                     }
                     SheetChoice.KEEP_SEARCHING -> {
-                        if (UiAction.KEEP_SEARCHING !in sheet.actions) return reject(a.tapId)
+                        if (UiAction.KEEP_SEARCHING !in sheet.actions || !session.keepSearching) return reject(a.tapId)
                         if (!bindingValid(binding)) return withdrawStale(sheet, rec, a.tapId)
                         closeSheet(sheet, key = null)
                         makeKept(rec)

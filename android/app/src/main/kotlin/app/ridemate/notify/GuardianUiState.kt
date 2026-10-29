@@ -200,6 +200,8 @@ data class GuardianUiState(
     val sessionId: String? = null,
     val demo: Boolean = false,
     val keepSearching: Boolean = false,
+    /** False while Remote Config `better_ride_enabled` is off for a live session: the toggle is hidden. */
+    val keepSearchingAvailable: Boolean = true,
     val closed: Boolean = false,
     val legs: List<LegUi> = emptyList(),
     /** Open items, oldest first. */

@@ -9,17 +9,12 @@ Setup for the commands: [README.md](README.md#setup-used-by-the-commands).
 ## Before submission (by 4 Nov evening)
 
 1. **Switch to the judging profile:** Remote Config `cap_profile` = `judging`
-   ([how](README.md#flipping-a-kill-switch-remote-config)). This only puts a **ceiling of $3/day** on the public's
-   daily AI cap: the computed cap (about $1.33/day on the 90-day horizon) is lower, so on its own the profile changes
-   nothing for judges. It draws from the same overall budget (AI $80).
-2. **Judge allowlist: this is what protects judges.** The young-account tier and the 70% tier pause apply in every
-   profile, and a judge signing in for the first time is a brand-new account (3 reads a day, paused first). Listed
-   judges get 20 reads a day, from the $15 judging sub-budget, and are never paced or paused by the public's day cap.
-   If the organisers share judge emails, add their SHA-256 hashes to `judge_allowlist`. How to hash:
-   [cap-tripped-or-abuse.md](cap-tripped-or-abuse.md#judges-are-being-cut-off). The dispatcher alerts
-   (`judging_allowlist_empty`) while `cap_profile` = `judging` and the list is empty. If no emails are shared, point
-   judges to Try the demo, which needs no sign-in and answers from the cache or the recorded outputs when its own
-   small budget is used up.
+   ([how](README.md#flipping-a-kill-switch-remote-config)). This sets a **$3/day** AI cap, keeps the young-account tier
+   on, and turns the judge allowlist on. It draws from the same overall budget (AI $80).
+2. **Judge allowlist:** if the organisers share judge emails, add their SHA-256 hashes to the server-only Firestore
+   document `server_config/judge_allowlist` (20 reads a day each; never Remote Config). How:
+   [cap-tripped-or-abuse.md](cap-tripped-or-abuse.md#judges-are-being-cut-off). If no emails are shared, judges use Try
+   the demo, which needs no sign-in and no AI budget.
 3. **Decide on `min_containers=1`** (a warm server, so the first request isn't slowed by a cold start):
    - Cost: about $0.016 an hour, so about **$0.38 a day** or **$2.70 a week**, from the $12 compute budget.
    - Benefit: no cold start (target ≤ 4 s anyway) on the first read after a quiet period.
@@ -55,7 +50,8 @@ Setup for the commands: [README.md](README.md#setup-used-by-the-commands).
 ## After judging ends
 
 1. `cap_profile` = `normal`.
-2. Clear `judge_allowlist` (empty list) unless the organisers ask you to keep access open.
+2. Clear `sha256_emails` in the Firestore document `server_config/judge_allowlist` (empty list) unless the organisers
+   ask you to keep access open.
 3. `min_containers` back to `0` in `backend/modal_app.py` and deploy.
 4. Note the AI and compute spent during judging.
 

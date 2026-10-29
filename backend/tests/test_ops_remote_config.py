@@ -172,7 +172,9 @@ def test_the_repository_defaults_load():
         return
     assert values["ai_reader_enabled"] in ("true", "false")
     assert json.loads(values["model_route"])["schema"].startswith("1.")
-    assert isinstance(json.loads(values["owner_emails_sha256"]), list)
+    # Identity lists are server-only (contracts §2.7): neither ships in the client template's defaults.
+    assert "owner_emails_sha256" not in values and "judge_allowlist" not in values
+    assert values["better_ride_enabled"] in ("true", "false")
     assert values["cap_profile"] in ("normal", "judging")  # scalar files unwrap {"value": ...}
     # The day-1 spike decides this default (docs/spikes.md); either way the bool file unwraps to "true"/"false".
     spiked = json.loads((REPO_DEFAULTS / "point_supported.json").read_text(encoding="utf-8"))["value"]

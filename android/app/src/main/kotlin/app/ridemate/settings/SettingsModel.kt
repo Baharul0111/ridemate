@@ -35,7 +35,10 @@ data class SettingsState(
     val language: AppLanguage,
     val killSwitches: KillSwitches,
     val eraseDialog: EraseDialog,
-)
+) {
+    /** The keep-searching toggle shows only while Remote Config `better_ride_enabled` allows better-ride offers. */
+    val keepSearchingAvailable: Boolean get() = killSwitches.betterRideEnabled
+}
 
 /**
  * Settings (goal 24, 26, 16): privacy notice, My data, Erase, grievance email, language, keep-searching default,
@@ -44,7 +47,7 @@ data class SettingsState(
 class SettingsModel(
     private val store: SettingsStore,
     private val language: LanguageController,
-    killSwitches: StateFlow<KillSwitches>,
+    private val killSwitches: StateFlow<KillSwitches>,
     private val eraseStatus: StateFlow<EraseStatus>,
     private val erase: suspend () -> Unit,
     private val auth: AuthGateway,
@@ -80,14 +83,17 @@ class SettingsModel(
         else -> EraseDialog.Result(status)
     }
 
-    /** Turning keep-searching **on** first shows the fair-play warning; off applies at once. */
+    /**
+     * Turning keep-searching **on** first shows the fair-play warning; off applies at once. While `better_ride_enabled`
+     * is off remotely it cannot be turned on (the toggle is hidden too).
+     */
     fun setKeepSearching(on: Boolean) {
-        if (on) keepSearchingWarning.value = true else store.setKeepSearchingDefault(false)
+        if (!on) store.setKeepSearchingDefault(false) else if (killSwitches.value.betterRideEnabled) keepSearchingWarning.value = true
     }
 
     fun confirmKeepSearching() {
-        store.setKeepSearchingDefault(true)
         keepSearchingWarning.value = false
+        if (killSwitches.value.betterRideEnabled) store.setKeepSearchingDefault(true)
     }
 
     fun dismissKeepSearchingWarning() {

@@ -109,7 +109,11 @@ def test_notification_cases_hit_only_the_expected_templates() -> None:
 
 
 def server_label(label: str, evidence_span: str, title: str, text: str) -> str:
-    """Server rule (contracts §1.3): a label whose evidence isn't in the post becomes unknown."""
+    """Server rule (contracts §1.3): a label whose evidence isn't in the post becomes unknown.
+
+    A fixture sanity check only. The real rule runs against these cases in
+    backend/tests/test_ai_injection_notifications.py (endpoint + prompts.validate_parse), and the phone's half in the
+    Kotlin NotificationInjectionReplayTest."""
     return label if evidence_span and evidence_span in f"{title}\n{text}" else "unknown"
 
 

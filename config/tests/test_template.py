@@ -5,7 +5,13 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 
 import pytest
-from ridemate_config.keys import ANDROID_ASSETS_CONFIG_DIR, ANDROID_DEFAULTS_XML, KEYS, KEYS_BY_NAME
+from ridemate_config.keys import (
+    ANDROID_ASSETS_CONFIG_DIR,
+    ANDROID_DEFAULTS_XML,
+    KEYS,
+    KEYS_BY_NAME,
+    SERVER_ONLY_KEYS,
+)
 from ridemate_config.template import BuildError, build_template, bundled_outputs, stale_bundled_files
 from ridemate_config.validation import default_value
 
@@ -51,13 +57,14 @@ def test_api_base_url_must_be_https(bad: str) -> None:
         build_template(bad)
 
 
-def test_owner_hashes_only_in_template() -> None:
-    h = "a" * 64
-    params = build_template(URL, [h, h])["parameters"]
-    assert json.loads(params["owner_emails_sha256"]["defaultValue"]["value"]) == [h]
-    with pytest.raises(BuildError):
-        build_template(URL, ["NOT-HEX"])
-    assert default_value("owner_emails_sha256") == []
+def test_no_identity_list_is_published_or_bundled() -> None:
+    """Judge/tester and owner email hashes stay server-side (contracts §2.7): not in the template, not in the APK."""
+    params = build_template(URL)["parameters"]
+    assert not SERVER_ONLY_KEYS & set(params)
+    bundled = {path.name for path in bundled_outputs()}
+    assert not {f"{key}.json" for key in SERVER_ONLY_KEYS} & bundled
+    xml = next(content for path, content in bundled_outputs().items() if path.suffix == ".xml")
+    assert not any(key in xml for key in SERVER_ONLY_KEYS)
 
 
 def test_bundled_defaults_are_up_to_date() -> None:

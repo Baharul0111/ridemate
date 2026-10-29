@@ -95,7 +95,7 @@ class OwnerAlertsTest {
     @Test
     fun `alerts show only while the owner is signed in on this phone`() {
         var auth: AuthState = AuthState.Google("owner@example.com", "Owner", null, "u")
-        val owner = OwnerAccess({ auth }, { setOf(OwnerAccess.emailHash("owner@example.com")) })
+        val owner = OwnerAccess({ auth }, { state -> (state as? AuthState.Google)?.uid == "u" })
         val shown = mutableListOf<OwnerAlert>()
         val messaging = OwnerMessaging(OwnerTokenRegistrar(ProgrammableApiClient(), owner) { null }, owner, { shown += it; true })
         assertTrue(messaging.onMessage(mapOf("type" to "owner_alert", "alert" to "slow_reads"), null, null))

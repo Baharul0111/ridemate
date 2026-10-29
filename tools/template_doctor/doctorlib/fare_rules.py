@@ -25,7 +25,7 @@ from .templates import compiled
 
 _DEVANAGARI = str.maketrans("०१२३४५६७८९", "0123456789")
 _CONFUSED_RUPEE = re.compile(r"^[ZR%](?=[0-9०-९])")
-_CURRENCY = re.compile(r"(?i)₹|\brs\.?|\binr")
+_CURRENCY = re.compile(r"(?i)₹|\brs\.?|\binr|रु\.?|रू\.?")
 _SPACES = re.compile(r"[\s  ]+")
 _RANGE_SPLIT = re.compile(r"[-–—]")
 

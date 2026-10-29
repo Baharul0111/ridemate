@@ -6,7 +6,7 @@ without an app update (goal item 22, architecture §4.2 "Config").
 
 | Path | What it is |
 |---|---|
-| `remote_config/<key>.json` | The default value of every key (23 keys) |
+| `remote_config/<key>.json` | The default value of every key (22 keys) |
 | `schemas/<key>.schema.json` | JSON Schema (draft 2020-12) for that file. Strings marked `"x-re2"` are RE2 patterns |
 | `ridemate_config/keys.py` | The key registry: value type, description, bundled override |
 | `validate.py` | Checks every default against its schema, compiles every regex with RE2, and checks that the bundled copies are current |
@@ -17,8 +17,7 @@ without an app update (goal item 22, architecture §4.2 "Config").
 
 There is one file per key.
 - **JSON keys** (`valueType: JSON`) hold the payload itself. Every object payload carries
-  `"schema": "MAJOR.MINOR"`. `owner_emails_sha256` is a bare JSON list, as the contract specifies, so it has no
-  `schema` field.
+  `"schema": "MAJOR.MINOR"`.
 - **Scalar keys** (BOOLEAN, NUMBER, STRING) hold `{"value": <scalar>}`. Keeping one file per key means every key
   gets its own schema and a one-line diff when it changes. It also lets the registry, the files and the schemas
   be checked one-to-one.
@@ -36,6 +35,14 @@ payload on any other, and DemoSource shows the demo providers' screens itself (c
   - `CANCELLED` templates only match when the title itself starts with the cancel phrase. That way a driver's
     chat message such as "Ride cancelled" never counts as rung-2 cancel proof.
   - `redacted` and `ongoing_channel_ids` stay empty until the real channel ids are recorded.
+  - Until then every real-app detection, proof and cancel step built on these payloads is **unverified for that
+    app** (goal items 9–15); only the demo providers' payloads match recorded screens. See "Unverified real-app
+    payloads" in `docs/runbooks/README.md` for the owner's recording step.
+
+**No identity lists.** Every install can fetch the client template, and an unsalted email hash can be checked
+against guessed emails. So the judge/tester allowlist (Firestore `server_config/judge_allowlist`, unreadable to
+clients) and the owners (`OWNER_EMAILS` secret, reported to the phone as `/v1/config-check` `is_owner`) are never
+Remote Config keys. `keys.SERVER_ONLY_KEYS` names them and the tests keep them out of the template and the APK.
 
 ## Matching rules the phone must follow (Kotlin TemplateEngine / FareParser)
 - The newest entry with `min_version_code` ≤ the installed versionCode is used. An unknown versionCode falls
@@ -51,7 +58,10 @@ payload on any other, and DemoSource shows the demo providers' screens itself (c
 - `eta_pattern` group 1 holds the minutes. `driver_distance_pattern` group 1 holds the number and group 2 the
   unit.
 - ₹ OCR confusions (Z, R, % or 2 before digits) are normalised by the parser before `price_token_pattern` runs
-  (architecture M5). The pattern itself only accepts ₹, Rs and INR.
+  (architecture M5). The pattern itself only accepts ₹, Rs, INR and the Hindi रु / रू (the Hindi marker only at the
+  start of a token or after a non-letter, so the endings of शुरू or गुरु are never read as ₹).
+- `driver_distance_pattern` reads km / m and the Hindi किमी, कि.मी. and मी. A Hindi unit must end the word, so मील
+  or मीटर never become metres; they fall back to "see in app".
 
 ## Commands
 Both scripts run in the eval uv project. It already has `jsonschema` and `google-re2`:
@@ -60,7 +70,7 @@ Both scripts run in the eval uv project. It already has `jsonschema` and `google
 uv run --project eval python config/validate.py
 uv run --project eval python config/build_template.py --bundled-only          # after editing a default
 uv run --project eval python config/build_template.py \
-    --api-base-url https://<workspace>--ridemate-api.modal.run [--out FILE] [--owner-email-sha256 HEX ...]
+    --api-base-url https://<workspace>--ridemate-api.modal.run [--out FILE]
 cd eval && uv run pytest -q                                                   # eval + config tests
 ```
 

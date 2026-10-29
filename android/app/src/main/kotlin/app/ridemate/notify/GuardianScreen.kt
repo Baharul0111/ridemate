@@ -128,7 +128,7 @@ fun GuardianScreen(
                 )
             }
         }
-        if (state.hasSession && state.legs.none { it.booked }) {
+        if (state.hasSession && state.keepSearchingAvailable && state.legs.none { it.booked }) {
             item(key = "keep-searching") { KeepSearchingRow(state.keepSearching, text, onAction) }
         }
         if (state.legs.isNotEmpty()) {

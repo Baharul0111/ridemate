@@ -122,9 +122,12 @@ class GatewayReader:
             model=result.model,
             source="live",
             request_id=request_id,
-            latency_ms=int((time.monotonic() - started) * 1000),
+            # The router's own timing of the model call (what the 12 s deadline and the read-p95 alert bound).
+            latency_ms=int(result.latency_ms),
             usage=None,
             cost_usd=round(cost, 6),
             # The meter's growth also covers a failed first attempt that the router retried.
             charged_usd=round(max(metered, cost), 6),
+            # This laptop's wall time for the whole call, Modal Dict reservation and settlement included.
+            wall_ms=int((time.monotonic() - started) * 1000),
         )

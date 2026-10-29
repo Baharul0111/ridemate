@@ -107,6 +107,14 @@ in a per-app statechart (searching → assigned → arriving → on trip → end
 provider-cancelled). If a post is hidden by Android or worded in a way RideMate doesn't recognise, it never stays
 silent: it asks you a simple question, for example *"Rapido has an update. Got a driver?"*
 
+> **Unverified for Uber, Ola and Rapido.** The shipped notification templates, cancel steps, cancelled-screen keywords,
+> fee windows and fare-parser rules for the three real apps are best-effort first versions written from general
+> knowledge. Nobody has recorded those apps' real notifications or screens yet, so every real-app detection, cancel
+> proof, cancel step and fee note (goal items 9–15) is **unverified for that app** until the owner records it with the
+> in-app Recorder and updates Remote Config ([runbook](docs/runbooks/README.md#unverified-real-app-payloads)). Until
+> then a miss falls back to the questions above (more of them than a verified template would need), never to a guess.
+> The demo providers' payloads match their recorded screens and are what the tests and Try the demo exercise.
+
 ### The cancel chain, with proof and reminders
 
 When the first driver accepts, RideMate shows the driver's distance and ETA (or "see in Rapido" if it can't confirm
@@ -131,7 +139,8 @@ expiring, or the same driver showing up on two apps ("Same driver on both. Keep 
 "Keep searching" is off by default and comes with a fair-play warning. When it's on and a later driver would reach you
 at least 5 minutes sooner **and** at least 40% sooner (verified ETAs only), RideMate shows both drivers' distance and
 time and any fee. Yes guides you to cancel the old
-booking; No guides you to cancel the new one. Nothing changes without a tap.
+booking; No guides you to cancel the new one. Nothing changes without a tap. The owner can switch the whole feature off
+remotely (Remote Config `better_ride_enabled`): open sessions stop offering switches and the toggle disappears.
 
 ### ONDC: the open ride network (demo seller during the hackathon)
 

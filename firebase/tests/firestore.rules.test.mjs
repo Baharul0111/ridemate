@@ -29,6 +29,8 @@ const SERVER_ONLY = [
   "spend_shards/lifetime_s1",
   "spend_shards/rollup",
   "blocked_uids/list",
+  // The judge/tester allowlist (email hashes) is server-only: never Remote Config, never readable by a phone.
+  "server_config/judge_allowlist",
   "metrics/2026-10-28",
   "metrics/2026-10-28/shards/202610281000",
   "ondc_txn/t-alice/private/x",
@@ -131,7 +133,7 @@ describe("everything else is server-only", () => {
   }
 
   test("collections cannot be listed", async () => {
-    for (const name of ["events", "audit", "usage_snapshot", "spend_shards", "metrics", "blocked_uids"]) {
+    for (const name of ["events", "audit", "usage_snapshot", "spend_shards", "metrics", "blocked_uids", "server_config"]) {
       await assertFails(getDocs(query(collection(alice(), name), where("uid", "==", "alice"))));
     }
   });

@@ -169,6 +169,8 @@ data class ConfigCheckResponse(
     @SerialName("cap_profile") val capProfile: String? = null,
     @SerialName("min_supported_version") val minSupportedVersion: Int? = null,
     @SerialName("server_time_utc") val serverTimeUtc: String? = null,
+    /** True only for the owner's Google account (the server's `OWNER_EMAILS`); the phone ships no owner list. */
+    @SerialName("is_owner") val isOwner: Boolean = false,
     val budget: ConfigCheckBudget? = null,
 )
 

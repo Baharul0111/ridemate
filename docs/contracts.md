@@ -129,11 +129,13 @@ device registration); marks the usage counter `erased_at` (deleted by cleanup af
 ```json
 {"ai_enabled": true, "reason": null, "resume_at_ist": null, "point_supported": false,
  "quota": {"reads_left": 6, "parses_left": 10}, "cap_profile": "normal", "min_supported_version": 1,
- "server_time_utc": "2026-10-28T10:00:00Z",
+ "server_time_utc": "2026-10-28T10:00:00Z", "is_owner": true,
  "budget": {"ai_spent_usd": 1.23, "ai_budget_usd": 80, "compute_spent_usd": 0.4, "compute_budget_usd": 12,
             "day_cap_usd": 1.3, "day_spent_usd": 0.1, "horizon_end": "2027-01-26"}}
 ```
-`budget` only for owner accounts (email in `OWNER_EMAILS`); `null` otherwise. `reason` ∈
+`is_owner` is true only for a Google token whose verified email is in the server's `OWNER_EMAILS` secret; `budget`
+only for those owner accounts, `null` otherwise. The phone ships no owner list: it opens developer mode and registers
+owner alerts only after this answer said `is_owner` for the signed-in Google account. `reason` ∈
 `signed_out|anonymous|kill_switch|budget|day_cap|tier_pause|quota|breaker|meter|model_missing`.
 
 **`POST /v1/owner/fcm-token`** — owner only. `{"token": "…"}` → 204. Used for owner alert pushes.
@@ -279,6 +281,7 @@ rejects the whole payload on an unknown launch mode.
 | `reader_enabled_uber` / `_ola` / `_rapido` | bool | true |
 | `ondc_enabled` | bool | true (hackathon mock) |
 | `demo_enabled` | bool | true |
+| `better_ride_enabled` | bool | true. Kill switch for the opt-in better-ride offers ("Keep searching", goal 16): false stops better-ride sheets in an open live session (as the §4.8 stop rule does) and hides the toggle. Demo sessions follow `demo_enabled` |
 | `point_supported` | bool | true (set by the day-1 spike, `docs/spikes.md`: grounding hit 3/3 demo cancel screens). The server reads it for `/v1/point` and reports it in `/v1/config-check`; its built-in fallback, used only without the bundled defaults, stays false |
 | `model_route` | JSON `{"schema":"1.0","read":"modal_spark_open","parse":"modal_spark_open"}` | |
 | `latest_version` | JSON `{"schema":"1.0","version_code":1,"version_name":"1.0.0-hackathon","url":"https://github.com/Baharul0111/ridemate/releases/latest","sha256":""}` | |
@@ -288,12 +291,14 @@ rejects the whole payload on an unknown launch mode.
 | `budget_horizon_days` | int | 90 |
 | `budget_horizon_start` | `YYYY-MM-DD` | 2026-10-28 |
 | `api_base_url` | string | "" (set at deploy) |
-| `judge_allowlist` | JSON `{"schema":"1.0","sha256_emails":[…]}` (lower-cased email, SHA-256 hex) | empty |
-| `owner_emails_sha256` | JSON list of SHA-256 of owner emails (enables developer mode) | `[]` |
 
-`owner_emails_sha256` stays a **bare JSON list** (no `"schema"` object): the phone parses it directly as a list of
-strings, without `resolveLayered`'s schema-major check, and treats a value that doesn't parse, or has any entry
-that isn't a SHA-256 hex digest, as `[]` (developer mode off).
+**Identity lists are never Remote Config.** Every install can fetch the client template, and an unsalted email hash
+can be checked against guessed emails, so who is a judge, tester or owner stays on the server:
+- The judge/tester allowlist is the Firestore document `server_config/judge_allowlist`,
+  `{"schema":"1.0","sha256_emails":[…]}` (lower-cased email, SHA-256 hex). `firestore.rules` denies every client
+  read; the server reads it with its service account and caches it for 60 s.
+- Owners are the `OWNER_EMAILS` Modal secret. The phone learns that the signed-in account is the owner from
+  `/v1/config-check` `is_owner` (§1.3).
 
 ---------------------------------------------------------------------------------------------------------------
 

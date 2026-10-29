@@ -272,7 +272,9 @@ class FakeRouter:
             raise self.fail
         if self.meter.records:
             self.meter.spent += self.cost + self.extra_metered
-        return SimpleNamespace(data={"app": "demo_kestrel", "options": []}, model="m", cost_usd=self.cost)
+        return SimpleNamespace(
+            data={"app": "demo_kestrel", "options": []}, model="m", cost_usd=self.cost, latency_ms=6900
+        )
 
 
 CALLS = gateway.BackendCalls(
@@ -299,6 +301,33 @@ def test_gateway_reads_through_router_call_with_eval_purpose_and_run_id() -> Non
     )
     assert result.read["validated"] is True and result.source == "live"
     assert result.cost_usd == 0.003 and result.run_charge == 0.003 and result.usage is None
+
+
+def test_gateway_records_the_router_s_model_time_apart_from_the_harness_wall_time(tmp_path) -> None:
+    """A gateway read's wall time includes this laptop's Modal Dict round trips; the model time is the router's."""
+    meter = FakeMeter()
+    reader = gateway.GatewayReader(FakeRouter(meter), meter, CALLS)
+    job = rec.load_jobs(DEMO_LABELS)[0]
+    result = reader.read(job, b"img")
+    reader.close()
+    assert result.latency_ms == 6900
+    assert result.wall_ms is not None and result.wall_ms >= 0
+    doc = rec.recorded_doc(job, result)
+    assert doc["latency_ms"] == 6900 and doc["wall_ms"] == result.wall_ms
+    # http mode: the API's own latency_ms is the server time; without it, only the wall time is recorded.
+    no_server_time = rec.ReadResult(dict(READ), "m", "live", "rid", None, None, None, wall_ms=48_000)
+    assert "latency_ms" not in rec.recorded_doc(job, no_server_time)
+    assert rec.recorded_doc(job, no_server_time)["wall_ms"] == 48_000
+
+
+def test_committed_recordings_never_pass_wall_time_off_as_model_latency() -> None:
+    """latency_ms is bounded by the router (12 s per attempt, one retry); longer is the harness's wall time."""
+    files = sorted((EVAL_DIR / "recorded/channel_a").glob("*.json"))
+    assert files
+    for path in files:
+        doc = json.loads(path.read_text(encoding="utf-8"))
+        if doc.get("source") == "live" and "latency_ms" in doc:
+            assert doc["latency_ms"] <= 2 * 12_000 + 1_000, path.name
 
 
 def test_gateway_counts_a_retried_attempt_against_the_run() -> None:

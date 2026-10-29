@@ -18,30 +18,29 @@ class OwnerSignInWatcherTest {
     private val ownerEmail = "baharul.owner@example.com"
     private val ownerSignIn = AuthState.Google(ownerEmail, "Baharul", null, "uid-owner")
     private val auth = MutableStateFlow<AuthState>(AuthState.SignedOut)
-    private val epoch = MutableStateFlow(0L)
-    private var hashes: Set<String> = emptySet()
-    private val owner = OwnerAccess({ auth.value }, { hashes })
+    /** What `/v1/config-check` last confirmed (`is_owner`), as [ServerOwnerStatus.confirmedOwnerUid] publishes it. */
+    private val serverOwnerUid = MutableStateFlow<String?>(null)
+    private val owner = OwnerAccess({ auth.value }, { state -> (state as? AuthState.Google)?.uid == serverOwnerUid.value })
     private val api = ProgrammableApiClient()
     private val registrar = OwnerTokenRegistrar(api, owner) { "fcm-current" }
     private val watcher = OwnerSignInWatcher(owner::isOwner) { registrar.registerCurrentToken() }
 
     @Test
-    fun `registers once when the owner signs in, also when the owner list arrives after the sign-in`() = runTest {
-        backgroundScope.launch { watcher.run(auth, epoch) }
+    fun `registers once when the owner signs in, also when the server's owner answer arrives after the sign-in`() = runTest {
+        backgroundScope.launch { watcher.run(auth, serverOwnerUid) }
         runCurrent()
         assertTrue("signed out: nothing sent", api.calls.isEmpty())
 
-        // The owner signs in before Remote Config has delivered the owner list (the bundled list is empty).
+        // The owner signs in before the server has answered /v1/config-check (the phone ships no owner list).
         auth.value = ownerSignIn
         runCurrent()
         assertTrue(api.calls.isEmpty())
-        hashes = setOf(OwnerAccess.emailHash(ownerEmail))
-        epoch.value = 1
+        serverOwnerUid.value = "uid-owner"
         runCurrent()
         assertEquals(listOf("fcm-current"), api.ownerTokens)
 
-        // Later config activations do not send it again.
-        epoch.value = 2
+        // The same answer again does not send it again.
+        serverOwnerUid.value = "uid-owner"
         runCurrent()
         assertEquals(1, api.ownerTokens.size)
 
@@ -60,17 +59,18 @@ class OwnerSignInWatcherTest {
 
     @Test
     fun `a failed registration is retried at the next change, then not repeated`() = runTest {
-        hashes = setOf(OwnerAccess.emailHash(ownerEmail))
+        val changes = MutableStateFlow(0)
+        serverOwnerUid.value = "uid-owner"
         api.ownerToken = ApiResult.Offline
-        backgroundScope.launch { watcher.run(auth, epoch) }
+        backgroundScope.launch { watcher.run(auth, changes) }
         auth.value = ownerSignIn
         runCurrent()
         assertEquals(1, api.ownerTokens.size)
         api.ownerToken = ApiResult.Ok(Unit)
-        epoch.value = 1
+        changes.value = 1
         runCurrent()
         assertEquals(2, api.ownerTokens.size)
-        epoch.value = 2
+        changes.value = 2
         runCurrent()
         assertEquals(2, api.ownerTokens.size)
     }

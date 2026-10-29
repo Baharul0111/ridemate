@@ -1,9 +1,6 @@
 package app.ridemate.dev
 
 import app.ridemate.auth.AuthState
-import app.ridemate.config.ConfigKeys
-import app.ridemate.messaging.OwnerAccess
-import app.ridemate.config.ConfigRepository
 import app.ridemate.ui.KeyValueStore
 import app.ridemate.ui.getBoolean
 import app.ridemate.ui.putBoolean
@@ -14,6 +11,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flowOf
 
 /** What a tap on the version line did. */
 sealed interface VersionTapOutcome {
@@ -33,24 +31,18 @@ sealed interface VersionTapOutcome {
     data object NotOwner : VersionTapOutcome
 }
 
-/** The owner's identity: SHA-256 (lower-case hex) of the lower-cased email, as Remote Config lists it. */
-object OwnerEmails {
-    fun hash(email: String): String = OwnerAccess.emailHash(email)
-
-    /** `owner_emails_sha256`, a bare JSON list (malformed lists count as empty); the same parse owner alerts use. */
-    fun hashesFrom(config: ConfigRepository): Set<String> = OwnerAccess.parseHashes(config.string(ConfigKeys.OWNER_EMAILS_SHA256))
-}
-
 /**
  * The hidden developer mode (architecture §4.19): seven taps on the version in About, owner only. It is on while
- * the switch is on **and** the signed-in Google account's email hash is in Remote Config `owner_emails_sha256`, so
- * signing out (or a config change removing the owner) turns it off immediately.
+ * the switch is on **and** the server confirmed the signed-in Google account as the owner (`/v1/config-check`
+ * `is_owner`, [app.ridemate.messaging.ServerOwnerStatus]); the phone ships no owner list. Signing out, another
+ * account, or the server no longer naming this account turns it off immediately.
  */
 class DeveloperModeGate(
     private val store: KeyValueStore,
     private val auth: StateFlow<AuthState>,
-    private val ownerHashes: () -> Set<String>,
+    private val isOwnerAccount: (AuthState) -> Boolean,
     private val clock: Clock,
+    ownerChanges: Flow<Any?> = flowOf(Unit),
 ) {
     private val switchedOn = MutableStateFlow(store.getBoolean(K_ENABLED))
     private val recorderOn = MutableStateFlow(store.getBoolean(K_RECORDER, default = true))
@@ -60,7 +52,7 @@ class DeveloperModeGate(
     private var lastTapElapsedMs = Long.MIN_VALUE
 
     /** Whether developer mode is on, re-evaluated on every sign-in change. */
-    val enabled: Flow<Boolean> = combine(switchedOn, auth) { on, state -> on && isOwner(state) }.distinctUntilChanged()
+    val enabled: Flow<Boolean> = combine(switchedOn, auth, ownerChanges) { on, state, _ -> on && isOwner(state) }.distinctUntilChanged()
 
     /** The Recorder's own switch (on by default once developer mode is on). */
     val recorderSwitch: StateFlow<Boolean> = recorderOn.asStateFlow()
@@ -74,8 +66,8 @@ class DeveloperModeGate(
     fun isRecording(): Boolean = isEnabled() && recorderOn.value
 
     fun isOwner(state: AuthState = auth.value): Boolean {
-        val email = (state as? AuthState.Google)?.email?.takeIf { it.isNotBlank() } ?: return false
-        return hash(email) in runCatching { ownerHashes() }.getOrDefault(emptySet())
+        if (state !is AuthState.Google) return false
+        return runCatching { isOwnerAccount(state) }.getOrDefault(false)
     }
 
     /** One tap on the version line. Taps more than [TAP_GAP_MS] apart start counting again. */
@@ -127,8 +119,6 @@ class DeveloperModeGate(
     companion object {
         const val TAPS_TO_ENABLE = 7
         const val TAP_GAP_MS = 3_000L
-
-        fun hash(email: String): String = OwnerEmails.hash(email)
 
         private const val K_ENABLED = "enabled"
         private const val K_RECORDER = "recorder_on"

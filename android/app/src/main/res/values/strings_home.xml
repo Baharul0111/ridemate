@@ -45,6 +45,7 @@
     <string name="home_switch_reader">%1$s reading</string>
     <string name="home_switch_ondc">Open network (ONDC)</string>
     <string name="home_switch_demo">Demo</string>
+    <string name="home_switch_better_ride">Better-ride offers</string>
 
     <!-- Pre-session issues: what is wrong, why, and the fix. -->
     <string name="home_issue_listener_title">RideMate can\'t see ride-app notifications</string>

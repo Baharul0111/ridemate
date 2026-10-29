@@ -3,7 +3,6 @@ package app.ridemate.dev
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.ridemate.auth.AuthState
-import app.ridemate.config.ConfigKeys
 import app.ridemate.testing.FakeClock
 import app.ridemate.testing.TestRideMateApp
 import app.ridemate.ui.InMemoryKeyValueStore
@@ -24,7 +23,11 @@ class DeveloperModeGateTest {
     private val auth = MutableStateFlow<AuthState>(AuthState.SignedOut)
     private val clock = FakeClock()
     private val kv = InMemoryKeyValueStore()
-    private val gate = DeveloperModeGate(kv, auth, { setOf(OwnerEmails.hash("owner@example.com")) }, clock)
+
+    /** The Google uid `/v1/config-check` confirmed as the owner ([ServerOwnerStatus.confirmedOwnerUid]). */
+    private val serverOwnerUid = MutableStateFlow<String?>("owner-uid")
+    private val isOwnerAccount: (AuthState) -> Boolean = { state -> (state as? AuthState.Google)?.uid == serverOwnerUid.value }
+    private val gate = DeveloperModeGate(kv, auth, isOwnerAccount, clock, serverOwnerUid)
 
     private fun tap(times: Int): VersionTapOutcome {
         var last: VersionTapOutcome? = null
@@ -88,7 +91,7 @@ class DeveloperModeGateTest {
         gate.setOwnerAlertsOn(true)
         assertTrue(gate.ownerAlertsSwitch.value)
         // Persisted: a new gate over the same store sees the same switches.
-        val again = DeveloperModeGate(kv, auth, { setOf(OwnerEmails.hash(ownerEmail)) }, clock)
+        val again = DeveloperModeGate(kv, auth, isOwnerAccount, clock)
         assertTrue(again.isEnabled())
         assertFalse(again.recorderSwitch.value)
         gate.disable()
@@ -100,17 +103,25 @@ class DeveloperModeGateTest {
     }
 
     @Test
-    fun `owner hashes come from remote config through core's scalar parser`() {
+    fun `the server withdrawing the owner turns developer mode off at once`() = runBlocking {
+        auth.value = owner
+        assertEquals(VersionTapOutcome.Enabled, tap(7))
+        assertTrue(gate.enabled.first())
+        serverOwnerUid.value = null
+        assertFalse(gate.isEnabled())
+        assertFalse(gate.enabled.first())
+        assertEquals(VersionTapOutcome.NotOwner, tap(7))
+    }
+
+    @Test
+    fun `the app ships no owner list - the owner comes only from the server`() = runBlocking {
         val app = ApplicationProvider.getApplicationContext<TestRideMateApp>()
-        val config = app.graph.configRepository
-        assertEquals(emptySet<String>(), OwnerEmails.hashesFrom(config))
-        val hash = OwnerEmails.hash("owner@example.com")
-        app.fakes.remoteConfig.active[ConfigKeys.OWNER_EMAILS_SHA256] = """["${hash.uppercase()}"]"""
-        assertEquals(setOf(hash), OwnerEmails.hashesFrom(config))
-        app.fakes.remoteConfig.active[ConfigKeys.OWNER_EMAILS_SHA256] = """["not-a-hash"]"""
-        assertEquals("malformed lists count as empty", emptySet<String>(), OwnerEmails.hashesFrom(config))
-        // Lower-cased and trimmed before hashing, as contracts §2.7 says.
-        assertEquals(OwnerEmails.hash("owner@example.com"), OwnerEmails.hash("  OWNER@example.COM "))
-        assertEquals(64, hash.length)
+        val bundled = app.assets.list("config").orEmpty().toSet()
+        assertFalse("owner_emails_sha256.json" in bundled)
+        assertFalse("judge_allowlist.json" in bundled)
+        assertTrue(app.graph.configRepository.raw("owner_emails_sha256").let { it.remote == null && it.bundled == null })
+        // Signed in as the owner, but the server has not confirmed it on this phone: not the owner.
+        app.fakes.auth.signInWithGoogleIdToken("token")
+        assertFalse(app.graph.ownerAccess.isOwner())
     }
 }

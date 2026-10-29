@@ -6,6 +6,7 @@ import app.ridemate.core.model.Provider
 import app.ridemate.core.ocr.Box
 import app.ridemate.core.ocr.OcrFrame
 import app.ridemate.core.ocr.OcrToken
+import java.io.File
 import kotlin.math.roundToInt
 
 /** Builds OCR frames the way ML Kit reports them: words with pixel boxes, grouped into numbered lines. */
@@ -96,4 +97,10 @@ object TestConfigs {
     val fareParsers: FareParsersConfig by lazy { parseFareParsers(FARE_PARSERS_JSON) }
 
     fun parser(app: Provider = Provider.DEMO_KESTREL): FareParser = FareParser.forApp(fareParsers, app, 1)!!
+
+    /** The repo's own `config/remote_config/fare_parsers.json` (the APK default), or null outside the repo. */
+    fun bundledFareParsers(): FareParsersConfig? {
+        val root = File(System.getProperty("ridemate.repoRoot") ?: ".")
+        return File(root, "config/remote_config/fare_parsers.json").takeIf { it.isFile }?.let { parseFareParsers(it.readText()) }
+    }
 }

@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:ridemate:config:better_ride_enabled",
+  "title": "better_ride_enabled (contracts §2.7)",
+  "description": "Kill switch for the opt-in better-ride offers (\"Keep searching\"); false stops them and hides the toggle. Stored as {\"value\": ...}; published as a Remote Config scalar.",
+  "type": "object",
+  "required": [
+    "value"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "value": {
+      "type": "boolean"
+    }
+  }
+}

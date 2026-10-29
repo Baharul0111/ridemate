@@ -1,7 +1,7 @@
 """The single list of Remote Config keys (docs/contracts.md §2) and how each is stored and published.
 
 Storage rule (config/README.md): every key has `config/remote_config/<key>.json`.
-- JSON-valued keys hold the payload itself (an object with "schema", or a list for `owner_emails_sha256`).
+- JSON-valued keys hold the payload itself (an object with "schema").
 - Scalar keys (BOOLEAN / NUMBER / STRING) hold `{"value": <scalar>}`.
 """
 
@@ -92,6 +92,11 @@ KEYS: tuple[KeySpec, ...] = (
     KeySpec("ondc_enabled", "BOOLEAN", "ONDC flow on/off (hackathon build: mock seller)."),
     KeySpec("demo_enabled", "BOOLEAN", "Try the demo on/off."),
     KeySpec(
+        "better_ride_enabled",
+        "BOOLEAN",
+        "Kill switch for the opt-in better-ride offers (\"Keep searching\"): false stops them and hides the toggle.",
+    ),
+    KeySpec(
         "point_supported",
         "BOOLEAN",
         "Whether /v1/point grounding is served (\"Show me\"); set by the day-1 spike, false until then.",
@@ -109,10 +114,11 @@ KEYS: tuple[KeySpec, ...] = (
         "Base URL of the ridemate-api Modal web app (set at deploy).",
         bundled_value="",
     ),
-    KeySpec(
-        "judge_allowlist", "JSON", "SHA-256 of lower-cased judge/tester emails with a larger fair share."
-    ),
-    KeySpec("owner_emails_sha256", "JSON", "SHA-256 of lower-cased owner emails (enables developer mode)."),
 )
+
+# Never Remote Config (contracts §2.7): every install can fetch the client template, and an unsalted email hash can
+# be checked against guessed emails. The judge allowlist is a server-only Firestore document and the owner list a
+# Modal secret; the phone learns "owner" from /v1/config-check.
+SERVER_ONLY_KEYS = frozenset({"judge_allowlist", "owner_emails_sha256"})
 
 KEYS_BY_NAME: dict[str, KeySpec] = {k.name: k for k in KEYS}

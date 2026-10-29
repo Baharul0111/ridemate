@@ -71,5 +71,5 @@
   "cost_usd": 0.006902,
   "source": "live",
   "request_id": "eval-run:793f4c6948e04a55:fffcada7a3d146098608fb7f81ec6201",
-  "latency_ms": 50969
+  "wall_ms": 50969
 }

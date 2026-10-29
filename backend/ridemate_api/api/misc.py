@@ -291,6 +291,8 @@ def _config_check(deps: Deps, principal: Principal | None) -> dict[str, Any]:
         "cap_profile": "judging" if rc.get_str("cap_profile", "normal") == "judging" else "normal",
         "min_supported_version": rc.get_int("min_supported_version", 1),
         "server_time_utc": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        # The phone ships no owner list (contracts §2.7): developer mode and owner alerts follow this answer.
+        "is_owner": principal is not None and principal.is_owner,
         "budget": budget,
     }
 
