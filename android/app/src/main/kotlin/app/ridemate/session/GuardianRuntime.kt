@@ -36,6 +36,8 @@ import app.ridemate.data.PlaceColumns
 import app.ridemate.data.SessionEntity
 import app.ridemate.data.SessionStatus
 import app.ridemate.notify.ActionTarget
+import app.ridemate.notify.BookChoice
+import app.ridemate.notify.BookTargets
 import app.ridemate.notify.GuardianIntents
 import app.ridemate.notify.GuardianNotifier
 import app.ridemate.notify.GuardianPresenter
@@ -115,6 +117,8 @@ class GuardianRuntime(
     private val mainExecutor: Executor,
     private val crash: CrashReporter? = null,
     private val guardianConfig: GuardianConfig = GuardianConfig(),
+    /** The pickup's state, so `fee_rules.states` applies to fee notes (Geocoder in production). */
+    private val stateCodes: StateCodeResolver = StateCodeResolver.NONE,
 ) : GuardianSessionApi, SessionCommands, RideWatchSink {
 
     private val coreClock = object : CoreClock {
@@ -123,7 +127,10 @@ class GuardianRuntime(
     }
 
     private val scope = CoroutineScope(parentScope.coroutineContext + SupervisorJob(parentScope.coroutineContext[Job]) + guardianDispatcher)
-    private val fees = LiveFeeEstimator(config::feeRules)
+    /** The open live session's pickup state (ISO code), resolved off the guardian thread when the session starts. */
+    @Volatile
+    private var sessionStateCode: String? = null
+    private val fees = LiveFeeEstimator(config::feeRules) { sessionStateCode }
     private val started = AtomicBoolean(false)
     private val restoredSignal = CompletableDeferred<Unit>()
 
@@ -141,6 +148,9 @@ class GuardianRuntime(
     private var drainScheduled = false
     private var dirty = false
     private var stopRequested = false
+
+    /** "Done": close the session once its kept ride (if any) no longer has a driver coming or riding. */
+    private var doneRequested = false
     private var startRefused = false
     private var sessionRow: SessionEntity? = null
     private var closedAtUtc: Long? = null
@@ -148,7 +158,9 @@ class GuardianRuntime(
     /** Written on the guardian thread; read by the fare reader from any thread ([openedLegId]). */
     @Volatile
     private var lastOpenedLegId: String? = null
-    private val captureTaps = HashMap<String, TapId>()
+
+    /** The user's capture taps by leg (Check screen, Show me), with when they came: single use, valid only for I6. */
+    private val captureTaps = HashMap<String, CaptureTap>()
     private val pendingOpens = mutableListOf<OpenRequest>()
     private var version = 0L
     private var lastServiceStartAttempt: Long? = null
@@ -255,10 +267,30 @@ class GuardianRuntime(
                 SessionOpKind.READ_FARES -> onMain { bindings.fareReader?.readFares() ?: notifier.openRideMate(GuardianIntents.DESTINATION_GUARDIAN) }
                 SessionOpKind.BOOKED_HERE -> enqueue {
                     if (guardian.state.session?.closed != false) return@enqueue
-                    val legId = target.ref ?: lastOpenedLegId?.takeIf { it in guardian.state.legs } ?: firstUnbookedLeg()
-                    if (legId != null) applyUserAction(UserAction.BookedHere(legId, newTap()))
+                    // The bubble and the notification name the app they record (the ref). Without one, the only app
+                    // it can be; when RideMate opened several and can't see which is on screen, it asks (goal 8).
+                    val legId = target.ref?.takeIf { it in guardian.state.legs } ?: when (val choice = bookChoice()) {
+                        is BookChoice.One -> choice.legId
+                        is BookChoice.Ask -> {
+                            askWhichApp(choice.legIds)
+                            null
+                        }
+                        BookChoice.None -> null
+                    }
+                    if (legId != null) {
+                        notifier.cancel(GuardianPresenter.BOOK_PICK_ID)
+                        applyUserAction(UserAction.BookedHere(legId, newTap()))
+                        confirmBooked(legId)
+                    }
                 }
-                SessionOpKind.DONE, SessionOpKind.STOP -> requestStop()
+                SessionOpKind.DONE -> {
+                    onMain { bindings.endFareCapture?.invoke() }
+                    requestDone()
+                }
+                SessionOpKind.STOP -> {
+                    onMain { bindings.endFareCapture?.invoke() }
+                    requestStop()
+                }
                 SessionOpKind.TOGGLE_KEEP_SEARCHING -> toggleKeepSearching()
                 SessionOpKind.DISMISS_NOTICE -> enqueue { target.ref?.let { ui = GuardianUiReducer.dismissNotice(ui, it) } }
                 SessionOpKind.OPEN_GUARDIAN -> onMain { notifier.openRideMate(GuardianIntents.DESTINATION_GUARDIAN) }
@@ -285,6 +317,43 @@ class GuardianRuntime(
     override fun requestStop() = enqueue {
         val session = guardian.state.session
         if (session != null && !session.closed) stopRequested = true
+    }
+
+    /**
+     * "Done": the user has finished. The session closes as soon as I8 allows and its kept ride (if any) no longer has
+     * a driver coming or riding, so a captain's cancel, a lost ride or the pay hand-off still reach the user.
+     */
+    fun requestDone() = enqueue {
+        val session = guardian.state.session
+        if (session != null && !session.closed) doneRequested = true
+    }
+
+    /** "Which app did you book in?": one button per app it could be, each recording that app. */
+    private fun askWhichApp(legIds: List<String>) {
+        val choices = legIds.mapNotNull { id -> guardian.state.legs[id]?.let { id to it.provider } }
+        if (choices.isEmpty()) return
+        try {
+            notifier.post(presenter().bookPick(choices))
+        } catch (e: RuntimeException) {
+            report(e)
+        }
+    }
+
+    /** What "Booked here" without a named app can record ([BookTargets], the same rule the bubble shows). */
+    private fun bookChoice(): BookChoice {
+        if (guardian.state.session?.closed != false) return BookChoice.None
+        return BookTargets.choose(guardian.state.legs.values, lastOpenedLegId, LegRecord::legId, { it.leg.state }) { bookable(it.legId) }
+    }
+
+    /** "Booked here" from the bubble or notification: a short notice says which app was recorded. */
+    private fun confirmBooked(legId: String) {
+        val rec = guardian.state.legs[legId] ?: return
+        if (!rec.leg.isBooked || rec.provider.isDemo) return
+        try {
+            notifier.post(presenter().bookedRecorded(legId, rec.provider))
+        } catch (e: RuntimeException) {
+            report(e)
+        }
     }
 
     // ------------------------------------------------------------------ SessionCommands
@@ -336,13 +405,14 @@ class GuardianRuntime(
         legOf(provider)?.let { guardian.onCaptureVerdict(it, cancelledKeywordsFound, tapId, frameAtElapsedMs) }
     }
 
-    override fun verifiedDriverReading(provider: Provider, etaMin: Int?, distanceMeters: Int?, tapId: TapId, frameAtElapsedMs: Long) = enqueue {
-        legOf(provider)?.let { guardian.onVerifiedDriverReading(it, etaMin, distanceMeters, tapId, frameAtElapsedMs) }
+    override fun verifiedDriverReading(provider: Provider, etaMin: Int?, distanceMeters: Int?, tapId: TapId, frameAtElapsedMs: Long, plateHash: String?) = enqueue {
+        legOf(provider)?.let { guardian.onVerifiedDriverReading(it, etaMin, distanceMeters, tapId, frameAtElapsedMs, plateHash) }
     }
 
     override fun captureTap(provider: Provider): TapId? = captureTapsByProvider[provider]
 
-    override fun done() = requestStop()
+    // "Done" keeps watching a kept ride that still has a driver (a captain's cancel, the pay hand-off still reach the user).
+    override fun done() = requestDone()
 
     override fun stop() = requestStop()
 
@@ -413,8 +483,10 @@ class GuardianRuntime(
             publishedUi = GuardianUiState.EMPTY
             _ui.value = ui
             stopRequested = false
+            doneRequested = false
             sessionRow = null
             lastOpenedLegId = null
+            sessionStateCode = null
             pendingOpens.clear()
             captureTaps.clear()
             keepSearchingPreference.clear()
@@ -457,14 +529,19 @@ class GuardianRuntime(
         require(providers.isNotEmpty()) { "a session needs at least one provider" }
         // Remote `better_ride_enabled` off: live sessions start without keep-searching (the demo has its own switch).
         val keepSearching = spec.keepSearching && (demo || config.betterRideEnabled.value)
+        // A screen projection belongs to one comparison: the new one asks Android for consent again.
+        if (!demo) onMain { bindings.endFareCapture?.invoke() }
         g.startSession(spec.sessionId, providers, keepSearching, demo)
         pipeline.demoSessionActive = demo
         pipeline.onSessionStarted()
         startRefused = false
         stopRequested = false
+        doneRequested = false
         closedAtUtc = null
         lastOpenedLegId = null
         captureTaps.clear()
+        sessionStateCode = null
+        if (!demo) resolveStateCode(spec.sessionId, spec.pickup.point)
         ui = GuardianUiState.EMPTY.copy(noticeSeq = ui.noticeSeq)
         sessionRow = SessionEntity(
             id = spec.sessionId,
@@ -480,14 +557,32 @@ class GuardianRuntime(
         )
     }
 
+    /** The pickup's state for `fee_rules.states`, looked up off the guardian thread; a newer session wins. */
+    private fun resolveStateCode(sessionId: String, pickup: app.ridemate.core.model.LatLng) {
+        if (stateCodes === StateCodeResolver.NONE || pickup == UNKNOWN_POINT) return
+        scope.launch(ioDispatcher) {
+            val code = try {
+                stateCodes.stateCodeAt(pickup)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                null
+            }
+            withContext(guardianDispatcher) {
+                if (guardian.state.session?.sessionId == sessionId) sessionStateCode = code
+            }
+        }
+    }
+
     private fun applyUserAction(action: UserAction) {
-        // I6: a capture is accepted only within 2 s of the tap that asked for it, so remember that tap for the
-        // capture area (Check screen on a leg, on a MAYBE prompt, and Show me).
+        // I6: a capture is accepted only within 2 s of the tap that asked for it, so remember that tap (and when it
+        // came) for the capture area (Check screen on a leg, on a MAYBE prompt, and Show me).
+        val now = clock.elapsedRealtimeMs()
         when (action) {
-            is UserAction.CheckScreen -> captureTaps[action.legId] = action.tapId
-            is UserAction.ShowMe -> captureTaps[action.legId] = action.tapId
+            is UserAction.CheckScreen -> captureTaps[action.legId] = CaptureTap(action.tapId, now)
+            is UserAction.ShowMe -> captureTaps[action.legId] = CaptureTap(action.tapId, now)
             is UserAction.AnswerPrompt -> if (action.answer == Answer.CHECK_SCREEN) {
-                guardian.state.prompts.firstOrNull { it.promptId == action.promptId }?.let { captureTaps[it.legId] = action.tapId }
+                guardian.state.prompts.firstOrNull { it.promptId == action.promptId }?.let { captureTaps[it.legId] = CaptureTap(action.tapId, now) }
             }
             // The user kept the ONDC ride after seeing the fee: the soft cancel lapses on the network side too.
             is UserAction.OndcKeepRide -> bindings.ondc?.let { sink -> onMain { sink.keepRide(action.legId, action.tapId) } }
@@ -500,7 +595,9 @@ class GuardianRuntime(
     /**
      * "Keep searching" (off by default). The tap flips what the user sees: the open session's setting, or the saved
      * preference when there is none. It applies to the open session only while nothing is booked there yet (no
-     * driver sheet can depend on it); otherwise it is saved for the next comparison.
+     * driver sheet can depend on it); otherwise it is saved for the next comparison. Turning it on is confirmed in the
+     * UI first (the "Play fair with drivers" warning). In Try the demo it changes only the demo session: the saved
+     * default for real comparisons stays as it is.
      */
     private fun toggleKeepSearching() = enqueue {
         val g = guardian
@@ -508,7 +605,7 @@ class GuardianRuntime(
         val value = !(session?.keepSearching ?: keepSearchingPreference.enabled)
         // While `better_ride_enabled` is off remotely it can only be turned off (the toggle is hidden as well).
         if (value && session?.demo != true && !config.betterRideEnabled.value) return@enqueue
-        keepSearchingPreference.enabled = value
+        if (session?.demo != true) keepSearchingPreference.enabled = value
         if (session == null || g.state.legs.values.any { it.leg.isBooked }) return@enqueue
         // Same session, same legs (ids, states and the user's earlier taps stay as they are).
         g.state.session = session.copy(keepSearching = value)
@@ -672,7 +769,12 @@ class GuardianRuntime(
                 pendingOpens += OpenRequest.of(effect.legId, effect.provider, effect.purpose, effect.tapId)
             }
             is GuardianEffect.RequestCapture -> if (!effect.provider.isDemo) {
-                val tap = captureTaps[effect.legId]
+                // A capture tap is single use and counts only while it is fresh (I6). A capture RideMate asks for by
+                // itself (the ride post went away after an earlier Show me) gets no tap: the user's own "Check screen"
+                // on the capture card drives it, instead of a surprise consent dialog whose frame would be rejected.
+                val entry = captureTaps[effect.legId]
+                val tap = entry?.takeIf { !it.used && clock.elapsedRealtimeMs() - it.atElapsedMs <= CAPTURE_TAP_FRESH_MS }?.tapId
+                if (entry != null) captureTaps[effect.legId] = entry.copy(used = true)
                 bindings.capture?.let { capture -> onMain { capture.request(effect.legId, effect.provider, effect.reason, tap) } }
             }
             is GuardianEffect.OndcCommand -> bindings.ondc?.let { sink -> onMain { sink.execute(effect) } }
@@ -687,14 +789,22 @@ class GuardianRuntime(
     private fun afterStep() {
         val g = guardian
         val session = g.state.session
-        if (session != null && !session.closed && !g.needsForegroundService && (stopRequested || keptLegPaid(g.state))) {
+        val close = stopRequested || keptLegPaid(g.state) || (doneRequested && !keptRideLive(g.state))
+        if (session != null && !session.closed && !g.needsForegroundService && close) {
             if (g.closeSession()) {
                 closedAtUtc = clock.wallMs()
                 pipeline.demoSessionActive = false
-                onMain { bindings.bubble.clearCancelCard() }
+                onMain {
+                    bindings.bubble.clearCancelCard()
+                    // The comparison is over: its screen projection ends with it.
+                    if (!session.demo) bindings.endFareCapture?.invoke()
+                }
             }
         }
-        if (g.state.session?.closed != false) stopRequested = false
+        if (g.state.session?.closed != false) {
+            stopRequested = false
+            doneRequested = false
+        }
         val stopBlocked = stopRequested && g.needsForegroundService
         ui = GuardianUiReducer.reconcile(ui, g.state, clock.elapsedRealtimeMs(), clock.wallMs(), nextReminderWallMs(g.state), stopBlocked)
             .let { it.copy(keepSearchingAvailable = it.demo || config.betterRideEnabled.value) }
@@ -706,7 +816,7 @@ class GuardianRuntime(
         }
         publishedUi = ui
         legIdsByProvider = g.state.legs.values.associate { it.provider to it.legId }
-        captureTapsByProvider = captureTaps.mapNotNull { (legId, tap) -> g.state.legs[legId]?.let { it.provider to tap } }.toMap()
+        captureTapsByProvider = captureTaps.mapNotNull { (legId, tap) -> g.state.legs[legId]?.let { it.provider to tap.tapId } }.toMap()
         publishStatus()
         maybeStartService()
         appOpener.withdrawSettled(::stillGuided)
@@ -726,6 +836,8 @@ class GuardianRuntime(
             stopRequested = stopRequested,
             bookedLegs = state.legs.values.count { it.leg.isBooked },
             pendingExtras = pendingExtras(state).size,
+            openedLegId = lastOpenedLegId?.takeIf { session != null && !session.closed && it in state.legs },
+            nextDueElapsedMs = if (guardian.needsForegroundService) guardian.nextDueElapsedMs() else null,
         )
     }
 
@@ -886,6 +998,13 @@ class GuardianRuntime(
     private fun keptLegPaid(state: GuardianState): Boolean =
         state.session?.keptLegId?.let { state.legs[it]?.leg?.state == RideState.PAY_HANDOFF } == true
 
+    /** The kept ride still has a driver coming, a search running or a trip under way: "Done" must not drop it. */
+    private fun keptRideLive(state: GuardianState): Boolean =
+        state.session?.keptLegId?.let { id -> state.legs[id]?.let { !it.dismissed && !it.leg.state.isTerminal } } == true
+
+    private fun bookable(legId: String): Boolean =
+        guardian.state.legs[legId]?.let { !it.leg.isBooked && !it.leg.state.isTerminal && !it.leg.isNetwork && !it.dismissed } == true
+
     /**
      * The open session's leg for [provider]. Bubble commands never touch a closed session: RideWatch no longer watches
      * its legs, so a "Booked here" there would be a booking nobody guards.
@@ -893,11 +1012,6 @@ class GuardianRuntime(
     private fun legOf(provider: Provider): String? {
         if (guardian.state.session?.closed != false) return null
         return guardian.state.legs.values.firstOrNull { it.provider == provider }?.legId
-    }
-
-    private fun firstUnbookedLeg(): String? {
-        if (guardian.state.session?.closed != false) return null
-        return guardian.state.legs.values.firstOrNull { !it.leg.isBooked && !it.leg.state.isTerminal && !it.leg.isNetwork }?.legId
     }
 
     private fun onMain(block: () -> Unit) = mainExecutor.execute {
@@ -923,10 +1037,19 @@ class GuardianRuntime(
         private const val IDLE_ROUNDS = 3
         private const val EVENT_BUFFER = 1_024
 
+        /** I6: a capture counts only within 2 s of the user's tap, so an older tap is never handed to a capture. */
+        const val CAPTURE_TAP_FRESH_MS = 2_000L
+
+        /** A typed place without coordinates (no state to look up). */
+        private val UNKNOWN_POINT = app.ridemate.compare.RoomActiveComparison.UNKNOWN_POINT
+
         /** The leg id core's guardian gives [provider] in session [sessionId] (first round). */
         fun legIdOf(sessionId: String, provider: Provider): String = Guardian.legIdOf(sessionId, provider)
     }
 }
+
+/** A user's capture tap and when it came (elapsed time). */
+private data class CaptureTap(val tapId: TapId, val atElapsedMs: Long, val used: Boolean = false)
 
 /** The platform outbox handler for the guardian's rows (REMINDER, FOLLOWUP_CHECK, OPEN_NEXT_APP). */
 class GuardianOutboxHandler(private val runtime: GuardianRuntime, private val watch: RideWatchStatus) : OutboxHandler {

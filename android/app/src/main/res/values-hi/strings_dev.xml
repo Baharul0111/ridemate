@@ -80,7 +80,11 @@
     <string name="dev_budget_not_owner">सर्वर बजट केवल मालिक के खातों को दिखाता है। मालिक के Google खाते से साइन इन करें।</string>
     <string name="dev_budget_of">%2$s में से %1$s (%3$d%%)</string>
     <string name="dev_budget_unknown">नहीं बताया गया</string>
-    <string name="dev_budget_ai">AI खर्च</string>
+    <string name="dev_budget_ai">AI इस्तेमाल (खर्च + आरक्षित), सीमा में से</string>
+    <string name="dev_budget_ai_reserved">AI आरक्षित (चल रहे कॉल)</string>
+    <string name="dev_budget_credit_left">बचा Modal क्रेडिट</string>
+    <string name="dev_budget_left_of">%2$s में से %1$s</string>
+    <string name="dev_budget_sub">AI हिस्सा: %1$s</string>
     <string name="dev_budget_compute">सर्वर कंप्यूट खर्च</string>
     <string name="dev_budget_today">आज (दैनिक सीमा)</string>
     <string name="dev_budget_horizon">बजट अवधि समाप्त</string>

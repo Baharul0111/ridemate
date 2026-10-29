@@ -15,6 +15,12 @@ open class RideMateApp : Application() {
     lateinit var graph: AppGraph
         private set
 
+    override fun attachBaseContext(base: Context) {
+        // Android 10–12: the in-app language for everything built from the application context (notifications,
+        // toasts, the bubble, fare-reading messages); Android 13+ uses the system per-app locale.
+        super.attachBaseContext(app.ridemate.settings.LegacyLocale.wrap(base))
+    }
+
     override fun onCreate() {
         super.onCreate()
         graph = createGraph()

@@ -27,6 +27,8 @@
         <item quantity="other">%1$d पढ़े नहीं जा सके: उन्हें ऐप में देखें।</item>
     </plurals>
     <string name="compare_manual_switched_off">AI से पढ़ना अभी बंद है। तब तक आप दाम टाइप कर सकते हैं।</string>
+    <string name="compare_manual_ai_paused_until_try">AI से पढ़ना %1$s (IST) पर फिर शुरू होगा। दाम टाइप करें, या फिर भी आज़माने के लिए दोबारा किराया पढ़ें दबाएँ।</string>
+    <string name="compare_manual_ai_paused_try">AI से पढ़ना अभी रुका हुआ है। दाम टाइप करें, या फिर भी आज़माने के लिए दोबारा किराया पढ़ें दबाएँ।</string>
     <string name="compare_manual_reader_unavailable">RideMate अभी %1$s के दाम नहीं जाँच सकता। तब तक आप दाम टाइप कर सकते हैं।</string>
     <string name="compare_manual_screenshot_blank">यह स्क्रीनशॉट खाली है: %1$s स्क्रीनशॉट भी नहीं लेने देता। %1$s में जो दाम दिख रहा है वह टाइप करें।</string>
 
@@ -49,6 +51,9 @@
     <string name="compare_booked_done">%1$s में बुकिंग दर्ज हुई। RideMate उस राइड पर नज़र रख रहा है।</string>
     <string name="compare_booked_failed">%1$s में बुकिंग दर्ज नहीं हो सकी। RideMate की यात्रा स्क्रीन खोलकर फिर से कोशिश करें।</string>
     <string name="compare_type_price">दाम टाइप करें</string>
+    <string name="compare_open_heading">हर ऐप में तुलना करें</string>
+    <string name="compare_open_app">%1$s खोलें</string>
+    <string name="compare_open_app_description">%1$s को आपके रास्ते के साथ खोलें, फिर बबल पर किराया पढ़ें टैप करें</string>
     <plurals name="compare_eta_minutes">
         <item quantity="one">%1$d मिनट में पिकअप</item>
         <item quantity="other">%1$d मिनट में पिकअप</item>

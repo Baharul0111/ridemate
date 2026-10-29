@@ -34,7 +34,7 @@ class GuardianModule(private val graph: AppGraph) {
     val cancelSteps: CancelStepsSource = CancelStepsSource { provider -> config.cancelSteps(provider) }
 
     /** A presenter in the current UI language (built per use so a language change applies at once). */
-    fun presenter(): GuardianPresenter = GuardianPresenter(GuardianText(context), cancelSteps)
+    fun presenter(): GuardianPresenter = GuardianPresenter(GuardianText(context) { graph.ondcClient.view.value.demoSeller }, cancelSteps)
 
     val notifier: GuardianNotifier by lazy {
         GuardianNotifier(context, ::presenter) { provider, purpose -> graph.guardianBindings.opener.intentFor(provider, purpose) }
@@ -79,6 +79,7 @@ class GuardianModule(private val graph: AppGraph) {
             captureGate = ServiceCaptureGate(context),
             mainExecutor = ContextCompat.getMainExecutor(context),
             crash = graph.crashReporter,
+            stateCodes = GeocoderStateCodes(context),
         ).also { runtime ->
             graph.localWipers.add(
                 LocalDataWiper {

@@ -19,7 +19,7 @@ class ApiMessagesTest {
     @Test
     fun `ai pause with a resume time names the IST time`() {
         val text = ApiMessages.text(context, ApiResult.AiPaused("ai_paused", "13:30", null), Locale.ENGLISH)
-        assertEquals("AI reading resumes at 1:30 pm (IST). You can type the price meanwhile.", text)
+        assertEquals("AI reading resumes at 1:30 PM (IST). You can type the price meanwhile.", text)
     }
 
     @Test

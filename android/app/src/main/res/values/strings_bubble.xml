@@ -13,6 +13,19 @@
     <string name="bubble_action_paste_drop_description">Paste drop: copy your drop address again, then long-press the app\'s destination box and tap Paste</string>
     <string name="bubble_action_stop">Stop</string>
     <string name="bubble_action_stop_description">Stop RideMate for this trip</string>
+    <string name="bubble_action_i_cancelled_it">I cancelled it</string>
+    <string name="bubble_action_i_cancelled_it_description">I cancelled it: you cancelled this booking in the app. RideMate checks again in a minute, then guides the next app</string>
+    <string name="bubble_action_next_app">Next app</string>
+    <string name="bubble_action_next_app_description">Open the next ride app with your route ready</string>
+    <!-- %1$s: ride app name. Opens that app with the route ready. -->
+    <string name="bubble_action_next_app_named">Next: %1$s</string>
+    <!-- %1$s: ride app name. Records the booking in that app. -->
+    <string name="bubble_action_booked_in">Booked in %1$s</string>
+    <!-- %1$s: ride app name. Reads that app's price again. -->
+    <string name="bubble_action_refresh_price">Refresh %1$s price</string>
+    <!-- %1$s: ride app name -->
+    <string name="bubble_status_refresh_pending">On %1$s\'s price list, tap Refresh %1$s price to read the new price.</string>
+    <string name="bubble_status_book_which_app">Booked a ride? Tap the app you booked it in.</string>
 
     <string name="bubble_head_description">RideMate controls. Double-tap to open or close. Drag to move.</string>
     <string name="bubble_head_open">Open</string>

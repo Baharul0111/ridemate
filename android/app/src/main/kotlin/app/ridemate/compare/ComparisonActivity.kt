@@ -3,7 +3,6 @@ package app.ridemate.compare
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
@@ -34,7 +33,7 @@ import kotlinx.coroutines.launch
  * Hosts [ComparisonScreen] for the active comparison (or [EXTRA_SESSION_ID]); opened from the bubble in manual mode
  * with the price form ([EXTRA_MANUAL_PROVIDER]). Not exported.
  */
-class ComparisonActivity : ComponentActivity() {
+class ComparisonActivity : app.ridemate.settings.LocalizedActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -71,11 +70,30 @@ class ComparisonActivity : ComponentActivity() {
 }
 
 /**
- * [ComparisonScreen] wired to the fare-reading module: live rows from Room, a 1 s ticker for freshness, the manual
- * prompt from the latest tap, Book / Booked here / refresh / typed prices.
+ * The open network's quotes for the list (goals 6–7): NETWORK rows with their seen-at time, grouped with the ride
+ * apps' rows by vehicle type. [legId] is the ONDC leg they belong to (rows of another comparison are not shown);
+ * [book] gets a row's [GatedRow.rowId]; [refresh] searches the network again (a stale network row's tap).
+ */
+data class NetworkQuotes(
+    val legId: String?,
+    val rows: List<app.ridemate.core.gate.GatedRow>,
+    val demoSeller: Boolean,
+    val book: (rowId: String) -> Unit,
+    val refresh: () -> Unit,
+)
+
+/**
+ * [ComparisonScreen] wired to the fare-reading module: live rows from Room (plus [network] quotes), a 1 s ticker for
+ * freshness, the manual prompt from the latest tap, Open / Book / Booked here / refresh / typed prices.
  */
 @Composable
-fun ComparisonRoute(module: FareReadingModule, sessionId: String?, manualProvider: Provider?, modifier: Modifier = Modifier) {
+fun ComparisonRoute(
+    module: FareReadingModule,
+    sessionId: String?,
+    manualProvider: Provider?,
+    modifier: Modifier = Modifier,
+    network: NetworkQuotes? = null,
+) {
     val context = LocalContext.current
     val resources = LocalResources.current
     val scope = rememberCoroutineScope()
@@ -83,20 +101,26 @@ fun ComparisonRoute(module: FareReadingModule, sessionId: String?, manualProvide
         if (sessionId != null) flowOf(sessionId) else module.comparisons.observeActiveSessionId()
     }.collectAsState(initial = sessionId)
     val id = activeId
-    val data by remember(id) {
+    val stored by remember(id) {
         if (id == null) flowOf(ComparisonData.empty("")) else module.comparisons.observe(id)
     }.collectAsState(initial = ComparisonData.empty(id.orEmpty()))
+    val data = remember(stored, network) {
+        val ondcLeg = stored.legFor(Provider.ONDC)
+        if (network != null && ondcLeg != null && network.legId == ondcLeg.id) stored.withNetworkRows(network.rows, network.demoSeller) else stored
+    }
     val lastRead by module.coordinator.lastRead.collectAsState()
     val now = rememberWallClock(module.clock)
     val manual = remember(lastRead, manualProvider, id) { manualPromptFor(context, lastRead, manualProvider, id) }
     val bookedText = { app: String -> resources.getString(R.string.compare_booked_done, app) }
-    val callbacks = remember(module, data) {
+    val callbacks = remember(module, data, network) {
         ComparisonCallbacks(
             onBook = { provider -> module.appLauncher.open(provider) },
             onBookedHere = module.sessionCommands?.let { commands ->
                 { provider: Provider ->
                     scope.launch {
                         val ok = commands.bookedHere(provider, TapIds.newTapId())
+                        // The fee note can then say "10% of the fare" instead of only the cap (goal 10).
+                        if (ok) bookedFareOf(data, provider)?.let { commands.recordBookedFare(provider, it) }
                         val app = FareReadingMessages.name(context, provider)
                         android.widget.Toast.makeText(
                             context,
@@ -107,7 +131,14 @@ fun ComparisonRoute(module: FareReadingModule, sessionId: String?, manualProvide
                     Unit
                 }
             },
-            onRefresh = { provider -> module.appLauncher.open(provider) },
+            onRefresh = { provider ->
+                if (provider.isNetwork) {
+                    network?.refresh?.invoke()
+                } else {
+                    // The next bubble tap reads this app's new price ("Refresh <app> price" on the bubble).
+                    if (module.appLauncher.open(provider)) module.coordinator.requestRefresh(provider)
+                }
+            },
             onSubmitManual = { provider: Provider, vehicleClass: VehicleClass, text: String, done: (String?) -> Unit ->
                 val leg = data.legFor(provider)
                 if (leg == null) {
@@ -119,18 +150,30 @@ fun ComparisonRoute(module: FareReadingModule, sessionId: String?, manualProvide
                     }
                 }
             },
+            onBookNetwork = network?.book,
         )
     }
     ComparisonScreen(data = data, nowMs = now, manual = manual, callbacks = callbacks, modifier = modifier)
 }
 
 /**
+ * The fare of a booking the user records with "Booked in <app>": the lowest VERIFIED price of that app among the
+ * chosen vehicle types (what the list showed as its price); null when no price of the app was verified.
+ */
+fun bookedFareOf(data: ComparisonData, provider: Provider): Int? =
+    data.rows.filter { it.provider == provider && it.status == app.ridemate.core.model.QuoteStatus.VERIFIED }
+        .mapNotNull { it.price?.last }
+        .minOrNull()
+
+/**
  * The form's prompt: the latest manual-mode tap of comparison [sessionId] (a tap from an earlier comparison never
- * prompts this one), or an explicit request to type a price for [manualProvider].
+ * prompts this one; a read that hit the 20 s limit counts as manual mode), or an explicit request to type a price
+ * for [manualProvider].
  */
 fun manualPromptFor(context: Context, lastRead: LastRead?, manualProvider: Provider?, sessionId: String? = null): ManualPrompt? {
     val sameComparison = sessionId == null || lastRead?.leg?.sessionId == sessionId
-    val manual = (lastRead?.result as? ReadFaresResult.ManualMode)?.takeIf { sameComparison }
+    val manual = lastRead?.let { read -> read.leg?.let { FareReadingCoordinator.manualModeOf(it, read.result) } ?: (read.result as? ReadFaresResult.ManualMode) }
+        ?.takeIf { sameComparison }
     return when {
         manual != null && (manualProvider == null || manual.provider == manualProvider) ->
             ManualPrompt(FareReadingMessages.manualText(context, manual), manual.provider, manual.suggestedClasses)

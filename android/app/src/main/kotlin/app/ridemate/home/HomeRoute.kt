@@ -27,6 +27,7 @@ fun HomeRoute(graph: AppGraph, navigator: FeatureNavigator) {
             api = graph.apiClient,
             gate = { shell.preSessionGate },
             scope = scope,
+            onAiCheck = graph.fareReading.aiPause::onConfigCheck,
         )
     }
     val state by model.state.collectAsStateWithLifecycle()
@@ -66,6 +67,8 @@ fun HomeRoute(graph: AppGraph, navigator: FeatureNavigator) {
             },
             continueAnyway = { model.continueAnyway(navigator::tripInput) },
             dismissCheck = model::dismissCompareCheck,
+            restrictedSettings = shell.device.restrictedSettingsPossible,
+            openAppInfo = { SystemIntents.startFirst(context, *PermissionIntents.appInfo(context).toTypedArray()) },
         ),
     )
 }

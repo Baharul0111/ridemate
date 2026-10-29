@@ -44,13 +44,17 @@ object PrecheckTags {
 /**
  * One compact fix-it card: a severity icon *and* word (never colour alone), a short title and one button per fix.
  * What it means and what to do sits behind the ⓘ (InfoSheet), never as a paragraph on the screen. The comparison
- * area reuses it for "no fares found" / "no ONDC results".
+ * area reuses it for "no fares found" / "no ONDC results". With [restrictedSettings] (sideloaded on Android 13+) the
+ * notification-access and overlay cards also say how to "Allow restricted settings" and offer "Open App info",
+ * because their switch is greyed out until then.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun PrecheckCard(issue: PrecheckIssue, onFix: (FixAction) -> Unit, modifier: Modifier = Modifier) {
+fun PrecheckCard(issue: PrecheckIssue, onFix: (FixAction) -> Unit, modifier: Modifier = Modifier, restrictedSettings: Boolean = false) {
     val severityText = stringResource(PrecheckMessages.severityLabel(issue.severity))
     val title = stringResource(PrecheckMessages.title(issue.kind))
+    val restricted = restrictedSettings && issue.kind in PrecheckMessages.RESTRICTED_SWITCHES
+    val fixes = if (restricted) (issue.fixes + FixAction.OPEN_APP_INFO).distinct() else issue.fixes
     val tone = issue.severity.tone()
     val icon = issue.severity.icon()
     var showWhy by rememberSaveable(issue.kind) { mutableStateOf(false) }
@@ -72,8 +76,15 @@ fun PrecheckCard(issue: PrecheckIssue, onFix: (FixAction) -> Unit, modifier: Mod
                 contentDescription = stringResource(R.string.precheck_why_cd, title),
             )
         }
+        if (restricted) {
+            Text(
+                stringResource(R.string.precheck_restricted_hint),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
         FlowRow(horizontalArrangement = Arrangement.spacedBy(RmSpacing.s), verticalArrangement = Arrangement.spacedBy(RmSpacing.s)) {
-            issue.fixes.forEachIndexed { index, fix ->
+            fixes.forEachIndexed { index, fix ->
                 val label = stringResource(PrecheckMessages.fixLabel(fix))
                 QuietButton(
                     text = label,
@@ -89,7 +100,8 @@ fun PrecheckCard(issue: PrecheckIssue, onFix: (FixAction) -> Unit, modifier: Mod
         InfoSheet(
             onDismiss = { showWhy = false },
             title = title,
-            body = stringResource(PrecheckMessages.body(issue.kind)),
+            body = stringResource(PrecheckMessages.body(issue.kind)) +
+                if (restricted) "\n\n" + stringResource(R.string.onb_restricted_steps) else "",
             icon = icon,
             tone = tone,
             primaryLabel = first?.let { stringResource(PrecheckMessages.fixLabel(it)) },

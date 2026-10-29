@@ -233,9 +233,20 @@ class GuardianPresenterTest {
 
     @Test
     fun `the ongoing notification mirrors the bubble for each phase`() {
-        val booking = en.ongoing(base.copy(legs = base.legs.map { it.copy(booked = false, state = RideState.QUOTED) }))
-        assertEquals(listOf("Read fares", "Booked here", "Stop"), booking.labels())
+        val booking = en.ongoing(base.copy(legs = base.legs.mapIndexed { i, leg -> leg.copy(booked = false, state = if (i == 0) RideState.QUOTED else RideState.SELECTED) }))
+        // "Booked here" names the app it records (only one app was opened through RideMate: that one).
+        assertEquals(listOf("Read fares", "Booked in Uber", "Stop"), booking.labels())
+        assertEquals(SessionOp(SessionOpKind.BOOKED_HERE, base.legs[0].legId), booking.actions[1].target)
+        // Both apps opened: RideMate can't see which one is on screen, so the button asks (no app named, no ref).
+        val opened = en.ongoing(base.copy(legs = base.legs.map { it.copy(booked = false, state = RideState.QUOTED) }), openedLegId = base.legs[1].legId)
+        assertEquals("Booked in…", opened.actions[1].label)
+        assertEquals(SessionOp(SessionOpKind.BOOKED_HERE), opened.actions[1].target)
         assertEquals(SessionOp(SessionOpKind.READ_FARES), booking.actions[0].target)
+        val pick = en.bookPick(listOf(base.legs[1].legId to base.legs[1].provider, base.legs[0].legId to base.legs[0].provider))
+        assertEquals("Which app did you book in?", pick.title)
+        assertEquals(listOf("Ola", "Uber"), pick.labels())
+        assertEquals(SessionOp(SessionOpKind.BOOKED_HERE, base.legs[1].legId), pick.actions[0].target)
+        assertEquals(CardStyle.HEADS_UP, pick.style)
 
         val chain = base.copy(
             legs = listOf(
@@ -351,6 +362,58 @@ class GuardianPresenterTest {
         assertEquals("Ride ended. Open Uber to pay", pay.extras.getCharSequence(Notification.EXTRA_TITLE).toString())
         notifier.sync(state, state.copy(items = emptyList()))
         assertTrue(shadowOf(manager).getNotification("pay:s:uber", GuardianNotifier.ITEM_NOTIFICATION_ID) == null)
+    }
+
+    @Test
+    fun `a reminder for an app already said to be cancelled offers Check screen, not I cancelled it again`() {
+        val guided = cards(GuardianEffect.Reminder(1, listOf(LegRef("s:ola", Provider.OLA, RideState.CANCEL_GUIDED)), true, true)).single()
+        assertEquals(listOf("Open Ola", "I cancelled it", "Dismiss"), guided.labels())
+        for (state in listOf(RideState.USER_SAYS_CANCELLED, RideState.CANCEL_UNCONFIRMED)) {
+            val said = cards(GuardianEffect.Reminder(2, listOf(LegRef("s:ola", Provider.OLA, state)), true, true)).single()
+            assertEquals(state.name, listOf("Open Ola", "Check screen", "Dismiss"), said.labels())
+            assertEquals(GuardianTap(TapScope.LEG, "s:ola", UiAction.CHECK_SCREEN), said.actions[1].target)
+        }
+    }
+
+    @Test
+    fun `after a quiet +60 s check the leg waits for the app's proof instead of checking again in a minute`() {
+        assertEquals("You said you cancelled it. Checking again in a minute", en.text.state(RideState.USER_SAYS_CANCELLED, Provider.OLA))
+        assertEquals(
+            "You said you cancelled it. Waiting for Ola to confirm",
+            en.text.state(RideState.USER_SAYS_CANCELLED, Provider.OLA, followUpPending = false),
+        )
+    }
+
+    @Test
+    fun `the same driver on another booking while a ride is kept is a heads-up with Open and Dismiss`() {
+        val kept = base.copy(
+            legs = listOf(
+                base.legs[0].copy(state = RideState.ASSIGNED, role = LegRole.KEPT),
+                base.legs[2].copy(state = RideState.ASSIGNED, role = LegRole.EXTRA),
+            ),
+        )
+        val card = cards(GuardianEffect.SameDriverNotice(listOf("s:uber", "s:rapido")), before = kept).single()
+        assertEquals(GuardianChannels.PROMPTS, card.channel)
+        assertEquals(CardStyle.HEADS_UP, card.style)
+        assertEquals(listOf("Open Rapido", "Dismiss"), card.labels())
+        assertEquals(GuardianTap(TapScope.LEG, "s:rapido", UiAction.OPEN_APP), card.actions[0].target)
+        assertTrue(card.lines.single(), card.lines.single().contains("Rapido"))
+    }
+
+    @Test
+    fun `the mock ONDC seller is named as such in the guardian's texts`() {
+        val demo = GuardianPresenter(GuardianText(context) { true }, CancelStepsSource.NONE)
+        assertEquals("Open network (ONDC demo seller)", demo.text.provider(Provider.ONDC))
+        assertEquals("Open network (ONDC)", en.text.provider(Provider.ONDC))
+        assertEquals("ओपन नेटवर्क (ONDC डेमो विक्रेता)", GuardianText(localized("hi")) { true }.provider(Provider.ONDC))
+    }
+
+    @Test
+    fun `a booked here confirmation names the app that was recorded`() {
+        val card = en.bookedRecorded("s:rapido", Provider.RAPIDO)
+        assertEquals("Recorded: booked in Rapido", card.title)
+        assertEquals(CardStyle.QUIET, card.style)
+        assertEquals("booked:s:rapido", card.id)
     }
 
     private companion object {

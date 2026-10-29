@@ -22,7 +22,11 @@ import app.ridemate.core.model.RideState
  * Every piece of guardian wording, from string resources (English + Hindi). I5: model output never reaches these
  * strings; they are filled only with provider names, numbers from admissible sources and formatted times/amounts.
  */
-class GuardianText(private val context: Context) {
+class GuardianText(
+    private val context: Context,
+    /** The open-network booking is with the hackathon's mock seller: it is named as such in every guardian text. */
+    private val ondcDemoSeller: () -> Boolean = { false },
+) {
 
     private fun s(@StringRes id: Int, vararg args: Any): String = context.getString(id, *args)
 
@@ -34,7 +38,7 @@ class GuardianText(private val context: Context) {
             Provider.UBER -> R.string.guardian_provider_uber
             Provider.OLA -> R.string.guardian_provider_ola
             Provider.RAPIDO -> R.string.guardian_provider_rapido
-            Provider.ONDC -> R.string.guardian_provider_ondc
+            Provider.ONDC -> if (runCatching(ondcDemoSeller).getOrDefault(false)) R.string.guardian_provider_ondc_demo else R.string.guardian_provider_ondc
             Provider.DEMO_KESTREL -> R.string.guardian_provider_demo_kestrel
             Provider.DEMO_PEPPER -> R.string.guardian_provider_demo_pepper
             Provider.DEMO_TAMARIND -> R.string.guardian_provider_demo_tamarind
@@ -99,7 +103,7 @@ class GuardianText(private val context: Context) {
 
     // ------------------------------------------------------------------ legs
 
-    fun state(state: RideState, provider: Provider): String {
+    fun state(state: RideState, provider: Provider, followUpPending: Boolean = true): String {
         val app = provider(provider)
         val c = captain(provider)
         return when (state) {
@@ -120,7 +124,8 @@ class GuardianText(private val context: Context) {
             RideState.PROVIDER_CANCELLED -> s(R.string.guardian_state_provider_cancelled, app)
             RideState.CANCEL_REQUESTED -> s(R.string.guardian_state_cancel_requested)
             RideState.CANCEL_GUIDED -> s(R.string.guardian_state_cancel_guided, app)
-            RideState.USER_SAYS_CANCELLED -> s(R.string.guardian_state_user_says_cancelled)
+            RideState.USER_SAYS_CANCELLED ->
+                if (followUpPending) s(R.string.guardian_state_user_says_cancelled) else s(R.string.guardian_state_user_says_cancelled_waiting, app)
             RideState.CANCEL_UNCONFIRMED -> s(R.string.guardian_state_cancel_unconfirmed, app)
             RideState.CANCEL_CONFIRMED -> s(R.string.guardian_state_cancel_confirmed)
             RideState.CONFIRMED -> s(R.string.guardian_state_network_confirmed)

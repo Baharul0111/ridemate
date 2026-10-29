@@ -82,6 +82,11 @@ sealed interface ReadFaresResult {
         val resumeAtIst: String? = null,
         val apiResult: ApiResult<*>? = null,
         val suggestedClasses: List<VehicleClass> = emptyList(),
+        /**
+         * The server had already said AI reading is paused, so nothing was captured or uploaded for this tap; tapping
+         * Read fares again soon after tries anyway ([AiPauseMemory]).
+         */
+        val pausedEarlier: Boolean = false,
     ) : ReadFaresResult
 
     /** K3: no ₹/Rs amount and no status keyword for this app; nothing was uploaded. */

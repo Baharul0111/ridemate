@@ -306,7 +306,11 @@ private fun CaptureTestResultView(status: CaptureTestStatus) {
     }
 }
 
-/** The owner budget block: AI and compute spend against their budgets, today's spend vs the pacing cap, horizon. */
+/**
+ * The owner budget block (goal 23): what is left of the Modal credit, AI use (spent + reserved) against the AI limit in
+ * force now (it shrinks when compute overruns the margin), compute spend, each AI sub-budget, today's spend vs the
+ * pacing cap, horizon.
+ */
 object BudgetLines {
     fun lines(context: Context, check: ConfigCheckResponse): List<Pair<String, String>> {
         val budget = check.budget ?: return emptyList()
@@ -316,8 +320,18 @@ object BudgetLines {
             return context.getString(R.string.dev_budget_of, UiFormat.usd(spent), UiFormat.usd(total), pct ?: 0)
         }
         return buildList {
-            add(context.getString(R.string.dev_budget_ai) to spend(budget.aiSpentUsd, budget.aiBudgetUsd))
+            val left = budget.creditLeftUsd
+            val total = budget.creditTotalUsd
+            add(
+                context.getString(R.string.dev_budget_credit_left) to
+                    if (left != null && total != null) context.getString(R.string.dev_budget_left_of, UiFormat.usd(left), UiFormat.usd(total)) else context.getString(R.string.dev_budget_unknown),
+            )
+            add(context.getString(R.string.dev_budget_ai) to spend(budget.aiUsedUsd, budget.aiLimitUsd ?: budget.aiBudgetUsd))
+            budget.aiReservedUsd?.takeIf { it > 0 }?.let { add(context.getString(R.string.dev_budget_ai_reserved) to UiFormat.usd(it)) }
             add(context.getString(R.string.dev_budget_compute) to spend(budget.computeSpentUsd, budget.computeBudgetUsd))
+            budget.subBudgets.toSortedMap().forEach { (name, sub) ->
+                add(context.getString(R.string.dev_budget_sub, name) to spend(sub.spentUsd, sub.budgetUsd))
+            }
             add(context.getString(R.string.dev_budget_today) to spend(budget.daySpentUsd, budget.dayCapUsd))
             add(
                 context.getString(R.string.dev_budget_horizon) to

@@ -20,6 +20,9 @@ interface SessionCommands {
      * the guardian, linked to the user's [tapId] (I1). Returns false when there is no such leg in the active session.
      */
     suspend fun bookedHere(provider: Provider, tapId: String): Boolean
+
+    /** The fare (₹) of the booking just recorded for [provider], from its VERIFIED row: fee notes use it (10% of fare). */
+    suspend fun recordBookedFare(provider: Provider, fareInr: Int) = Unit
 }
 
 /** Opens a ride app (the trip/launch area's AppLauncher implements this with route prefill). */

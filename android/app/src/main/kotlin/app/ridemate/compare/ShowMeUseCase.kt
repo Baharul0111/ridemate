@@ -25,7 +25,7 @@ import app.ridemate.ocr.MaskedUpload
 import app.ridemate.ocr.OcrEngine
 import app.ridemate.ocr.OcrFailedException
 import app.ridemate.util.Clock
-import app.ridemate.util.Ist
+import app.ridemate.ui.UiFormat
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -255,7 +255,7 @@ object ShowMeMessages {
             ShowMeResult.NoRoom -> problem(context.getString(R.string.show_me_no_room))
             ShowMeResult.Unsupported -> problem(context.getString(R.string.show_me_unsupported))
             is ShowMeResult.Unavailable -> problem(
-                Ist.formatResumeAt(result.resumeAtIst)?.let { context.getString(R.string.show_me_paused_until, it) }
+                UiFormat.resumeAtIst(result.resumeAtIst)?.let { context.getString(R.string.show_me_paused_until, it) }
                     ?: context.getString(R.string.show_me_unavailable),
             )
             ShowMeResult.NeedsConsent -> problem(context.getString(R.string.show_me_consent_needed))

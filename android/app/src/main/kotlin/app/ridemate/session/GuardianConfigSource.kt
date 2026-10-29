@@ -73,15 +73,21 @@ class RemoteGuardianConfig(
     override val betterRideEnabled: StateFlow<Boolean> get() = config.betterRideEnabled
 }
 
-/** Core's rule-based fee estimator over the latest `fee_rules` (rebuilt only when the payload changes). */
-class LiveFeeEstimator(private val rules: () -> FeeRules, private val stateCode: String? = null) : FeeEstimator {
+/**
+ * Core's rule-based fee estimator over the latest `fee_rules` and the session's state ([stateCode], the ISO code of
+ * the pickup's state, so `fee_rules.states` applies); rebuilt only when either changes.
+ */
+class LiveFeeEstimator(private val rules: () -> FeeRules, private val stateCode: () -> String? = { null }) : FeeEstimator {
+    private class Built(val rules: FeeRules, val stateCode: String?, val estimator: RuleBasedFeeEstimator)
+
     @Volatile
-    private var cached: Pair<FeeRules, RuleBasedFeeEstimator>? = null
+    private var cached: Built? = null
 
     private fun delegate(): RuleBasedFeeEstimator {
         val current = rules()
-        cached?.takeIf { it.first === current }?.let { return it.second }
-        return RuleBasedFeeEstimator(current, stateCode).also { cached = current to it }
+        val state = stateCode()
+        cached?.takeIf { it.rules === current && it.stateCode == state }?.let { return it.estimator }
+        return RuleBasedFeeEstimator(current, state).also { cached = Built(current, state, it) }
     }
 
     override fun note(query: FeeQuery): FeeNote = delegate().note(query)

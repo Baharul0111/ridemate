@@ -150,6 +150,8 @@ class FareReadingCoordinator(
      */
     private suspend fun present(leg: ActiveLeg?, result: ReadFaresResult) {
         _lastRead.value = LastRead(leg, result, clock.wallMs())
+        // A read for the app whose stale price the user asked to refresh answers that request.
+        if (leg != null && _refreshPending.value == leg.provider) _refreshPending.value = null
         val status = FareReadingMessages.status(context, result)
         withContext(main) {
             val surface = bubble()
@@ -158,11 +160,38 @@ class FareReadingCoordinator(
             } else {
                 Toast.makeText(context, status.text, Toast.LENGTH_LONG).show()
             }
-            if (leg != null && result is ReadFaresResult.ManualMode) openManualEntry(leg, result)
+            // Goal 21: when reading cannot finish (the 20 s limit included), the price form opens right away.
+            if (leg != null) manualModeOf(leg, result)?.let { openManualEntry(leg, it) }
         }
     }
 
+    private val _refreshPending = MutableStateFlow<app.ridemate.core.model.Provider?>(null)
+
+    /**
+     * The app whose stale price the user tapped "old, tap to refresh" for; the bubble then offers "Refresh <app>
+     * price" so the next tap reads it. Cleared by the next read of that app.
+     */
+    val refreshPending: StateFlow<app.ridemate.core.model.Provider?> = _refreshPending.asStateFlow()
+
+    fun requestRefresh(provider: app.ridemate.core.model.Provider) {
+        _refreshPending.value = provider
+    }
+
+    fun clearRefresh() {
+        _refreshPending.value = null
+    }
+
     companion object {
+        /**
+         * The manual mode a result leads to: [ReadFaresResult.ManualMode] itself, and the 20 s deadline
+         * ([ReadFaresResult.TimedOut]) as a TIMEOUT, so the user can type the price instead of waiting again.
+         */
+        fun manualModeOf(leg: ActiveLeg, result: ReadFaresResult): ReadFaresResult.ManualMode? = when (result) {
+            is ReadFaresResult.ManualMode -> result
+            ReadFaresResult.TimedOut -> ReadFaresResult.ManualMode(leg.provider, ManualReason.TIMEOUT)
+            else -> null
+        }
+
         /** Time for Android's consent dialog to leave the screen before the first frame. */
         const val CONSENT_DIALOG_SETTLE_MS: Long = 450
     }

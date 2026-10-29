@@ -152,4 +152,21 @@ class DefaultAuthGatewayTest {
         backend.signInAnonymously()
         assertEquals(AuthState.SignedOut, gw.state.value)
     }
+
+    @Test
+    fun `a Firebase call that never answers ends with a network error instead of hanging (goal 21)`() = runBlocking {
+        backend.user = FakeAuthBackend.googleUser()
+        val silent = object : AuthBackend by backend {
+            override suspend fun deleteCurrentUser() = kotlinx.coroutines.awaitCancellation()
+            override suspend fun getIdToken(forceRefresh: Boolean): BackendToken = kotlinx.coroutines.awaitCancellation()
+            override suspend fun signInWithGoogleIdToken(idToken: String): AuthUser = kotlinx.coroutines.awaitCancellation()
+        }
+        val gw = DefaultAuthGateway(silent, google, clock, backendTimeoutMs = 50) { "raw-nonce" }
+        assertEquals(DeleteAccountResult.NetworkError, gw.deleteAccount())
+        assertEquals(IdTokenResult.NetworkError, gw.idToken(forceRefresh = true))
+        assertTrue("still signed in: nothing was deleted", gw.state.value is AuthState.Google)
+
+        // Google's sheet answered; Firebase never does.
+        assertEquals(SignInResult.NetworkError, gw.signInWithGoogle(activity))
+    }
 }

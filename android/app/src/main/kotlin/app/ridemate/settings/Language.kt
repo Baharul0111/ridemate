@@ -55,11 +55,17 @@ class SystemLocaleBackend(context: Context) : AppLocaleBackend {
     }
 }
 
-class StoredLocaleBackend(private val store: SettingsStore) : AppLocaleBackend {
+/**
+ * Android 10–12: the choice is stored, and [onChanged] applies it to the running process at once (the application's
+ * resources, which notifications, toasts and the bubble use; the notification channel names). Activities and the
+ * session service pick it up in `attachBaseContext` ([LegacyLocale.wrap]).
+ */
+class StoredLocaleBackend(private val store: SettingsStore, private val onChanged: (String?) -> Unit = {}) : AppLocaleBackend {
     override val recreatesActivity: Boolean = false
     override fun get(): String? = store.languageTag
     override fun set(tag: String?) {
         store.languageTag = tag
+        onChanged(tag)
     }
 }
 
@@ -77,9 +83,29 @@ class DefaultLanguageController(private val backend: AppLocaleBackend, private v
 
     companion object {
         fun create(context: Context, store: SettingsStore): LanguageController = DefaultLanguageController(
-            backend = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) SystemLocaleBackend(context) else StoredLocaleBackend(store),
+            backend = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                SystemLocaleBackend(context)
+            } else {
+                StoredLocaleBackend(store) { tag ->
+                    val application = context.applicationContext
+                    LegacyLocale.applyToProcess(application, tag)
+                    // Channel names are shown in Android's settings: rename them in the new language.
+                    runCatching { app.ridemate.notify.GuardianChannels.ensure(application) }
+                }
+            },
             store = store,
         )
+    }
+}
+
+/**
+ * The base of RideMate's own activities other than [app.ridemate.MainActivity] (the comparison and price form opened
+ * from the bubble, capture consent, opening a ride app, a shared screenshot): on Android 10–12 they show the in-app
+ * language too, not only the phone's.
+ */
+open class LocalizedActivity : androidx.activity.ComponentActivity() {
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(LegacyLocale.wrap(newBase))
     }
 }
 
@@ -106,5 +132,25 @@ object LegacyLocale {
         val config = Configuration(base.resources.configuration)
         config.setLocales(LocaleList(locale))
         return base.createConfigurationContext(config)
+    }
+
+    /**
+     * A language change while the process runs (Android 10–12): the application's resources switch now, so the
+     * bubble, notifications and toasts (which use the application context) follow without a restart.
+     */
+    fun applyToProcess(
+        app: Context,
+        tag: String?,
+        sdkInt: Int = Build.VERSION.SDK_INT,
+        systemLocale: () -> Locale = { Resources.getSystem().configuration.locales[0] },
+    ) {
+        if (sdkInt >= Build.VERSION_CODES.TIRAMISU) return
+        val locale = tag?.let(Locale::forLanguageTag) ?: runCatching { systemLocale() }.getOrNull() ?: return
+        Locale.setDefault(locale)
+        val resources = app.resources
+        val config = Configuration(resources.configuration)
+        config.setLocales(LocaleList(locale))
+        @Suppress("DEPRECATION") // The only way to switch an existing Resources object; Android 13+ never gets here.
+        resources.updateConfiguration(config, resources.displayMetrics)
     }
 }

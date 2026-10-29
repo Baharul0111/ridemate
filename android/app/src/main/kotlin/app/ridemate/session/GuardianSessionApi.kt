@@ -49,6 +49,16 @@ data class GuardianStatus(
     val stopRequested: Boolean = false,
     val bookedLegs: Int = 0,
     val pendingExtras: Int = 0,
+    /**
+     * The leg whose app RideMate opened last in this session: the app on screen as far as RideMate knows. "Booked
+     * here" records it (and the bubble names it); null before any app was opened.
+     */
+    val openedLegId: String? = null,
+    /**
+     * While I8 holds: when (on `elapsedRealtime`) the guardian's next reminder or +60 s check is due. The session
+     * service keeps the CPU awake for it and sets a while-idle alarm as a backstop.
+     */
+    val nextDueElapsedMs: Long? = null,
 ) {
     /** M7: the foreground service runs while a session is open or anything still needs reminding. */
     val shouldRunService: Boolean get() = !restored || starting || needsForegroundService || (sessionOpen && !stopRequested)
@@ -116,8 +126,11 @@ interface SessionCommands {
     /** Rung 3's capture half: the user-tapped capture's OCR checked against [provider]'s cancelled keywords. */
     fun captureVerdict(provider: Provider, cancelledKeywordsFound: Boolean, tapId: TapId, frameAtElapsedMs: Long)
 
-    /** A driver ETA/distance read through the VerificationGate from a user-tapped capture (VERIFIED). */
-    fun verifiedDriverReading(provider: Provider, etaMin: Int?, distanceMeters: Int?, tapId: TapId, frameAtElapsedMs: Long)
+    /**
+     * A driver ETA/distance read through the VerificationGate from a user-tapped capture (VERIFIED), with the hash of
+     * the plate on that frame (same-driver detection; the plate itself never leaves the frame).
+     */
+    fun verifiedDriverReading(provider: Provider, etaMin: Int?, distanceMeters: Int?, tapId: TapId, frameAtElapsedMs: Long, plateHash: String? = null)
 
     /** The tap id RideMate recorded for the latest Check screen / Show me on [provider] (I6 pairs frames with it). */
     fun captureTap(provider: Provider): TapId?

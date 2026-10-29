@@ -145,6 +145,7 @@ class OndcClient(
     private val scope: CoroutineScope,
     private val stepTimeoutMs: Long = STEP_TIMEOUT_MS,
     private val searchTimeoutMs: Long = SEARCH_TIMEOUT_MS,
+    private val statusPollMs: Long = STATUS_POLL_MS,
 ) {
     private val _view = MutableStateFlow(OndcView())
     val view: StateFlow<OndcView> = _view.asStateFlow()
@@ -184,6 +185,9 @@ class OndcClient(
 
         /** The user's confirmed cancel has not been confirmed by the network in time. */
         var confirmStalled = false
+
+        /** Asks the seller for the booked ride's status until it is over (the seller only reports a driver on `status`). */
+        var statusPoll: Job? = null
         var feeShownRound = -1
 
         /** The soft-cancel round the user answered "Keep ride" to. */
@@ -411,6 +415,7 @@ class OndcClient(
             it.searchTimeout?.cancel()
             it.cancelTimer?.cancel()
             it.confirmTimer?.cancel()
+            it.statusPoll?.cancel()
             if (abandon) {
                 val txnId = it.txnId
                 scope.launch { api.ondcAbandon(txnId) }
@@ -455,6 +460,25 @@ class OndcClient(
                 }
                 fresh.forEach { deliver(t.legId, it) }
                 refreshView(t)
+                pollStatusWhileRiding(t)
+            }
+        }
+    }
+
+    /**
+     * After confirm the seller reports the driver, the trip and its end only when asked (`status`): while the booked
+     * ride is under way, ask every [statusPollMs] (each call bounded by [stepTimeoutMs]) until it is over, is being
+     * cancelled, or the transaction stops. Without this a booked network ride would never get a driver or progress,
+     * and its cancellation fee would always be the pre-driver ₹0.
+     */
+    private fun pollStatusWhileRiding(t: Txn) {
+        if (t.statusPoll?.isActive == true || !t.live) return
+        if (t.doc.value?.state !in STATUS_POLLED) return
+        t.statusPoll = scope.launch {
+            while (true) {
+                delay(statusPollMs)
+                if (!t.live || txn !== t || t.doc.value?.state !in STATUS_POLLED) return@launch
+                withTimeoutOrNull(stepTimeoutMs) { api.ondcStatus(t.txnId) }
             }
         }
     }
@@ -580,6 +604,12 @@ class OndcClient(
 
         /** A search without any quote after this shows "No rides on the open network". */
         const val SEARCH_TIMEOUT_MS: Long = 30_000
+
+        /** How often a booked ride's status is asked for while it is under way. */
+        const val STATUS_POLL_MS: Long = 10_000
+
+        /** States in which the booked ride is under way: its status is polled (a soft cancel pauses it). */
+        val STATUS_POLLED: Set<OndcTxnState> = setOf(OndcTxnState.CONFIRMED, OndcTxnState.ARRIVING, OndcTxnState.ON_TRIP)
 
         /** A confirmed cancel is sent at most this many times (the user's one tap) while the network stays silent. */
         const val MAX_CONFIRM_SENDS: Int = 3

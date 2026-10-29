@@ -370,6 +370,13 @@ def test_compute_over_budget_reports_but_does_not_pause_ai() -> None:
     assert m.summary()["ai_limit_usd"] == pytest.approx(80.0)
 
 
+def test_the_owner_view_reports_the_whole_credit_so_the_app_can_show_what_is_left() -> None:
+    m = make(MemoryStore())
+    s = m.summary()
+    assert s["credit_usd"] == pytest.approx(100.0)
+    assert s["credit_usd"] == pytest.approx(s["ai_budget_usd"] + s["compute_budget_usd"] + s["margin_usd"])
+
+
 def test_compute_past_the_margin_shrinks_the_ai_headroom_so_the_credit_holds() -> None:
     store = MemoryStore()
     preload(store, "old", "compute", 25.0)

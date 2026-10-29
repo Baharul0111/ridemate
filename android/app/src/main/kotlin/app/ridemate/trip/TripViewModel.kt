@@ -525,7 +525,6 @@ class TripViewModel(private val deps: TripDeps) : ViewModel() {
             FixAction.TRY_DEMO -> _events.trySend(TripEvent.TryDemo)
             FixAction.CHOOSE_APPS -> _state.update { it.copy(report = null) }
             FixAction.REQUEST_LOCATION -> useCurrentLocation()
-            FixAction.CONTINUE_WITHOUT_ONDC -> _state.update { it.copy(includeOndc = false, report = null) }
             else -> Unit
         }
     }

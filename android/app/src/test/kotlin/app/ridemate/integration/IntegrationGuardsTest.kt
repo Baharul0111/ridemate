@@ -31,7 +31,11 @@ import app.ridemate.core.watch.PostRemoval
 import app.ridemate.core.watch.PostSnapshot
 import app.ridemate.demo.DemoStartResult
 import app.ridemate.demo.DemoTrackChoice
+import app.ridemate.launch.FakeInstalledApps
 import app.ridemate.launch.LaunchRequest
+import app.ridemate.home.PreSessionIssue
+import app.ridemate.precheck.PrecheckProbes
+import app.ridemate.precheck.PreSessionCheck
 import app.ridemate.notify.ActionTarget
 import app.ridemate.notify.GuardianUiState
 import app.ridemate.notify.LegUi
@@ -201,6 +205,121 @@ class IntegrationGuardsTest {
     }
 
     @Test
+    fun `Open Ola on the list opens Ola with its route, offers its drop to paste, and Read fares then reads Ola`() {
+        installRideApp(Provider.UBER)
+        installRideApp(Provider.OLA)
+        val plan = TripPlan(
+            pickup = TripPlace("Pickup", LatLng(26.1445, 91.7362)),
+            drop = TripPlace("Drop", LatLng(26.1158, 91.7086)),
+            apps = listOf(Provider.UBER, Provider.OLA),
+            vehicles = setOf(VehicleChoice.AUTO),
+            includeOndc = false,
+        )
+        val id = graph.comparisonStarter.start(plan)!!
+        assertEquals(Provider.UBER.packageName, awaitStartedPackage())
+        settle()
+        assertEquals(Provider.UBER, activeLeg()?.provider)
+        val ola = runtime.uiState.value.legs.single { it.provider == Provider.OLA }
+        assertEquals("Ola waits, never opened yet", RideState.SELECTED, ola.state)
+
+        // The comparison screen's "Open Ola" (the same callback as Book): the route opener, as the user's tap.
+        assertTrue(graph.fareReading.appLauncher.open(Provider.OLA))
+        assertEquals(Provider.OLA.packageName, awaitStartedPackage())
+        settle()
+        assertEquals(Provider.OLA, graph.appLauncher.pasteDrop.value?.provider)
+        val leg = activeLeg()
+        assertEquals(Provider.OLA, leg?.provider)
+        assertEquals(GuardianRuntime.legIdOf(id, Provider.OLA), leg?.legId)
+        assertEquals(RideState.OPENED, runtime.uiState.value.legs.single { it.provider == Provider.OLA }.state)
+    }
+
+    @Test
+    fun `the bubble's Next app opens the next selected app through the launcher with its leg`() {
+        installRideApp(Provider.UBER)
+        installRideApp(Provider.RAPIDO)
+        shadowOf(app).grantPermissions(android.Manifest.permission.POST_NOTIFICATIONS)
+        runtime.startSession(liveSpec(SESSION).copy(providers = listOf(Provider.UBER, Provider.RAPIDO)))
+        settle()
+        // RideMate is in front (the launcher's direct path); the same call posts a heads-up from the background.
+        val rapido = GuardianRuntime.legIdOf(SESSION, Provider.RAPIDO)
+        assertTrue(graph.routeFareLauncher.openNext(Provider.RAPIDO, rapido))
+        val deadline = System.currentTimeMillis() + 10_000
+        var opened: String? = null
+        while (opened == null && System.currentTimeMillis() < deadline) {
+            shadowOf(Looper.getMainLooper()).idle()
+            opened = shadowOf(app).nextStartedActivity?.`package` ?: run {
+                val posted = shadowOf(context.getSystemService(android.app.NotificationManager::class.java)).allNotifications
+                if (posted.isNotEmpty()) "notification" else null
+            }
+            Thread.sleep(5)
+        }
+        assertTrue("opened directly or asked by heads-up: $opened", opened == Provider.RAPIDO.packageName || opened == "notification")
+    }
+
+    @Test
+    fun `a live open-network booking keeps the session, so a new Compare is refused and says why`() {
+        val booked = GuardianUiState(
+            sessionId = "old",
+            legs = listOf(LegUi("old:ondc", Provider.ONDC, RideState.CONFIRMED, 1, LegRole.KEPT, dismissed = false, booked = true, endedByApp = false)),
+        )
+        val open = GuardianStatus(restored = true, sessionId = "old", sessionOpen = true)
+        assertTrue(ComparisonStarter.networkBookingLive(open, booked))
+        assertFalse("cancelled", ComparisonStarter.networkBookingLive(open, booked.copy(legs = booked.legs.map { it.copy(state = RideState.CANCEL_CONFIRMED) })))
+        assertFalse("a demo", ComparisonStarter.networkBookingLive(open.copy(demo = true), booked))
+
+        val guardian = RecordingGuardian(open)
+        guardian.uiState.value = booked
+        var told = 0
+        val starter = ComparisonStarter(
+            guardian = guardian,
+            launcher = RouteLauncher { null },
+            network = NetworkSearch { _, _, _, _ -> OndcResult.Ok },
+            keepSearchingDefault = { false },
+            scope = CoroutineScope(Dispatchers.Unconfined),
+            onNetworkBookingLive = { told++ },
+        )
+        val plan = TripPlan(
+            pickup = TripPlace("Pickup", LatLng(26.1445, 91.7362)),
+            drop = TripPlace("Drop", LatLng(26.1158, 91.7086)),
+            apps = listOf(Provider.UBER),
+            vehicles = setOf(VehicleChoice.AUTO),
+            includeOndc = true,
+        )
+        assertNull(starter.start(plan))
+        assertEquals(1, told)
+        assertTrue("the old session (and its network ride) is kept", guardian.started.isEmpty())
+    }
+
+    @Test
+    fun `Compare again waits for the pre-session check before the apps open again`() {
+        graph.guardianBindings.compareAgain!!.compareAgain("s-again")
+        assertEquals("s-again", graph.comparePrecheck.value)
+    }
+
+    @Test
+    fun `Home's Compare check ignores info notes, as the trip screen does`() {
+        val probes = object : PrecheckProbes {
+            override fun listenerEnabled() = true
+            override fun overlayAllowed() = true
+            override fun batteryExempt() = true
+            override fun notificationsAllowed() = true
+            override fun online() = true
+            override fun locationAllowed() = false
+            override fun installedRideApps() = setOf(Provider.UBER)
+        }
+        val check = PreSessionCheck(probes, { null }, app.fakes.clock)
+        val installed = FakeInstalledApps(installed = setOf(Provider.UBER))
+        val report = runBlocking { PrecheckGate(check, installed) { false }.check() }
+        assertTrue("location denied is only a note", report.blocking.isEmpty() && report.warnings.isEmpty())
+
+        val offline = object : PrecheckProbes by probes {
+            override fun online() = false
+        }
+        val warned = runBlocking { PrecheckGate(PreSessionCheck(offline, { null }, app.fakes.clock), installed) { false }.check() }
+        assertEquals(listOf(PreSessionIssue.OFFLINE), warned.warnings)
+    }
+
+    @Test
     fun `the first Read fares that falls back to typing offers Google sign-in once`() {
         val store = graph.appShell.onboardingStore
         store.chooseSignIn(SignInChoice.MANUAL)
@@ -235,6 +354,34 @@ class IntegrationGuardsTest {
     }
 
     private fun activeLeg() = runBlocking { graph.fareReading.activeComparison.current() }
+
+    /** Makes [provider]'s app installed with a launcher activity (no Uber link handler: a plain launch). */
+    private fun installRideApp(provider: Provider) {
+        val pm = shadowOf(context.packageManager)
+        pm.installPackage(
+            android.content.pm.PackageInfo().apply {
+                packageName = provider.packageName
+                applicationInfo = android.content.pm.ApplicationInfo().apply { packageName = provider.packageName }
+            },
+        )
+        val main = android.content.ComponentName(provider.packageName, "${provider.packageName}.MainActivity")
+        pm.addActivityIfNotPresent(main)
+        pm.addIntentFilterForActivity(
+            main,
+            android.content.IntentFilter(android.content.Intent.ACTION_MAIN).apply { addCategory(android.content.Intent.CATEGORY_LAUNCHER) },
+        )
+    }
+
+    /** The package of the next activity RideMate started (the launcher runs on other threads), within 10 s. */
+    private fun awaitStartedPackage(): String? {
+        val deadline = System.currentTimeMillis() + 10_000
+        while (System.currentTimeMillis() < deadline) {
+            shadowOf(Looper.getMainLooper()).idle()
+            shadowOf(app).nextStartedActivity?.let { return it.`package` ?: it.component?.packageName }
+            Thread.sleep(5)
+        }
+        return null
+    }
 
     private fun liveSpec(sessionId: String) = SessionSpec(
         pickup = Place("Pickup", LatLng(26.1445, 91.7362)),

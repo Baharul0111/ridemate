@@ -10,6 +10,7 @@
     <string name="guardian_provider_ola">Ola</string>
     <string name="guardian_provider_rapido">Rapido</string>
     <string name="guardian_provider_ondc">Open network (ONDC)</string>
+    <string name="guardian_provider_ondc_demo">Open network (ONDC demo seller)</string>
     <string name="guardian_provider_demo_kestrel">Kestrel Go (DEMO)</string>
     <string name="guardian_provider_demo_pepper">Pepper Rides (DEMO)</string>
     <string name="guardian_provider_demo_tamarind">Tamarind Cabs (DEMO)</string>
@@ -59,6 +60,8 @@
     <string name="guardian_state_cancel_requested">To cancel: waiting for its turn</string>
     <string name="guardian_state_cancel_guided">Cancel it in %1$s now</string>
     <string name="guardian_state_user_says_cancelled">You said you cancelled it. Checking again in a minute</string>
+    <!-- %1$s: ride app name. After the +60 s check found no ride post, while the app has not confirmed the cancel. -->
+    <string name="guardian_state_user_says_cancelled_waiting">You said you cancelled it. Waiting for %1$s to confirm</string>
     <string name="guardian_state_cancel_unconfirmed">Cancel not proven yet: check %1$s</string>
     <string name="guardian_state_cancel_confirmed">Cancelled and proven</string>
     <string name="guardian_state_network_confirmed">Booked on the open network</string>
@@ -172,6 +175,8 @@
     <string name="guardian_banner_proof_hint">See Bookings for the proof RideMate saw.</string>
     <string name="guardian_banner_user_says_cancelled">Noted. RideMate will check %1$s again in a minute.</string>
     <string name="guardian_banner_same_driver">Same driver on both. Keep one.</string>
+    <!-- %1$s: the other booking's app. The same driver turned up there while another ride is kept. -->
+    <string name="guardian_same_driver_body">The same driver accepted your %1$s booking too. Open %1$s and cancel it, or dismiss this if you meant to keep both.</string>
     <string name="guardian_banner_leg_dismissed">RideMate stopped reminding you about %1$s.</string>
     <string name="guardian_banner_all_cancels_done">All extra bookings are cancelled.</string>
     <string name="guardian_pay_offer">Ride ended. Open %1$s to pay</string>
@@ -214,6 +219,14 @@
     <string name="guardian_action_ondc_keep_ride">Keep ride</string>
     <string name="guardian_action_read_fares">Read fares</string>
     <string name="guardian_action_booked_here">Booked here</string>
+    <!-- %1$s: ride app name. The notification button that records a booking in that app. -->
+    <string name="guardian_action_booked_in">Booked in %1$s</string>
+    <!-- %1$s: ride app name. Confirms which app "Booked here" recorded. -->
+    <string name="guardian_booked_recorded">Recorded: booked in %1$s</string>
+    <string name="guardian_booked_recorded_body">Wrong app? Open RideMate and tap Dismiss on that booking.</string>
+    <string name="guardian_action_booked_ask">Booked in…</string>
+    <string name="guardian_book_pick_title">Which app did you book in?</string>
+    <string name="guardian_book_pick_body">RideMate can\'t see your screen. Tap the app you booked the ride in.</string>
     <string name="guardian_action_done">Done</string>
     <string name="guardian_action_stop">Stop</string>
     <string name="guardian_action_keep_searching_on">Keep searching: on</string>
@@ -233,10 +246,9 @@
     <string name="guardian_resume_title">Tap to resume RideMate\'s ride guardian</string>
     <string name="guardian_resume_body">RideMate needs to run to keep reminding you about extra bookings.</string>
     <string name="guardian_start_blocked">Finish cancelling your previous bookings before starting a new comparison.</string>
+    <string name="guardian_start_blocked_network">Your open-network ride is still booked. Cancel it in RideMate, or let it finish, before starting a new comparison.</string>
 
     <!-- Onboarding self-test. -->
-    <string name="guardian_selftest_title">RideMate self-test</string>
-    <string name="guardian_selftest_body">Checking that RideMate can see ride notifications. This goes away by itself.</string>
 
     <!-- Notification channels. -->
     <string name="guardian_channel_guardian">Ride guardian status</string>

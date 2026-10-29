@@ -4,7 +4,6 @@ import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.widget.Toast
-import androidx.activity.ComponentActivity
 import androidx.lifecycle.lifecycleScope
 import app.ridemate.RideMateApp
 import app.ridemate.core.model.LatLng
@@ -17,7 +16,7 @@ import kotlinx.coroutines.launch
  * it is in the foreground: it opens the ride app through [AppLauncher.openFromUserTap] (which also copies the drop
  * address and records the leg as OPENED) and finishes. Transparent, not exported, never in recents.
  */
-class OpenRideAppActivity : ComponentActivity() {
+class OpenRideAppActivity : app.ridemate.settings.LocalizedActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)

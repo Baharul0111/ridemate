@@ -7,6 +7,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * Sign-in for RideMate (architecture §4.2 Onboarding): Google through Credential Manager for AI features,
@@ -41,6 +42,7 @@ class DefaultAuthGateway(
     private val backend: AuthBackend,
     private val google: GoogleCredentialSource,
     private val clock: Clock,
+    private val backendTimeoutMs: Long = BACKEND_TIMEOUT_MS,
     private val newNonce: () -> String = Nonce::newRaw,
 ) : AuthGateway, AutoCloseable {
 
@@ -67,7 +69,7 @@ class DefaultAuthGateway(
         return when (val credential = google.requestIdToken(activity, hashedNonce)) {
             is GoogleCredentialResult.Success -> {
                 if (Nonce.claimOf(credential.idToken) != hashedNonce) return SignInResult.Failed
-                signInWith { backend.signInWithGoogleIdToken(credential.idToken) }
+                signInWith { bounded { backend.signInWithGoogleIdToken(credential.idToken) } }
             }
             GoogleCredentialResult.Cancelled -> SignInResult.Cancelled
             GoogleCredentialResult.NoGoogleAccount -> SignInResult.NoGoogleAccount
@@ -77,7 +79,7 @@ class DefaultAuthGateway(
 
     override suspend fun signInAnonymously(): SignInResult {
         backend.currentUser()?.let { return SignInResult.Success(it.toState()) }
-        return signInWith { backend.signInAnonymously() }
+        return signInWith { bounded { backend.signInAnonymously() } }
     }
 
     private suspend fun signInWith(block: suspend () -> AuthUser): SignInResult = try {
@@ -103,7 +105,7 @@ class DefaultAuthGateway(
             return IdTokenResult.Token(current.value, current.expiresAtWallMs)
         }
         try {
-            val token = backend.getIdToken(forceRefresh)
+            val token = bounded { backend.getIdToken(forceRefresh) }
             cached = CachedToken(user.uid, token.value, token.expiresAtWallMs)
             IdTokenResult.Token(token.value, token.expiresAtWallMs)
         } catch (e: AuthBackendException) {
@@ -124,7 +126,7 @@ class DefaultAuthGateway(
     override suspend fun deleteAccount(): DeleteAccountResult {
         if (backend.currentUser() == null) return DeleteAccountResult.SignedOut
         return try {
-            backend.deleteCurrentUser()
+            bounded { backend.deleteCurrentUser() }
             afterDeletion()
             DeleteAccountResult.Deleted
         } catch (e: AuthBackendException) {
@@ -140,6 +142,13 @@ class DefaultAuthGateway(
         }
     }
 
+    /**
+     * Goal 21 (never hangs): every Firebase call has a time limit. A call that does not answer within [backendTimeoutMs]
+     * counts as a network failure, so sign-in, the token and account deletion say what to do next instead of spinning.
+     */
+    private suspend fun <T> bounded(block: suspend () -> T): T =
+        withTimeoutOrNull(backendTimeoutMs) { block() } ?: throw AuthBackendException(AuthFailure.NETWORK)
+
     private fun afterDeletion() {
         cached = null
         backend.signOut()
@@ -151,6 +160,9 @@ class DefaultAuthGateway(
     companion object {
         /** A cached token is refreshed this long before it expires. */
         const val REFRESH_MARGIN_MS: Long = 5 * 60 * 1000
+
+        /** The longest any Firebase Auth call (sign-in, token, delete) may take before it counts as a network failure. */
+        const val BACKEND_TIMEOUT_MS: Long = 20_000
 
         fun AuthUser?.toState(): AuthState = when {
             this == null -> AuthState.SignedOut

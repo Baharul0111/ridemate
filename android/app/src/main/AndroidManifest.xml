@@ -19,6 +19,8 @@
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- Keeps the CPU up only while an extra booking still needs reminders (I8), so they fire with the screen off. -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
 
     <!-- Only these ride apps (plus maps, speech and browser intents) are visible to RideMate. -->
     <queries>
@@ -137,6 +139,11 @@
 
         <receiver
             android:name=".session.NotificationActionReceiver"
+            android:exported="false" />
+
+        <!-- Backstop while-idle alarm for the next reminder or +60 s check (I8). Never exported. -->
+        <receiver
+            android:name=".session.GuardianAlarmReceiver"
             android:exported="false" />
 
         <receiver

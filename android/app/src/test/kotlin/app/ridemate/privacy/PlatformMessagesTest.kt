@@ -37,8 +37,8 @@ class PlatformMessagesTest {
         assertEquals("Ride comparisons: 0", lines.first())
         assertTrue(lines.contains("Developer recorder entries: 8"))
         assertTrue(lines.contains("Signed in with Google as rider@example.com"))
-        assertTrue(lines.contains("Last comparison: 28 Oct 2026, 1:30 pm"))
-        assertTrue(lines.contains("Settings version abc123def456, fetched 28 Oct 2026, 1:30 pm"))
+        assertTrue(lines.contains("Last comparison: 28 Oct 2026, 1:30 PM"))
+        assertTrue(lines.contains("Settings version abc123def456, fetched 28 Oct 2026, 1:30 PM"))
         assertEquals("Server erase pending", lines.last())
         HeldData.entries.forEach { assertTrue(context.getString(PrivacyMessages.heldDataLabelRes(it)).isNotBlank()) }
 

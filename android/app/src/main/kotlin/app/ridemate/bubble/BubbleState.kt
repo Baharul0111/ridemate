@@ -26,23 +26,50 @@ data class BubbleState(
     val expanded: Boolean = true,
     /** While true "Read fares" is disabled and a progress indicator shows. */
     val busy: Boolean = false,
+    /**
+     * Localised labels that name an app ("Next: Ola", "Booked in Rapido", "Refresh Uber price"), in place of the
+     * action's generic label; the screen reader hears the same words.
+     */
+    val labels: Map<BubbleAction, String> = emptyMap(),
 ) {
+    /** The text the control for [action] shows (and speaks), or null for its generic string resource. */
+    fun labelFor(action: BubbleAction): String? = labels[action]
+
     companion object {
-        /** On a ride app's price screen: read, record a booking, maybe paste the drop address, stop. */
-        fun comparing(pasteDrop: Boolean = false): BubbleState = BubbleState(
+        /** The "Booked in <app>" buttons, in order: one, or one per app when RideMate must ask which. */
+        val BOOKED_SLOTS: List<BubbleAction> = listOf(BubbleAction.BOOKED_HERE, BubbleAction.BOOKED_HERE_2, BubbleAction.BOOKED_HERE_3)
+
+        /**
+         * On a ride app's price screen: read, open the next selected app (goal 3), record a booking, maybe paste the
+         * drop address, stop. [labels] name the apps the buttons are about; [status] says what a pending refresh is for.
+         * [bookedChoices] > 1 shows one "Booked in <app>" per app RideMate can't tell apart (it can't see the screen).
+         */
+        fun comparing(
+            pasteDrop: Boolean = false,
+            nextApp: Boolean = false,
+            labels: Map<BubbleAction, String> = emptyMap(),
+            status: BubbleStatus? = null,
+            bookedChoices: Int = 1,
+        ): BubbleState = BubbleState(
             actions = buildList {
                 add(BubbleAction.READ_FARES)
                 if (pasteDrop) add(BubbleAction.PASTE_DROP)
-                add(BubbleAction.BOOKED_HERE)
+                if (nextApp) add(BubbleAction.NEXT_APP)
+                addAll(BOOKED_SLOTS.take(bookedChoices.coerceIn(1, BOOKED_SLOTS.size)))
                 add(BubbleAction.STOP)
             },
+            labels = labels,
+            status = status,
         )
 
-        /** In a guided cancel: the instruction card, Show me (when grounding is supported), Done, Stop. */
+        /**
+         * In a guided cancel: the instruction card, Show me (when grounding is supported), "I cancelled it" (the same
+         * answer as on the notification: RideMate checks a minute later and moves on to the next app), Stop.
+         */
         fun cancelGuide(card: InstructionCard, showMe: Boolean): BubbleState = BubbleState(
             actions = buildList {
                 if (showMe) add(BubbleAction.SHOW_ME)
-                add(BubbleAction.DONE)
+                add(BubbleAction.I_CANCELLED_IT)
                 add(BubbleAction.STOP)
             },
             card = card,

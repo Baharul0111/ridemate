@@ -5,6 +5,7 @@
     <string name="guardian_provider_ola">Ola</string>
     <string name="guardian_provider_rapido">Rapido</string>
     <string name="guardian_provider_ondc">ओपन नेटवर्क (ONDC)</string>
+    <string name="guardian_provider_ondc_demo">ओपन नेटवर्क (ONDC डेमो विक्रेता)</string>
     <string name="guardian_provider_demo_kestrel">Kestrel Go (डेमो)</string>
     <string name="guardian_provider_demo_pepper">Pepper Rides (डेमो)</string>
     <string name="guardian_provider_demo_tamarind">Tamarind Cabs (डेमो)</string>
@@ -51,6 +52,7 @@
     <string name="guardian_state_cancel_requested">रद्द करना है: अपनी बारी का इंतज़ार</string>
     <string name="guardian_state_cancel_guided">अभी %1$s में इसे रद्द करें</string>
     <string name="guardian_state_user_says_cancelled">आपने कहा कि रद्द कर दिया। एक मिनट में फिर जाँचेंगे</string>
+    <string name="guardian_state_user_says_cancelled_waiting">आपने कहा कि रद्द कर दिया। %1$s की पुष्टि का इंतज़ार है</string>
     <string name="guardian_state_cancel_unconfirmed">रद्द होना अभी साबित नहीं: %1$s देखें</string>
     <string name="guardian_state_cancel_confirmed">रद्द हो गया और साबित हुआ</string>
     <string name="guardian_state_network_confirmed">ओपन नेटवर्क पर बुक हुआ</string>
@@ -156,6 +158,7 @@
     <string name="guardian_banner_proof_hint">RideMate ने जो सबूत देखा, वह बुकिंग में देखें।</string>
     <string name="guardian_banner_user_says_cancelled">नोट किया। RideMate एक मिनट में %1$s फिर से जाँचेगा।</string>
     <string name="guardian_banner_same_driver">दोनों में एक ही ड्राइवर है। एक रखें।</string>
+    <string name="guardian_same_driver_body">उसी ड्राइवर ने आपकी %1$s बुकिंग भी स्वीकार की है। %1$s खोलकर उसे रद्द करें, या अगर दोनों रखनी हैं तो इसे हटाएँ।</string>
     <string name="guardian_banner_leg_dismissed">RideMate ने %1$s के रिमाइंडर बंद किए।</string>
     <string name="guardian_banner_all_cancels_done">सभी अतिरिक्त बुकिंग रद्द हो गईं।</string>
     <string name="guardian_pay_offer">राइड पूरी हुई। भुगतान के लिए %1$s खोलें</string>
@@ -196,6 +199,12 @@
     <string name="guardian_action_ondc_keep_ride">राइड रखें</string>
     <string name="guardian_action_read_fares">किराया पढ़ें</string>
     <string name="guardian_action_booked_here">यहाँ बुक किया</string>
+    <string name="guardian_action_booked_in">%1$s में बुक किया</string>
+    <string name="guardian_booked_recorded">दर्ज हुआ: %1$s में बुक किया</string>
+    <string name="guardian_booked_recorded_body">गलत ऐप? RideMate खोलें और उस बुकिंग पर हटाएँ टैप करें।</string>
+    <string name="guardian_action_booked_ask">किसमें बुक किया…</string>
+    <string name="guardian_book_pick_title">आपने किस ऐप में बुक किया?</string>
+    <string name="guardian_book_pick_body">RideMate आपकी स्क्रीन नहीं देख सकता। जिस ऐप में राइड बुक की, उसे टैप करें।</string>
     <string name="guardian_action_done">हो गया</string>
     <string name="guardian_action_stop">रोकें</string>
     <string name="guardian_action_keep_searching_on">खोजते रहें: चालू</string>
@@ -214,9 +223,8 @@
     <string name="guardian_resume_title">RideMate का राइड गार्डियन फिर से शुरू करने के लिए टैप करें</string>
     <string name="guardian_resume_body">अतिरिक्त बुकिंग के रिमाइंडर देते रहने के लिए RideMate का चलना ज़रूरी है।</string>
     <string name="guardian_start_blocked">नई तुलना शुरू करने से पहले अपनी पिछली बुकिंग रद्द करना पूरा करें।</string>
+    <string name="guardian_start_blocked_network">आपकी ओपन नेटवर्क राइड अभी बुक है। नई तुलना शुरू करने से पहले उसे RideMate में रद्द करें, या राइड पूरी होने दें।</string>
 
-    <string name="guardian_selftest_title">RideMate स्व-जाँच</string>
-    <string name="guardian_selftest_body">जाँच रहे हैं कि RideMate राइड की सूचनाएँ देख पा रहा है। यह अपने आप हट जाएगा।</string>
 
     <string name="guardian_channel_guardian">राइड गार्डियन की स्थिति</string>
     <string name="guardian_channel_guardian_desc">RideMate जब आपकी बुकिंग पर नज़र रखता है तब की लगातार सूचना और शांत अपडेट।</string>

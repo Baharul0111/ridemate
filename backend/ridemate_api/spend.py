@@ -409,6 +409,7 @@ class SpendMeter:
             "compute_budget_usd": BUDGET_COMPUTE_USD,
             "compute_over_budget": self._compute_over_budget(view),
             "margin_usd": BUDGET_MARGIN_USD,
+            "credit_usd": TOTAL_CREDIT_USD,
             "day_cap_usd": usd(self._day_cap(view, now)),
             "day_spent_usd": usd(self._paced_day_used(view, day)),
             "demo_day_cap_usd": DEMO_DAY_CAP_USD,

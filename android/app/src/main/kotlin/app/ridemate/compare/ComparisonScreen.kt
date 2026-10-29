@@ -75,16 +75,23 @@ data class ComparisonCallbacks(
     val onBook: (Provider) -> Unit,
     /** "Booked in <app>"; null hides the button (no guardian bound yet). */
     val onBookedHere: ((Provider) -> Unit)?,
-    /** A stale row ("old, tap to refresh"): opens the app so the user can tap Read fares again. */
+    /**
+     * A stale row ("old, tap to refresh"): opens the app and arms the bubble's "Refresh <app> price" so the next tap
+     * reads it; for an open-network row ([Provider.ONDC]) it searches the network again.
+     */
     val onRefresh: (Provider) -> Unit,
     /** Saves a typed price; [done] gets null on success, else the message to show. */
     val onSubmitManual: (provider: Provider, vehicleClass: VehicleClass, text: String, done: (String?) -> Unit) -> Unit,
+    /** "Book" on an open-network row ([GatedRow.rowId] of the network quote); null hides it (booked inside RideMate). */
+    val onBookNetwork: ((rowId: String) -> Unit)? = null,
 )
 
 /** Test tags (stable; used by UI tests). */
 object ComparisonTags {
     const val LIST = "comparison_list"
     const val MANUAL_FORM = "comparison_manual_form"
+    const val OPEN_APPS = "comparison_open_apps"
+    fun openApp(provider: Provider) = "open_${provider.wireId}"
     const val PRICE_FIELD = "comparison_manual_price"
     fun row(provider: Provider, vehicleClass: VehicleClass) = "quote_${provider.wireId}_${vehicleClass.wireId}"
 }
@@ -107,6 +114,9 @@ fun rememberWallClock(clock: Clock, periodMs: Long = 1_000): Long {
  * (icon + word, not colour); unreadable rows say "Couldn't read · check in app" with no number; every row says when
  * it was seen and, after 60 s, greys out and adds "old, tap to refresh"; ONDC rows say "network quote" and typed rows
  * "entered by you". Each row has Book (opens the app), and each app has "Booked in <app>".
+ *
+ * Goal 3: every app of the trip that is still before booking has "Open <app>" (the route ready, the leg marked
+ * opened so Read fares reads that app), also before it has any price row, so each selected app can be compared.
  */
 @Composable
 fun ComparisonScreen(
@@ -130,11 +140,15 @@ fun ComparisonScreen(
                 modifier = Modifier.semantics { heading() },
             )
         }
+        if (data.openableApps.isNotEmpty()) {
+            item(key = "open_apps") { OpenApps(data.openableApps, callbacks.onBook) }
+        }
         if (manualOpen || manual != null) {
             item {
                 ManualPriceForm(
                     prompt = manual ?: ManualPrompt(null, null),
                     apps = data.rideApps,
+                    classes = data.formClasses,
                     onSubmit = callbacks.onSubmitManual,
                 )
             }
@@ -154,7 +168,7 @@ fun ComparisonScreen(
                 group.entries,
                 key = { i, entry -> entry.row.rowId ?: "${group.vehicleClass.name}_${entry.row.provider.name}_$i" },
             ) { _, entry ->
-                QuoteRow(entry, callbacks)
+                QuoteRow(entry, callbacks, demoSeller = data.networkDemoSeller)
             }
         }
         if (data.rideApps.isNotEmpty()) {
@@ -163,8 +177,31 @@ fun ComparisonScreen(
     }
 }
 
+/** "Open <app>" for each app still to compare: opens it with the route ready (the user taps there themselves). */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun QuoteRow(entry: ComparisonEntry, callbacks: ComparisonCallbacks) {
+private fun OpenApps(apps: List<Provider>, onOpen: (Provider) -> Unit) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.testTag(ComparisonTags.OPEN_APPS)) {
+        Text(stringResource(R.string.compare_open_heading), style = MaterialTheme.typography.titleMedium, modifier = Modifier.semantics { heading() })
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            apps.forEach { provider ->
+                val app = FareReadingMessages.name(context, provider)
+                val description = stringResource(R.string.compare_open_app_description, app)
+                OutlinedButton(
+                    onClick = { onOpen(provider) },
+                    modifier = Modifier
+                        .heightIn(min = 48.dp)
+                        .testTag(ComparisonTags.openApp(provider))
+                        .semantics { contentDescription = description },
+                ) { Text(stringResource(R.string.compare_open_app, app)) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun QuoteRow(entry: ComparisonEntry, callbacks: ComparisonCallbacks, demoSeller: Boolean) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val row = entry.row
     val app = FareReadingMessages.name(context, row.provider)
@@ -218,7 +255,14 @@ private fun QuoteRow(entry: ComparisonEntry, callbacks: ComparisonCallbacks) {
                         modifier = Modifier.size(16.dp),
                     )
                     Spacer(Modifier.width(4.dp))
-                    Text(stringResource(FareReadingMessages.gateTextRes(key)), style = MaterialTheme.typography.labelMedium)
+                    val status = stringResource(FareReadingMessages.gateTextRes(key))
+                    // The hackathon's mock seller is always labelled as such (goal 17).
+                    val text = if (row.status == QuoteStatus.NETWORK && demoSeller) {
+                        stringResource(R.string.ondc_row_label, status, stringResource(R.string.ondc_label_demo_seller))
+                    } else {
+                        status
+                    }
+                    Text(text, style = MaterialTheme.typography.labelMedium)
                 }
             }
             if (row.eta != null) {
@@ -235,11 +279,20 @@ private fun QuoteRow(entry: ComparisonEntry, callbacks: ComparisonCallbacks) {
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(seenAt, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
+                val bookNetwork = callbacks.onBookNetwork
+                val rowId = row.rowId
                 if (!row.provider.isNetwork) {
                     OutlinedButton(
                         onClick = { callbacks.onBook(row.provider) },
                         modifier = Modifier.heightIn(min = 48.dp).semantics { contentDescription = bookDescription },
                     ) { Text(stringResource(R.string.compare_book, app)) }
+                } else if (bookNetwork != null && rowId != null) {
+                    val className = stringResource(FareReadingMessages.vehicleClassRes(row.vehicleClass))
+                    val networkDescription = stringResource(R.string.ondc_action_book_description, label.ifBlank { app }, entry.priceText ?: className)
+                    OutlinedButton(
+                        onClick = { bookNetwork(rowId) },
+                        modifier = Modifier.heightIn(min = 48.dp).semantics { contentDescription = networkDescription },
+                    ) { Text(stringResource(R.string.ondc_action_book)) }
                 }
             }
         }
@@ -278,11 +331,14 @@ private fun AppActions(apps: List<Provider>, callbacks: ComparisonCallbacks, onT
 private fun ManualPriceForm(
     prompt: ManualPrompt,
     apps: List<Provider>,
+    classes: List<VehicleClass>,
     onSubmit: (Provider, VehicleClass, String, (String?) -> Unit) -> Unit,
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     var provider by remember(prompt, apps) { mutableStateOf(prompt.provider ?: apps.firstOrNull()) }
-    var vehicleClass by remember(prompt) { mutableStateOf(prompt.suggestedClasses.firstOrNull()) }
+    // Only the vehicle types chosen for this trip: a typed price of another type would not be listed.
+    val offered = remember(prompt, classes) { (prompt.suggestedClasses.filter { it in classes } + classes).distinct() }
+    var vehicleClass by remember(prompt, classes) { mutableStateOf(prompt.suggestedClasses.firstOrNull { it in classes } ?: classes.singleOrNull()) }
     var text by rememberSaveable(prompt) { mutableStateOf("") }
     var feedback by remember(prompt) { mutableStateOf<String?>(null) }
     val savedText = stringResource(R.string.compare_manual_saved)
@@ -313,9 +369,8 @@ private fun ManualPriceForm(
                 }
             }
             Text(stringResource(R.string.compare_manual_vehicle), style = MaterialTheme.typography.labelLarge)
-            val classes = (prompt.suggestedClasses + VehicleClass.entries).distinct()
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                classes.forEach { c ->
+                offered.forEach { c ->
                     FilterChip(
                         selected = vehicleClass == c,
                         onClick = { vehicleClass = c },

@@ -23,10 +23,9 @@
     <string name="precheck_offline_body">RideMate can still open the apps and watch your rides. Type the prices yourself, or connect to the internet to read them automatically.</string>
     <string name="precheck_location_title">Pickup is the address you typed</string>
     <string name="precheck_location_body">Location is off for RideMate, so it uses the pickup you typed. Check it\'s right, or allow location.</string>
-    <string name="precheck_no_fares_title">No prices found on this screen</string>
-    <string name="precheck_no_fares_body">Open the screen that lists the prices and read the fares again, or type the price yourself.</string>
-    <string name="precheck_no_ondc_title">No rides on the open network</string>
-    <string name="precheck_no_ondc_body">The open network has no rides for this trip right now. Carry on with the other apps.</string>
+    <!-- Sideloaded on Android 13+: shown with onb_restricted_steps on the notification-access and overlay cards. -->
+    <string name="precheck_restricted_hint">Switch greyed out? Android blocks it for apps installed from outside the Play Store until you allow restricted settings.</string>
+    <string name="precheck_compare_again_heading">Before comparing again</string>
 
     <string name="precheck_fix_notification_access">Open notification access</string>
     <string name="precheck_fix_overlay">Allow floating button</string>
@@ -36,9 +35,6 @@
     <string name="precheck_fix_location">Allow location</string>
     <string name="precheck_fix_demo">Try the demo</string>
     <string name="precheck_fix_choose_apps">Choose apps</string>
-    <string name="precheck_fix_retry_read">Read fares again</string>
-    <string name="precheck_fix_type_price">Type the price</string>
-    <string name="precheck_fix_without_ondc">Continue without the open network</string>
 
     <string name="precheck_fix_description">%1$s: %2$s</string>
     <string name="precheck_settings_missing">This phone has no such settings screen. Open Settings, find RideMate and change it there.</string>

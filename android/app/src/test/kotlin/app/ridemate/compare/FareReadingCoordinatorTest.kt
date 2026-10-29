@@ -146,6 +146,35 @@ class FareReadingCoordinatorTest {
     }
 
     @Test
+    fun `a read that hits the 20 s limit opens the price form as well as saying so`() = runBlocking {
+        val tap = clock.elapsed
+        // The server or a cold start never answered: the read's deadline passed.
+        consentAnswer = {
+            clock.advance(25_000)
+            ConsentResult.Granted(clock.elapsed, fresh = false)
+        }
+
+        assertEquals(ReadFaresResult.TimedOut, coordinator.readFares("t1", tap))
+
+        assertEquals(context.getString(R.string.compare_timed_out), lastStatus().text)
+        val (leg, manual) = opened.single()
+        assertEquals("l1", leg.legId)
+        assertEquals(ReadFaresResult.ManualMode(Provider.UBER, ManualReason.TIMEOUT), manual)
+        // The form opened by it says why and is for the right app.
+        val prompt = manualPromptFor(context, coordinator.lastRead.value, Provider.UBER, "s1")!!
+        assertEquals(Provider.UBER, prompt.provider)
+        assertEquals(context.getString(R.string.platform_timeout), prompt.message)
+    }
+
+    @Test
+    fun `a refresh asked for from a stale row is answered by the next read of that app`() = runBlocking {
+        coordinator.requestRefresh(Provider.UBER)
+        assertEquals(Provider.UBER, coordinator.refreshPending.value)
+        coordinator.readFares("t1", clock.elapsed)
+        assertNull(coordinator.refreshPending.value)
+    }
+
+    @Test
     fun `a refused consent captures nothing and says what to do`() = runBlocking {
         consentAnswer = { ConsentResult.Denied }
 
@@ -305,7 +334,7 @@ class FareReadingMessagesTest {
     @Test
     fun `manual mode wording comes from the server answer or the reason`() {
         val paused = ReadFaresResult.ManualMode(Provider.UBER, ManualReason.AI_PAUSED, "21:05", ApiResult.AiPaused("ai_paused", "21:05", null))
-        assertTrue(FareReadingMessages.manualText(context, paused).startsWith("AI reading resumes at 9:05 pm (IST)"))
+        assertTrue(FareReadingMessages.manualText(context, paused).startsWith("AI reading resumes at 9:05 PM (IST)"))
         val offline = ReadFaresResult.ManualMode(Provider.UBER, ManualReason.OFFLINE, apiResult = ApiResult.Offline)
         assertEquals(context.getString(R.string.platform_offline), FareReadingMessages.manualText(context, offline))
         val off = ReadFaresResult.ManualMode(Provider.UBER, ManualReason.KILL_SWITCH)

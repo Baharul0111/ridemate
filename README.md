@@ -495,6 +495,7 @@ Short version (full notice: [English](docs/privacy-notice.md) · [हिन्�
 | Microphone (`RECORD_AUDIO`) | Say your destination aloud through Android's speech recognizer | Only when you tap the mic |
 | `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` | Stop Android's battery saver from killing reminders | You approve it once |
 | `RECEIVE_BOOT_COMPLETED` | Re-arm pending cancel reminders after the phone restarts | After a restart, if reminders are pending |
+| `WAKE_LOCK` | Keep the phone's processor awake so cancel reminders and the one-minute check fire with the screen off (no exact alarms are used) | Only while an extra booking still needs cancelling |
 | `VIBRATE` | Loud alerts, for example "your ride is still active" | Alerts only |
 | `INTERNET`, `ACCESS_NETWORK_STATE` | Talk to RideMate's server and Firebase; detect offline and switch to manual mode | Normal use |
 
@@ -522,7 +523,8 @@ apkanalyzer manifest print RideMate-1.0.0-hackathon.apk \
 ```
 
 `apkanalyzer manifest permissions` lists the final (merged) manifest, so you will also see a few standard permissions
-added by Google's and Android's own libraries, for example `WAKE_LOCK` (WorkManager, Firebase Cloud Messaging),
+added by Google's and Android's own libraries (RideMate itself also declares `WAKE_LOCK`, see the table above), for
+example `WAKE_LOCK` (WorkManager, Firebase Cloud Messaging),
 `com.google.android.c2dm.permission.RECEIVE` (Firebase Cloud Messaging) and
 `in.ridemate.app.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION` (AndroidX). None of them lets RideMate act inside another
 app.
