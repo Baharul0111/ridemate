@@ -9,12 +9,12 @@
     <string name="set_section_privacy">गोपनीयता</string>
     <string name="set_privacy_notice">गोपनीयता सूचना</string>
     <string name="set_my_data">मेरा डेटा</string>
-    <string name="set_my_data_summary">देखें कि RideMate इस फ़ोन पर क्या रखता है</string>
     <string name="set_my_data_intro">RideMate इस फ़ोन पर यही सब रखता है। राइड का डेटा राइड के एक दिन बाद हटा दिया जाता है।</string>
     <string name="set_my_data_server">RideMate का सर्वर अनुरोधों और राइड का केवल मेटाडेटा रखता है (कोई टेक्स्ट, स्थान या किराया नहीं)। इसकी कॉपी के लिए हमें ईमेल करें।</string>
     <string name="set_my_data_failed">RideMate अभी अपना डेटा नहीं पढ़ पाया। वापस जाकर \"मेरा डेटा\" फिर से खोलें।</string>
+    <string name="set_my_data_on_phone">इस फ़ोन पर</string>
+    <string name="set_my_data_why">मेरे डेटा के बारे में</string>
     <string name="set_erase">मेरा डेटा मिटाएँ</string>
-    <string name="set_erase_summary">आपका खाता और आपका RideMate डेटा मिटा देता है</string>
     <string name="set_contact">गोपनीयता संपर्क</string>
     <string name="set_contact_summary">%1$s · हम 30 दिनों के भीतर जवाब देते हैं</string>
     <string name="set_contact_button">गोपनीयता संपर्क को ईमेल करें</string>
@@ -34,20 +34,23 @@
     <string name="set_language_system">फ़ोन की भाषा</string>
 
     <string name="set_section_rides">राइड</string>
-    <string name="set_keep_searching">ड्राइवर मिलने के बाद भी खोजते रहें</string>
-    <string name="set_keep_searching_summary">शुरू में बंद। चालू होने पर, अगर कोई कहीं ज़्यादा पास का ड्राइवर मिले तो RideMate आपको बताता है, और आपकी हाँ के बिना कुछ नहीं बदलता।</string>
+    <string name="set_keep_searching">खोज जारी रखें</string>
+    <string name="set_keep_searching_summary">पास के ड्राइवर की सूचना</string>
     <string name="set_keep_searching_warning_title">ड्राइवरों के साथ निष्पक्ष रहें</string>
     <string name="set_keep_searching_warning">एक से ज़्यादा बुकिंग रखने का मतलब है कि ड्राइवर आपकी ओर आ सकते हैं और फिर रद्द हो सकते हैं, जिससे उनका समय और ईंधन बर्बाद होता है। राइड ऐप्स रद्द करने का शुल्क भी ले सकते हैं (भारत के नियमों के तहत ₹100 तक)। इसे तभी चालू करें जब आप अतिरिक्त बुकिंग जल्दी रद्द करेंगे।</string>
     <string name="set_keep_searching_confirm">चालू करें</string>
+    <string name="set_keep_searching_info">शुरू में बंद। चालू होने पर, अगर कोई कहीं ज़्यादा पास का ड्राइवर मिले तो RideMate आपको बताता है, और आपकी हाँ के बिना कुछ नहीं बदलता।</string>
+    <string name="set_keep_searching_why">खोज जारी रखने के बारे में</string>
 
     <string name="set_section_status">स्थिति</string>
     <string name="set_status_body">अगर कोई राइड ऐप बदल जाए, तो RideMate के मालिक दूर से सुविधाएँ बंद कर सकते हैं। AI से पढ़ना बंद होने पर आप किराए टाइप करते हैं और गार्डियन काम करता रहता है।</string>
+    <string name="set_status_why">स्थिति के बारे में</string>
 
     <string name="set_section_app">ऐप</string>
     <string name="set_about">RideMate के बारे में</string>
     <string name="set_about_summary">संस्करण %1$s · Built with Muse Spark Open</string>
     <string name="set_report">समस्या की रिपोर्ट करें</string>
-    <string name="set_report_summary">केवल ऐप और Android के संस्करण तथा सेटिंग्स की स्थिति भेजता है। कोई स्क्रीनशॉट या टेक्स्ट नहीं।</string>
+    <string name="set_report_summary">केवल संस्करण · कोई स्क्रीनशॉट या टेक्स्ट नहीं</string>
     <string name="set_report_subject">RideMate समस्या रिपोर्ट (%1$s)</string>
     <string name="set_report_intro">यहाँ बताइए कि क्या हुआ। RideMate ने नीचे केवल तकनीकी जानकारी जोड़ी है (संस्करण और चालू/बंद स्थितियाँ); कृपया फ़ोन नंबर या OTP न जोड़ें।</string>
 
@@ -59,6 +62,8 @@
     <string name="set_dev_on">डेवलपर मोड चालू है।</string>
     <string name="set_dev_sign_in">डेवलपर मोड केवल RideMate के मालिक के लिए है। पहले मालिक के Google खाते से साइन इन करें।</string>
     <string name="set_dev_not_owner">डेवलपर मोड केवल RideMate के मालिक के लिए है।</string>
+    <string name="set_update_short">यह संस्करण अब इस्तेमाल नहीं हो सकता।</string>
+    <string name="set_update_why">अपडेट क्यों?</string>
     <string name="set_developer">डेवलपर मोड</string>
     <string name="set_updates">अपडेट</string>
     <string name="set_up_to_date">आपके पास नया संस्करण है</string>
@@ -66,9 +71,11 @@
     <string name="set_certificate">साइनिंग प्रमाणपत्र (SHA-256)</string>
     <string name="set_certificate_body">अपनी कॉपी असली है यह जाँचने के लिए इसे RideMate के README में दिए फ़िंगरप्रिंट से मिलाएँ।</string>
     <string name="set_certificate_unavailable">Android ने इस संस्करण का साइनिंग प्रमाणपत्र नहीं बताया।</string>
+    <string name="set_certificate_why">इसे क्यों जाँचें?</string>
+    <string name="set_certificate_copy">फ़िंगरप्रिंट कॉपी करें</string>
     <string name="set_built_with_body">RideMate किराए की स्क्रीन Meta के ओपन-वेट Muse Spark Open मॉडल से पढ़ता है, जो Modal पर चलता है।</string>
+    <string name="set_built_with_why">Muse Spark Open के बारे में</string>
     <string name="set_licences">ओपन-सोर्स लाइसेंस</string>
-    <string name="set_licences_intro">RideMate ओपन सोर्स है और इन घटकों का उपयोग करता है।</string>
     <string name="set_source">सोर्स कोड</string>
 
     <string name="lic_mlkit_terms">ML Kit सेवा की शर्तें</string>

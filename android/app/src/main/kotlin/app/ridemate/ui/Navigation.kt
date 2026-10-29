@@ -3,17 +3,32 @@ package app.ridemate.ui
 import android.net.Uri
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material.icons.rounded.SystemUpdate
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.dp
+import app.ridemate.ui.components.IconWell
+import app.ridemate.ui.components.InfoSheet
+import app.ridemate.ui.components.QuietButton
+import app.ridemate.ui.components.RmScaffold
+import app.ridemate.ui.components.RmTone
+import app.ridemate.ui.components.WhyButton
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
@@ -217,11 +232,31 @@ fun RideMateRoot(
 @Composable
 fun ForceUpdateScreen(update: UpdateState, onSettings: () -> Unit) {
     val context = LocalContext.current
-    Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-        ScreenScaffold(title = stringResource(R.string.ui_update_required_title), onBack = null) {
-            Text(stringResource(R.string.ui_update_required_body), style = MaterialTheme.typography.bodyLarge)
+    var why by rememberSaveable { mutableStateOf(false) }
+    Surface(Modifier.fillMaxSize(), color = RideMateTheme.colors.canvas) {
+        RmScaffold(
+            title = null,
+            onBack = null,
+            actions = { WhyButton(onClick = { why = true }, contentDescription = stringResource(R.string.set_update_why)) },
+        ) {
+            IconWell(Icons.Rounded.SystemUpdate, tone = RmTone.WARN, size = 72.dp)
+            Text(
+                stringResource(R.string.ui_update_required_title),
+                style = RideMateTheme.type.display,
+                modifier = Modifier.semantics { heading() },
+            )
+            Text(stringResource(R.string.set_update_short), style = MaterialTheme.typography.bodyLarge, color = RideMateTheme.colors.muted)
             UpdateBanner(update) { SystemIntents.openHttps(context, it) }
-            SecondaryButton(stringResource(R.string.ui_open_settings), onSettings)
+            QuietButton(stringResource(R.string.ui_open_settings), onSettings, icon = Icons.Rounded.Settings, fillWidth = true)
         }
+    }
+    if (why) {
+        InfoSheet(
+            onDismiss = { why = false },
+            title = stringResource(R.string.ui_update_required_title),
+            body = stringResource(R.string.ui_update_required_body),
+            icon = Icons.Rounded.SystemUpdate,
+            tone = RmTone.WARN,
+        )
     }
 }
