@@ -81,6 +81,79 @@ class MaskPropertyTest {
         }
     }
 
+    /** What ML Kit reads in place of a digit. */
+    private val lookAlikes = mapOf('0' to listOf('O', 'o'), '1' to listOf('I', 'l', '|'), '2' to listOf('Z'), '5' to listOf('S'), '8' to listOf('B'))
+
+    /** [text] with one or two of its look-alike-prone digits misread; unchanged when it has none. */
+    private fun ocrNoise(text: String): String {
+        val positions = text.indices.filter { text[it] in lookAlikes }.shuffled(random).take(1 + random.nextInt(2))
+        val chars = text.toCharArray()
+        positions.forEach { chars[it] = lookAlikes.getValue(chars[it]).random(random) }
+        return String(chars)
+    }
+
+    private fun price(): String {
+        val amount = 15 + random.nextInt(5_000)
+        return if (random.nextBoolean()) IndianFormat.rupees(amount.toLong()) else "Rs. $amount"
+    }
+
+    @Test
+    fun `OCR-misread and lower-case plates never survive and hash to the clean plate`() {
+        var noised = 0
+        repeat(1_500) {
+            val state = states.random(random)
+            val rto = (1 + random.nextInt(99)).toString().padStart(2, '0')
+            val series = (1..(1 + random.nextInt(2))).map { 'A' + random.nextInt(26) }.joinToString("")
+            val number = digits(4)
+            val canonical = "$state$rto$series$number"
+            val (noisyRto, noisyNumber) = ocrNoise(rto + number).let { it.take(2) to it.drop(2) }
+            if (noisyRto + noisyNumber != rto + number) noised++
+            val lower = random.nextInt(3) == 0
+            val sep = listOf("", " ", "-").random(random)
+            val written = listOf(if (lower) state.lowercase() else state, noisyRto, if (lower) series.lowercase() else series, noisyNumber)
+                .joinToString(sep)
+            val fare = price()
+            val text = sentence(written, fare)
+            val masked = maskText(text)
+            assertFalse("$text → $masked", masked.contains(written) || masked.contains(noisyNumber))
+            assertEquals(text, PlateHash.sha256(canonical), PlateHash.of(text))
+            assertTrue("price kept: $text → $masked", masked.contains(fare))
+        }
+        assertTrue("the generator misreads most plates", noised > 1_000)
+    }
+
+    @Test
+    fun `OCR-misread OTPs and labels never survive, prices next to them do`() {
+        val labels = listOf("OTP", "0TP", "otp:", "PIN", "P1N", "Start ride code", "ओटीपी")
+        var noised = 0
+        repeat(1_500) {
+            val code = digits(4 + random.nextInt(3))
+            val noisy = ocrNoise(code)
+            if (noisy != code) noised++
+            val written = if (random.nextInt(4) == 0) noisy.toList().joinToString(" ") else noisy
+            val label = labels.random(random)
+            val text = if (random.nextBoolean()) "$label $written" else "$written is your $label"
+            val fare = price()
+            val masked = maskText(sentence(text, fare))
+            val realDigits = noisy.filter { it.isDigit() }
+            assertFalse("$text → $masked", masked.contains(written))
+            // What is left once the price and the label (which may hold a digit, `P1N`) are taken out has no code digits.
+            val rest = Digits.toAscii(masked.replace(fare, " ").replace(label, " ")).filter { it.isDigit() }
+            assertFalse("$text → $masked", rest.contains(realDigits))
+            assertTrue("price kept: $text → $masked", masked.contains(fare))
+        }
+        assertTrue("the generator misreads most codes", noised > 1_000)
+    }
+
+    @Test
+    fun `words and prices are not taken for OCR-misread plates or codes`() {
+        val clean = listOf(
+            "as soon as possible", "up to 50% OFF", "Save ₹120 on rides", "Rs. 1,450 for Premier", "or 12 min away",
+            "Book Auto at ₹110", "PIN code SOLD OUT", "OTP will be shared", "AS SOON AS", "an 8 min ride", "UP 10:30 PM",
+        )
+        for (text in clean) assertEquals(text, text, maskText(text))
+    }
+
     @Test
     fun `driver names next to an anchor never survive`() {
         val given = listOf("Ramesh", "Priya", "Mohd.", "Sunil", "Anjali", "Imran", "Kavya", "Arjun", "रमेश", "सुनील", "प्रिया")

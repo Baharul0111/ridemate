@@ -251,18 +251,18 @@ The user makes every Book and Cancel tap inside Uber, Ola and Rapido. On the OND
 2. **Channel B:** FareParser runs over the ML Kit tokens from the same frames.
 3. A row's **price is VERIFIED** only if all of these hold:
    - (a) `app` equals the launched app;
-   - (b) Channel A's price digits equal **the parser-selected payable token**, and that token's centre is in A's bbox (± 4% of the frame);
+   - (b) Channel A's price digits equal **the parser-selected payable token**, that token's centre is in A's bbox (± 4% of the frame), and A's `price_struck_text` does not name that same amount (a struck conflict is not re-read);
    - (c) A's normalised `label_text` matches the parser's label for that row and maps to the same vehicle_class;
    - (d) the digits are identical across both frames;
    - (e) the value is inside the sanity bands (₹15–₹5,000; ₹/km band vs haversine distance; ETA 0–60 min).
 4. **ETA rule (f):** `eta_min` must equal the parser-selected pickup-ETA token for that row, else show "ETA: see in app". **Driver ETA and distance** must equal the parser's anchor-selected tokens, else "see in <app>".
 5. On disagreement, re-read all disagreeing row crops in **one** call, but only if ≥ 6 s remain in the tap's 20 s budget and the first call didn't time out. Still disagreeing → "Couldn't read · check in app" with no number, plus re-capture.
 6. Every row shows "seen in <app> at hh:mm:ss" and greys at 60 s ("old, tap to refresh"; state never shown by colour alone).
-7. Only VERIFIED rows can be sorted or flagged "cheapest". ONDC quotes are protocol data ("network quote"). Manual entries are labelled "entered by you".
+7. Only VERIFIED rows can be sorted or flagged "cheapest", and only fresh ones (under 60 s) are flagged: an old price is never "cheapest". ONDC quotes are protocol data ("network quote"). Manual entries are labelled "entered by you".
 
 ### 4.4 Ride statechart (per leg, with `generation`)
 - **Forward:** `SELECTED → OPENED → QUOTED → BOOK_REQUESTED → SEARCHING → ASSIGNED{eta?, distance?, plate_hash?, t_assigned} → ARRIVING → ON_TRIP → ENDED → PAY_HANDOFF`.
-- **Uncertain:** MAYBE_ASSIGNED (from SEARCHING), MAYBE_CHANGED (from ASSIGNED/ARRIVING), MAYBE_NEW_DRIVER (from DRIVER_CANCELLED). Each resolves on the user's answer **or** on any deterministic evidence (template hit, protocol data, removal rung), whichever comes first. When evidence wins, the prompt is withdrawn with the reason.
+- **Uncertain:** MAYBE_BOOKED (from OPENED/QUOTED: an app RideMate opened, not marked "Booked here"), MAYBE_ASSIGNED (from SEARCHING), MAYBE_CHANGED (from ASSIGNED/ARRIVING), MAYBE_NEW_DRIVER (from DRIVER_CANCELLED). Each resolves on the user's answer **or** on any deterministic evidence (template hit, protocol data, removal rung), whichever comes first. When evidence wins, the prompt is withdrawn with the reason.
 - **Provider-initiated:** SEARCH_EXPIRED (terminal: "Ended by Ola. No cancel needed"), DRIVER_CANCELLED, PROVIDER_CANCELLED (terminal).
 - **User cancel:** `CANCEL_REQUESTED → CANCEL_GUIDED → CANCEL_CONFIRMED | USER_SAYS_CANCELLED | CANCEL_UNCONFIRMED`. Provider events during CANCEL_REQUESTED/GUIDED update the instruction card and fee note but never end the chain, except a terminal provider event (expired / provider-cancelled), which closes that leg as "ended by the app".
 - **ONDC:** `SEARCHING_NET → ON_SELECT → INIT → CONFIRMED → … → SOFT_CANCEL (fee shown) → [user tap] CONFIRM_CANCEL → CANCEL_CONFIRMED`.
@@ -273,13 +273,14 @@ The user makes every Book and Cancel tap inside Uber, Ola and Rapido. On the OND
 
 | State ↓ / Event → | searching tpl | assigned tpl | arriving tpl | driver-cancelled tpl | no-drivers / expired tpl | cancelled tpl / removal rung | ended tpl | UNKNOWN_UPDATE | user answer | timeout |
 |---|---|---|---|---|---|---|---|---|---|---|
-| OPENED / QUOTED / BOOK_REQUESTED | SEARCHING | ASSIGNED | ARRIVING | — | SEARCH_EXPIRED | PROVIDER_CANCELLED | — | MAYBE_ASSIGNED (only if BOOK_REQUESTED) | "Booked here" → BOOK_REQUESTED | — |
+| OPENED / QUOTED / BOOK_REQUESTED | SEARCHING | ASSIGNED | ARRIVING | — | SEARCH_EXPIRED | PROVIDER_CANCELLED | — | OPENED/QUOTED → MAYBE_BOOKED; BOOK_REQUESTED → MAYBE_ASSIGNED | "Booked here" → BOOK_REQUESTED | — |
+| MAYBE_BOOKED | SEARCHING (withdraw) | ASSIGNED (withdraw) | ARRIVING (withdraw) | — | SEARCH_EXPIRED (withdraw) | PROVIDER_CANCELLED (withdraw) | — | dup-drop | Yes, booked → BOOK_REQUESTED; No → previous | re-prompt after 2 min |
 | SEARCHING | dup-drop | ASSIGNED | ARRIVING | — | SEARCH_EXPIRED | PROVIDER_CANCELLED | — | MAYBE_ASSIGNED | — | — |
 | MAYBE_ASSIGNED | SEARCHING (withdraw) | ASSIGNED (withdraw) | ARRIVING (withdraw) | — | SEARCH_EXPIRED (withdraw) | PROVIDER_CANCELLED (withdraw) | — | dup-drop | Yes → ASSIGNED (eta "see in app"); Not yet → SEARCHING; Check → capture | re-prompt after 2 min |
 | ASSIGNED | SEARCHING (gen+1) | dup-drop, or new plate → ASSIGNED (gen+1) | ARRIVING | DRIVER_CANCELLED (gen+1) | PROVIDER_CANCELLED | PROVIDER_CANCELLED | ENDED | MAYBE_CHANGED | — | — |
 | ARRIVING | SEARCHING (gen+1) | new plate → ASSIGNED (gen+1) | dup-drop | DRIVER_CANCELLED (gen+1) | PROVIDER_CANCELLED | PROVIDER_CANCELLED | ENDED | MAYBE_CHANGED | — | — |
 | MAYBE_CHANGED | SEARCHING (gen+1, withdraw) | new plate → ASSIGNED (gen+1); same → back (withdraw) | ARRIVING (withdraw) | DRIVER_CANCELLED (gen+1, withdraw) | PROVIDER_CANCELLED (withdraw) | PROVIDER_CANCELLED (withdraw) | ENDED (withdraw) | dup-drop | Still coming → previous; Driver cancelled → DRIVER_CANCELLED (gen+1); Check → capture | re-prompt after 2 min |
-| DRIVER_CANCELLED | SEARCHING | ASSIGNED | ARRIVING | dup-drop | PROVIDER_CANCELLED | PROVIDER_CANCELLED | — | MAYBE_NEW_DRIVER | — | 3 min with the ongoing notification still present → MAYBE_NEW_DRIVER |
+| DRIVER_CANCELLED | SEARCHING | ASSIGNED | ARRIVING | dup-drop | PROVIDER_CANCELLED | PROVIDER_CANCELLED (the app removing its last ride post without a capture → MAYBE_NEW_DRIVER) | — | MAYBE_NEW_DRIVER | — | 3 min → MAYBE_NEW_DRIVER, whether or not the ongoing notification is still present |
 | MAYBE_NEW_DRIVER | SEARCHING (withdraw) | ASSIGNED (withdraw) | ARRIVING (withdraw) | dup-drop | PROVIDER_CANCELLED (withdraw) | PROVIDER_CANCELLED (withdraw) | — | dup-drop | Yes → SEARCHING; No, it ended → PROVIDER_CANCELLED; Check → capture | re-prompt after 2 min |
 | ON_TRIP | — | — | — | — | — | — | ENDED | ignored, logged | — | — |
 | ENDED | — | — | — | — | — | — | — | — | Pay → PAY_HANDOFF | — |
@@ -288,7 +289,8 @@ The user makes every Book and Cancel tap inside Uber, Ola and Rapido. On the OND
 
 "(withdraw)" = the open prompt is withdrawn and the user is told why. "—" = no transition, logged. ON_TRIP is entered from ARRIVING on a trip-started template.
 
-- **Kept leg lost:** on PROVIDER_CANCELLED, or the user's "No, it ended", a loud alert: "Your Rapido captain cancelled. [Compare again (same trip)] [Open Rapido]". On DRIVER_CANCELLED the kept leg shows "Rapido is finding another captain".
+- **Kept leg lost:** on PROVIDER_CANCELLED, or the user's "No, it ended", a loud alert: "Your Rapido captain cancelled. [Compare again (same trip)] [Open Rapido]". On DRIVER_CANCELLED the kept leg shows "Rapido is finding another captain"; if "Is a new captain coming?" then goes a full re-prompt round (2 min) unanswered, a loud alert says "Your Rapido ride may be lost" [Open Rapido] [Check screen].
+- Re-read posts (reconnect, restore) that already raised a question in the current generation are idempotent: an answered question is not asked again.
 
 ### 4.5 RideWatch pipeline
 1. Every post from an allowlisted package is masked and template-matched **immediately**. Nothing on the local path is debounced.
@@ -300,6 +302,8 @@ The user makes every Book and Cancel tap inside Uber, Ola and Rapido. On the OND
    - On SEARCHING → MAYBE_ASSIGNED: "Rapido has an update. Got a driver? [Yes, cancel the others] [Not yet] [Check screen]". "Yes, cancel the others" is itself the user's Yes for the chain; no second confirmation sheet.
    - On ASSIGNED/ARRIVING → MAYBE_CHANGED: "Rapido has an update. Is your captain still coming? [Yes] [Driver cancelled] [Check screen]".
    - On DRIVER_CANCELLED → MAYBE_NEW_DRIVER: "Uber has an update. Is a new driver coming? [Yes] [No, it ended] [Check screen]".
+   - On OPENED/QUOTED (an app RideMate opened this session) → MAYBE_BOOKED: "Uber sent an update. Did you book on Uber? [Yes, booked] [No]". Yes is "Booked here"; such posts are never classified.
+   - "Yes, cancel the others" is offered only while no ride is kept, other bookings exist and Keep searching is off; otherwise a plain Yes moves the leg to ASSIGNED and the first-driver sheet asks (with [Keep searching] when it is on). Only the "Yes, cancel the others" button starts the chain.
 
    A classifier label can raise these prompts or propose SEARCHING/ASSIGNED, but never CANCEL_CONFIRMED and never ends a leg.
 7. An unknown versionCode uses the newest template ≤ the installed version (`template=fallback` logged).
@@ -352,7 +356,7 @@ Opt-in "Keep searching", off by default, with a fee and driver-harm warning.
 - **I6** A frame is processed only within 2 s of a user tap (or from DemoSource).
 - **I7** Posts from non-allowlisted packages are dropped unread.
 - **I8** While any extra leg is **non-terminal** and not dismissed, reminders stay scheduled. Terminal states: CANCEL_CONFIRMED, SEARCH_EXPIRED, PROVIDER_CANCELLED, ENDED, PAY_HANDOFF. USER_SAYS_CANCELLED keeps its +60 s check. While I8 holds for any leg, the foreground service stays running (reminders never depend on WorkManager under Doze).
-- **I9** Every allowlisted post on **every booked, non-terminal leg** produces a deterministic RideEvent, a MAYBE prompt, or a logged exact-duplicate drop. Rule hits and redacted posts complete within 3 s. Rule misses complete within 3 s plus the classifier deadline (6 s), with UNKNOWN_UPDATE as the fallback at the deadline. Never silently ignored.
+- **I9** Every allowlisted post on **every booked, non-terminal leg** (and on every leg whose app RideMate opened this session) produces a deterministic RideEvent, a MAYBE prompt, or a logged exact-duplicate drop. Rule hits and redacted posts complete within 3 s. Rule misses complete within 3 s plus the classifier deadline (6 s), with UNKNOWN_UPDATE as the fallback at the deadline. Never silently ignored.
 - **I10** No cancel chain starts, and no "your ride" banner shows, for a leg whose current generation isn't ASSIGNED or ARRIVING.
 
 ### 4.10 Models

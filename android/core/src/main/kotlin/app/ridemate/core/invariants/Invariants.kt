@@ -189,7 +189,8 @@ object Invariants {
     }
 
     /**
-     * I9: every allowlisted post on a booked, non-terminal leg produced a RideEvent (incl. a MAYBE prompt) or a logged
+     * I9: every allowlisted post on a booked, non-terminal leg (or one whose app RideMate opened, see
+     * [PostAuditEntry.coveredByI9]) produced a RideEvent (incl. a MAYBE prompt) or a logged
      * exact-duplicate drop, within 3 s for rule hits and redacted posts and 3 s + 10 s for rule misses. A post covered by
      * a newer one on the same key counts when that one resolved within this post's own bound.
      */

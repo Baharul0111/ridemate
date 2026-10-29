@@ -108,9 +108,17 @@ class PostAuditEntry internal constructor(
         coveredBySeq = intoSeq
     }
 
-    /** I9 applies to posts on booked, non-terminal legs. */
+    /**
+     * I9 applies to posts on booked, non-terminal legs, and on legs whose app RideMate opened this session (the user
+     * may have booked there without tapping "Booked here"; an unreadable post asks "Did you book on <App>?").
+     */
     val coveredByI9: Boolean
-        get() = legId != null && legBookedAtArrival && legStateAtArrival?.isTerminal == false
+        get() = legId != null && legStateAtArrival?.isTerminal == false &&
+            (legBookedAtArrival || legStateAtArrival in OPENED_APP_STATES)
+
+    private companion object {
+        val OPENED_APP_STATES = setOf(RideState.OPENED, RideState.QUOTED, RideState.MAYBE_BOOKED)
+    }
 
     override fun toString(): String =
         "Post#$seq($packageName key=$sbnKey kind=$kind tpl=$templateId outcome=$outcome event=$eventType disp=$disposition " +

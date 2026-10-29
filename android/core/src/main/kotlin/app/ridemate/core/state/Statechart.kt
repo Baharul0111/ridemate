@@ -17,6 +17,7 @@ import app.ridemate.core.model.RideState.DRIVER_CANCELLED
 import app.ridemate.core.model.RideState.ENDED
 import app.ridemate.core.model.RideState.INIT
 import app.ridemate.core.model.RideState.MAYBE_ASSIGNED
+import app.ridemate.core.model.RideState.MAYBE_BOOKED
 import app.ridemate.core.model.RideState.MAYBE_CHANGED
 import app.ridemate.core.model.RideState.MAYBE_NEW_DRIVER
 import app.ridemate.core.model.RideState.ON_SELECT
@@ -130,10 +131,11 @@ private class Step(private val before: LegState, private val now: Moment) {
     private fun applyProvider(u: ProviderUpdate) {
         val s = u.signal
         when (leg.state) {
-            SELECTED, OPENED, QUOTED, BOOK_REQUESTED -> when (s) {
-                NotificationEvent.SEARCHING -> moveTo(SEARCHING)
-                NotificationEvent.ASSIGNED -> moveTo(ASSIGNED, driver = driverFrom(u))
-                NotificationEvent.ARRIVING -> moveTo(ARRIVING, driver = driverFrom(u))
+            // A live-ride post from MAYBE_BOOKED answers "Did you book?" itself (BOOKING_SEEN).
+            SELECTED, OPENED, QUOTED, MAYBE_BOOKED, BOOK_REQUESTED -> when (s) {
+                NotificationEvent.SEARCHING -> moveTo(SEARCHING, withdraw = WithdrawReason.BOOKING_SEEN)
+                NotificationEvent.ASSIGNED -> moveTo(ASSIGNED, driver = driverFrom(u), withdraw = WithdrawReason.BOOKING_SEEN)
+                NotificationEvent.ARRIVING -> moveTo(ARRIVING, driver = driverFrom(u), withdraw = WithdrawReason.BOOKING_SEEN)
                 NotificationEvent.NO_DRIVERS -> moveTo(SEARCH_EXPIRED)
                 NotificationEvent.CANCELLED -> moveTo(PROVIDER_CANCELLED)
                 NotificationEvent.DRIVER_CANCELLED, NotificationEvent.ENDED, NotificationEvent.TRIP_STARTED -> log(LogReason.NO_TRANSITION)
@@ -207,10 +209,18 @@ private class Step(private val before: LegState, private val now: Moment) {
 
     private fun unknown(e: UnknownUpdate) {
         if (isStaleReplay(e.replayed, e.postTimeWallMs)) return log(LogReason.STALE_REPLAY)
+        // The same post re-read on a reconnect or restore, already turned into a question in this generation (and maybe
+        // answered since): asking again would undo the user's answer.
+        val key = e.sbnKey
+        if (e.replayed && key != null && leg.marks[key] == AppliedMark(EventType.UNKNOWN_UPDATE, leg.generation)) {
+            return log(LogReason.IDEMPOTENT)
+        }
         when (leg.state) {
-            SELECTED, OPENED, QUOTED -> log(LogReason.NO_TRANSITION)
+            SELECTED -> log(LogReason.NO_TRANSITION)
+            // An app RideMate opened this session: the user may have booked there without tapping "Booked here".
+            OPENED, QUOTED -> moveTo(MAYBE_BOOKED, returnState = leg.state)
             BOOK_REQUESTED, SEARCHING -> moveTo(MAYBE_ASSIGNED)
-            MAYBE_ASSIGNED, MAYBE_CHANGED, MAYBE_NEW_DRIVER -> dup()
+            MAYBE_BOOKED, MAYBE_ASSIGNED, MAYBE_CHANGED, MAYBE_NEW_DRIVER -> dup()
             ASSIGNED, ARRIVING -> moveTo(MAYBE_CHANGED, returnState = leg.state)
             DRIVER_CANCELLED -> moveTo(MAYBE_NEW_DRIVER)
             ON_TRIP -> log(LogReason.IGNORED_ON_TRIP)
@@ -229,6 +239,12 @@ private class Step(private val before: LegState, private val now: Moment) {
             leg.state in LegState.CHAIN_STATES -> {
                 log(LogReason.REMOVAL_RECORDED)
                 outputs += StateOutput.RequestCapture(CapturePurpose.CANCEL_PROOF)
+            }
+            // The driver cancelled and the app then took down its last ride post: it may have dropped the ride. Ask now
+            // instead of waiting out DRIVER_CANCELLED_WAIT in silence.
+            leg.state == DRIVER_CANCELLED && !e.ongoingLeft -> {
+                log(LogReason.REMOVAL_RECORDED)
+                moveTo(MAYBE_NEW_DRIVER)
             }
             else -> log(LogReason.REMOVAL_RECORDED)
         }
@@ -249,7 +265,7 @@ private class Step(private val before: LegState, private val now: Moment) {
     /** The "cancelled tpl / removal rung" column. */
     private fun cancelledColumn(rung: EvidenceRung) {
         when (leg.state) {
-            SELECTED, OPENED, QUOTED, BOOK_REQUESTED, SEARCHING, MAYBE_ASSIGNED, ASSIGNED, ARRIVING, MAYBE_CHANGED,
+            SELECTED, OPENED, QUOTED, MAYBE_BOOKED, BOOK_REQUESTED, SEARCHING, MAYBE_ASSIGNED, ASSIGNED, ARRIVING, MAYBE_CHANGED,
             DRIVER_CANCELLED, MAYBE_NEW_DRIVER -> moveTo(PROVIDER_CANCELLED)
             in LegState.CHAIN_STATES -> confirm(rung)
             else -> log(LogReason.NO_TRANSITION)
@@ -272,6 +288,12 @@ private class Step(private val before: LegState, private val now: Moment) {
                 } else {
                     notApplicable()
                 }
+            // "Yes, booked" (or the bubble's "Booked here") → BOOK_REQUESTED; "No" → back where the leg was.
+            MAYBE_BOOKED -> when (a) {
+                Answer.BOOKED_HERE -> moveTo(BOOK_REQUESTED, withdraw = WithdrawReason.ANSWERED)
+                Answer.NOT_BOOKED -> moveTo(leg.returnState ?: OPENED, withdraw = WithdrawReason.ANSWERED)
+                else -> notApplicable()
+            }
             MAYBE_ASSIGNED -> when (a) {
                 Answer.YES -> moveTo(ASSIGNED, driver = DriverInfo(assignedAtElapsedMs = now.elapsedMs, assignedAtWallMs = now.wallMs), withdraw = WithdrawReason.ANSWERED)
                 Answer.NOT_YET -> moveTo(SEARCHING, withdraw = WithdrawReason.ANSWERED)
@@ -306,12 +328,17 @@ private class Step(private val before: LegState, private val now: Moment) {
 
     private fun timeout(e: Timeout) {
         when (leg.state) {
-            MAYBE_ASSIGNED, MAYBE_CHANGED, MAYBE_NEW_DRIVER ->
+            MAYBE_BOOKED, MAYBE_ASSIGNED, MAYBE_CHANGED, MAYBE_NEW_DRIVER ->
                 if (e.kind == TimeoutKind.REPROMPT) outputs += StateOutput.RePrompt(leg.state.promptKind()!!) else log(LogReason.NO_TRANSITION)
+            // 3 min after a driver cancel with no new driver: ask. Without the ongoing post (gone, or never flagged
+            // ongoing by the app) the ride may have been dropped, which is no reason to stay silent.
             DRIVER_CANCELLED -> when {
                 e.kind != TimeoutKind.DRIVER_CANCELLED_WAIT -> log(LogReason.NO_TRANSITION)
                 e.ongoingPresent -> moveTo(MAYBE_NEW_DRIVER)
-                else -> log(LogReason.NO_ONGOING_POST)
+                else -> {
+                    log(LogReason.NO_ONGOING_POST)
+                    moveTo(MAYBE_NEW_DRIVER)
+                }
             }
             CANCEL_REQUESTED, CANCEL_GUIDED ->
                 if (e.kind == TimeoutKind.REMINDER) outputs += StateOutput.ReminderDue else log(LogReason.NO_TRANSITION)

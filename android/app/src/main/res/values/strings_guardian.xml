@@ -104,6 +104,7 @@
     <string name="guardian_sheet_closed">That question was closed.</string>
 
     <!-- Questions when an update could not be read (§4.5.6). -->
+    <string name="guardian_prompt_maybe_booked">%1$s sent an update. Did you book on %1$s?</string>
     <string name="guardian_prompt_maybe_assigned">%1$s has an update. Got a driver?</string>
     <string name="guardian_prompt_maybe_changed">%1$s has an update. Is your driver still coming?</string>
     <string name="guardian_prompt_maybe_changed_captain">%1$s has an update. Is your captain still coming?</string>
@@ -122,6 +123,7 @@
     <string name="guardian_prompt_withdrawn_trip_started">%1$s says the trip started, so the question was closed.</string>
     <string name="guardian_prompt_withdrawn_same_driver">%1$s confirmed the same driver is still coming.</string>
     <string name="guardian_prompt_withdrawn_cancelling">You\'re cancelling %1$s, so the question was closed.</string>
+    <string name="guardian_prompt_withdrawn_booking_seen">%1$s shows your booking, so the question was closed.</string>
     <string name="guardian_prompt_answered">Thanks, noted.</string>
 
     <!-- Opening apps. RideMate only opens them; you tap everything inside. -->
@@ -158,6 +160,8 @@
     <string name="guardian_alert_still_live_body">Its ride notification is still there. Open %1$s and make sure the booking is cancelled.</string>
     <string name="guardian_alert_check_screen">Check %1$s now</string>
     <string name="guardian_alert_check_screen_body">%1$s sent an update RideMate couldn\'t read. Open it and check the booking is cancelled.</string>
+    <string name="guardian_alert_kept_leg_may_be_lost">Your %1$s ride may be lost</string>
+    <string name="guardian_alert_kept_leg_may_be_lost_body">The driver cancelled and no new driver has shown up. Open %1$s to check, and answer whether a new driver is coming.</string>
 
     <!-- Updates. -->
     <string name="guardian_banner_your_ride">Your ride: %1$s</string>
@@ -172,6 +176,7 @@
     <string name="guardian_banner_all_cancels_done">All extra bookings are cancelled.</string>
     <string name="guardian_pay_offer">Ride ended. Open %1$s to pay</string>
     <string name="guardian_pay_offer_body">RideMate never handles money. Pay in %1$s.</string>
+    <string name="guardian_banner_ondc_pay_driver">Ride ended. Pay the driver as agreed. RideMate never handles money.</string>
     <string name="guardian_compare_again">Comparing again for the same trip</string>
     <string name="guardian_answer_rejected">That question had already changed. Check the latest update.</string>
 
@@ -192,6 +197,8 @@
     <string name="guardian_action_keep_current">No, keep current</string>
     <string name="guardian_action_yes">Yes</string>
     <string name="guardian_action_not_yet">Not yet</string>
+    <string name="guardian_action_yes_booked">Yes, booked</string>
+    <string name="guardian_action_not_booked">No</string>
     <string name="guardian_action_driver_cancelled">Driver cancelled</string>
     <string name="guardian_action_no_it_ended">No, it ended</string>
     <string name="guardian_action_check_screen">Check screen</string>

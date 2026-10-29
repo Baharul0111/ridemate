@@ -81,6 +81,36 @@ class ComparisonListTest {
     }
 
     @Test
+    fun `an old price is never flagged cheapest over a fresh one`() {
+        // A 5-minute-old Uber ₹90 (greyed, "old") and a fresh Ola ₹100.
+        val list = ComparisonList.build(
+            listOf(
+                verified(Provider.UBER, VehicleClass.AUTO, 90..90, at = seen - 300_000),
+                verified(Provider.OLA, VehicleClass.AUTO, 100..100),
+                verified(Provider.RAPIDO, VehicleClass.AUTO, 100..100, at = seen - 61_000),
+            ),
+            nowMs = seen + 1_000,
+        )
+        val auto = list.groups.single().entries
+        assertEquals(listOf(Provider.UBER, Provider.OLA, Provider.RAPIDO), auto.map { it.row.provider })
+        assertEquals(listOf(true, false, true), auto.map { it.stale })
+        assertEquals("only the fresh ₹100 is cheapest; the old ₹100 tie is not", listOf(false, true, false), auto.map { it.cheapest })
+
+        // Every verified price old: no cheapest flag at all.
+        val allOld = ComparisonList.build(
+            listOf(verified(Provider.UBER, VehicleClass.BIKE, 45..45, at = seen), verified(Provider.OLA, VehicleClass.BIKE, 50..50, at = seen)),
+            nowMs = seen + Freshness.STALE_AFTER_MS,
+        )
+        assertTrue(allOld.groups.single().entries.none { it.cheapest })
+        // The same rows while fresh: the cheaper one is flagged.
+        val fresh = ComparisonList.build(
+            listOf(verified(Provider.UBER, VehicleClass.BIKE, 45..45, at = seen), verified(Provider.OLA, VehicleClass.BIKE, 50..50, at = seen)),
+            nowMs = seen + 59_999,
+        )
+        assertEquals(listOf(true, false), fresh.groups.single().entries.map { it.cheapest })
+    }
+
+    @Test
     fun `rows go stale at exactly 60 seconds with a text key, not just colour`() {
         val rows = listOf(verified(Provider.UBER, VehicleClass.AUTO, 110..110))
         val fresh = ComparisonList.build(rows, seen + 59_999).groups.single().entries.single()

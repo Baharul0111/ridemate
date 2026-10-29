@@ -72,16 +72,210 @@ class GuardianFlowsReplayTest {
     }
 
     @Test
-    fun `a driver-cancelled leg whose ride post is gone gets no new-driver question`() = runTest {
+    fun `a driver-cancelled leg whose ride post the app takes down is asked about a new driver at once`() = runTest {
         val h = ReplayHarness(this, providers = listOf(Provider.UBER, Provider.RAPIDO))
         h.book(Provider.UBER, Provider.RAPIDO)
         h.post(UBER, "u1", Text.uberSearching)
         h.post(RAPIDO, "r1", Text.rapidoAssigned())
         h.post(RAPIDO, "r1", Text.rapidoDriverCancelled)
-        h.remove(RAPIDO, "r1")
-        h.advance(200_000)
-        assertEquals(RideState.DRIVER_CANCELLED, h.state(Provider.RAPIDO))
         assertTrue(h.effectsOf<GuardianEffect.MaybePrompt>().isEmpty())
+        h.remove(RAPIDO, "r1")
+        assertEquals(RideState.MAYBE_NEW_DRIVER, h.state(Provider.RAPIDO))
+        assertEquals(UiKey.PROMPT_MAYBE_NEW_DRIVER, h.effectsOf<GuardianEffect.MaybePrompt>().single().key)
+        h.advance(200_000)
+        assertEquals(listOf(0, 1), h.effectsOf<GuardianEffect.MaybePrompt>().map { it.repeat })
+        assertTrue("not the kept ride: no loud alert", h.effectsOf<GuardianEffect.LoudAlert>().isEmpty())
+        assertClean(h)
+    }
+
+    @Test
+    fun `the kept ride's dropped post - asked at once, then a loud alert when nobody answers`() = runTest {
+        val h = ReplayHarness(this, providers = listOf(Provider.UBER, Provider.RAPIDO))
+        h.book(Provider.UBER, Provider.RAPIDO)
+        h.post(UBER, "u1", Text.uberSearching)
+        h.post(RAPIDO, "r1", Text.rapidoAssigned())
+        h.yes()
+        assertEquals(LegRole.KEPT, h.record(Provider.RAPIDO).role)
+        h.post(RAPIDO, "r1", Text.rapidoDriverCancelled)
+        // Rapido drops the ride by taking its post down, with no "no captains" post RideMate could read.
+        val mark = h.mark()
+        h.remove(RAPIDO, "r1")
+        assertEquals(RideState.MAYBE_NEW_DRIVER, h.state(Provider.RAPIDO))
+        val prompt = h.effectsOf<GuardianEffect.MaybePrompt>(mark).single()
+        assertEquals(UiKey.PROMPT_MAYBE_NEW_DRIVER, prompt.key)
+        h.advance(119_000)
+        assertTrue(h.effectsOf<GuardianEffect.LoudAlert>(mark).isEmpty())
+        h.advance(1_000)
+        val alert = h.effectsOf<GuardianEffect.LoudAlert>(mark).single()
+        assertEquals(UiKey.ALERT_KEPT_LEG_MAY_BE_LOST, alert.key)
+        assertEquals(Provider.RAPIDO, alert.provider)
+        assertEquals(listOf(UiAction.OPEN_APP, UiAction.CHECK_SCREEN), alert.actions)
+        h.advance(240_000)
+        assertEquals("loud once, then the question keeps being asked", 1, h.effectsOf<GuardianEffect.LoudAlert>(mark).size)
+        val lost = h.mark()
+        h.act(UserAction.AnswerPrompt(prompt.promptId, Answer.NO_IT_ENDED, h.tap()))
+        assertEquals(RideState.PROVIDER_CANCELLED, h.state(Provider.RAPIDO))
+        assertEquals(UiKey.ALERT_KEPT_LEG_LOST, h.effectsOf<GuardianEffect.LoudAlert>(lost).single().key)
+        assertClean(h)
+    }
+
+    @Test
+    fun `the kept ride's driver cancels in a post the app never flags ongoing - asked after 3 min, never silent`() = runTest {
+        val h = ReplayHarness(this, providers = listOf(Provider.UBER, Provider.RAPIDO))
+        h.book(Provider.UBER, Provider.RAPIDO)
+        h.post(UBER, "u1", Text.uberSearching)
+        h.post(RAPIDO, "r1", Text.rapidoAssigned())
+        h.yes()
+        // Real apps' templates list no ongoing channel, and this post is not flagged ongoing either.
+        h.post(RAPIDO, "r1", Text.rapidoDriverCancelled.first, Text.rapidoDriverCancelled.second, channel = "updates", ongoing = false)
+        assertEquals(RideState.DRIVER_CANCELLED, h.state(Provider.RAPIDO))
+        assertFalse(h.pipeline.hasOngoingRide(RAPIDO))
+        h.advance(179_000)
+        assertEquals(RideState.DRIVER_CANCELLED, h.state(Provider.RAPIDO))
+        h.advance(1_000)
+        assertEquals(RideState.MAYBE_NEW_DRIVER, h.state(Provider.RAPIDO))
+        val prompt = h.effectsOf<GuardianEffect.MaybePrompt>().single()
+        h.advance(120_000)
+        assertEquals(UiKey.ALERT_KEPT_LEG_MAY_BE_LOST, h.effectsOf<GuardianEffect.LoudAlert>().single().key)
+        // A new captain after all: the question is withdrawn with the reason, and the ride is announced again.
+        val mark = h.mark()
+        h.post(RAPIDO, "r2", Text.rapidoAssigned(plate = "AS02XY9876"))
+        assertEquals(RideState.ASSIGNED, h.state(Provider.RAPIDO))
+        assertEquals(
+            GuardianEffect.PromptWithdrawn(prompt.promptId, h.legId(Provider.RAPIDO), UiKey.PROMPT_WITHDRAWN_DRIVER_ASSIGNED),
+            h.effectsOf<GuardianEffect.PromptWithdrawn>(mark).single(),
+        )
+        assertEquals(Provider.RAPIDO, h.effectsOf<GuardianEffect.RideBanner>(mark).single().driver.provider)
+        assertClean(h)
+    }
+
+    @Test
+    fun `an app RideMate opened that sends an unreadable post asks 'Did you book', and Yes puts it under watch`() = runTest {
+        val h = ReplayHarness(this, providers = listOf(Provider.UBER, Provider.RAPIDO))
+        h.guardian.markOpened(h.legId(Provider.UBER))
+        h.guardian.markQuoted(h.legId(Provider.UBER))
+        h.book(Provider.RAPIDO)
+        h.post(RAPIDO, "r1", Text.rapidoSearching)
+        // The user booked in Uber without tapping "Booked here"; Uber's post is redacted.
+        val sentAt = h.now
+        val audit = h.post(UBER, "u1", null, null, id = 7, redacted = true)
+        assertTrue("I9 covers apps RideMate opened", audit.coveredByI9)
+        assertEquals(RideState.MAYBE_BOOKED, h.state(Provider.UBER))
+        val (shownAt, prompt) = h.timedOf<GuardianEffect.MaybePrompt>().single()
+        assertTrue("prompt within 3 s", shownAt - sentAt <= 3_000)
+        assertEquals(UiKey.PROMPT_MAYBE_BOOKED, prompt.key)
+        assertEquals(listOf(UiAction.YES_BOOKED, UiAction.NOT_BOOKED), prompt.actions)
+        assertTrue("never classified (no spend on unbooked legs)", h.classifier!!.requests.isEmpty())
+        val yes = h.tap()
+        h.act(UserAction.AnswerPrompt(prompt.promptId, Answer.BOOKED_HERE, yes, button = UiAction.YES_BOOKED))
+        assertEquals(RideState.BOOK_REQUESTED, h.state(Provider.UBER))
+        assertEquals(ActionKind.BOOKED_HERE, h.guardian.state.actions.single { it.tapId == yes }.kind)
+        // Rapido finds a driver: Uber is now one of the bookings to cancel.
+        h.post(RAPIDO, "r1", Text.rapidoAssigned())
+        val sheet = h.effectsOf<GuardianEffect.DriverSheet>().single()
+        assertEquals(listOf(Provider.UBER), sheet.others.map { it.provider })
+        h.yes()
+        assertEquals(RideState.CANCEL_GUIDED, h.state(Provider.UBER))
+        assertClean(h)
+    }
+
+    @Test
+    fun `'Did you book' - No puts the app back, a re-read does not ask again, and the app's own post answers it`() = runTest {
+        val h = ReplayHarness(this)
+        h.guardian.markOpened(h.legId(Provider.UBER))
+        h.guardian.markOpened(h.legId(Provider.OLA))
+        h.post(UBER, "u-promo", "Uber", "Something RideMate has no template for")
+        val prompt = h.effectsOf<GuardianEffect.MaybePrompt>().single()
+        assertEquals(UiKey.PROMPT_MAYBE_BOOKED, prompt.key)
+        h.act(UserAction.AnswerPrompt(prompt.promptId, Answer.NOT_BOOKED, h.tap(), button = UiAction.NOT_BOOKED))
+        assertEquals(RideState.OPENED, h.state(Provider.UBER))
+        h.restart()
+        assertEquals("the re-read post is not asked about again", 1, h.historyOf<GuardianEffect.MaybePrompt>().size)
+        assertEquals(RideState.OPENED, h.state(Provider.UBER))
+
+        // Ola: asked, then Ola's own searching post shows the booking and closes the question with that reason.
+        h.post(OLA, "o-pin", null, null, id = 3)
+        val olaPrompt = h.historyOf<GuardianEffect.MaybePrompt>().last().second
+        assertEquals(h.legId(Provider.OLA), olaPrompt.legId)
+        h.post(OLA, "o1", Text.olaSearching)
+        assertEquals(RideState.SEARCHING, h.state(Provider.OLA))
+        assertEquals(
+            GuardianEffect.PromptWithdrawn(olaPrompt.promptId, h.legId(Provider.OLA), UiKey.PROMPT_WITHDRAWN_BOOKING_SEEN),
+            h.historyOf<GuardianEffect.PromptWithdrawn>().last().second,
+        )
+        // An app RideMate never opened stays quiet: nothing suggests a booking there.
+        h.post(RAPIDO, "r-pin", null, null, id = 4, channel = "otp", ongoing = false)
+        assertEquals(RideState.SELECTED, h.state(Provider.RAPIDO))
+        assertTrue(h.historyOf<GuardianEffect.MaybePrompt>().none { it.second.legId == h.legId(Provider.RAPIDO) })
+        assertClean(h)
+    }
+
+    @Test
+    fun `an answered question is not asked again after a reconnect or a restore`() = runTest {
+        val h = ReplayHarness(this, providers = listOf(Provider.UBER, Provider.RAPIDO))
+        h.book(Provider.UBER, Provider.RAPIDO)
+        h.post(UBER, "u1", Text.uberSearching)
+        h.post(RAPIDO, "r1", Text.rapidoSearching)
+        // A redacted PIN post that stays in the shade.
+        h.post(UBER, "u-pin", null, null, id = 5, channel = "otp", ongoing = false)
+        val prompt = h.effectsOf<GuardianEffect.MaybePrompt>().single()
+        h.act(UserAction.AnswerPrompt(prompt.promptId, Answer.NOT_YET, h.tap()))
+        assertEquals(RideState.SEARCHING, h.state(Provider.UBER))
+
+        h.reconnect()
+        assertEquals(RideState.SEARCHING, h.state(Provider.UBER))
+        h.restart()
+        assertEquals(RideState.SEARCHING, h.state(Provider.UBER))
+        assertEquals("asked once, answered, not asked again", 1, h.historyOf<GuardianEffect.MaybePrompt>().size)
+        assertClean(h)
+    }
+
+    @Test
+    fun `a plain Yes on 'Got a driver' never cancels a booking made after it was asked`() = runTest {
+        val h = ReplayHarness(this, providers = listOf(Provider.UBER, Provider.RAPIDO))
+        h.book(Provider.RAPIDO)
+        h.post(RAPIDO, "r1", Text.rapidoSearching)
+        h.post(RAPIDO, "r-pin", null, null, id = 4, channel = "otp", ongoing = false)
+        val first = h.effectsOf<GuardianEffect.MaybePrompt>().single()
+        assertEquals("nothing else booked: a plain Yes", UiAction.YES, first.actions.first())
+        // The user books Uber too before answering: the question is re-sent with the Yes that now applies.
+        val mark = h.mark()
+        h.book(Provider.UBER)
+        val refreshed = h.effectsOf<GuardianEffect.MaybePrompt>(mark).single()
+        assertEquals(first.promptId, refreshed.promptId)
+        assertEquals(UiAction.YES_CANCEL_OTHERS, refreshed.actions.first())
+        // A tap on the first copy's plain "Yes" only says a driver came; nothing is cancelled without the question.
+        val effects = h.act(UserAction.AnswerPrompt(first.promptId, Answer.YES, h.tap(), button = UiAction.YES))
+        assertEquals(RideState.ASSIGNED, h.state(Provider.RAPIDO))
+        assertEquals(RideState.BOOK_REQUESTED, h.state(Provider.UBER))
+        assertTrue(effects.none { it is GuardianEffect.OpenApp })
+        assertTrue(h.guardian.state.actions.none { it.kind == ActionKind.CANCEL_CHAIN_START })
+        val sheet = effects.filterIsInstance<GuardianEffect.DriverSheet>().single()
+        assertEquals(UiKey.SHEET_CANCEL_OTHERS, sheet.key)
+        assertEquals(listOf(Provider.UBER), sheet.others.map { it.provider })
+        assertClean(h)
+    }
+
+    @Test
+    fun `with Keep searching on, Yes on 'Got a driver' offers Keep searching instead of cancelling the others`() = runTest {
+        val h = ReplayHarness(this, providers = listOf(Provider.UBER, Provider.RAPIDO), keepSearching = true)
+        h.book(Provider.UBER, Provider.RAPIDO)
+        h.post(UBER, "u1", Text.uberSearching)
+        h.post(RAPIDO, "r1", Text.rapidoSearching)
+        h.post(RAPIDO, "r-pin", null, null, id = 4, channel = "otp", ongoing = false)
+        val prompt = h.effectsOf<GuardianEffect.MaybePrompt>().single()
+        assertEquals(listOf(UiAction.YES, UiAction.NOT_YET, UiAction.CHECK_SCREEN), prompt.actions)
+        val effects = h.act(UserAction.AnswerPrompt(prompt.promptId, Answer.YES, h.tap(), button = UiAction.YES))
+        assertEquals(RideState.ASSIGNED, h.state(Provider.RAPIDO))
+        assertEquals(RideState.SEARCHING, h.state(Provider.UBER))
+        assertTrue(effects.none { it is GuardianEffect.OpenApp })
+        val sheet = effects.filterIsInstance<GuardianEffect.DriverSheet>().single()
+        assertEquals(listOf(UiAction.YES_CANCEL_OTHERS, UiAction.KEEP_SEARCHING, UiAction.NOT_NOW), sheet.actions)
+        h.act(UserAction.AnswerSheet(sheet.sheetId, SheetChoice.KEEP_SEARCHING, h.tap()))
+        assertEquals(LegRole.KEPT, h.record(Provider.RAPIDO).role)
+        assertEquals(LegRole.CANDIDATE, h.record(Provider.UBER).role)
+        assertEquals(RideState.SEARCHING, h.state(Provider.UBER))
+        assertClean(h)
     }
 
     @Test
@@ -214,12 +408,14 @@ class GuardianFlowsReplayTest {
         h.book(Provider.UBER, Provider.RAPIDO)
         h.post(UBER, "u1", Text.uberSearching)
         h.post(RAPIDO, "r1", Text.rapidoAssigned())
+        assertEquals(FeeNoteKind.FREE_WHILE_SEARCHING, h.effectsOf<GuardianEffect.DriverSheet>().single().others.single().fee.kind)
         h.advance(12_000)
         h.post(UBER, "u1", Text.uberAssigned())
         val sheets = h.effectsOf<GuardianEffect.DriverSheet>()
-        assertEquals(1, sheets.size)
-        assertEquals(UiKey.SHEET_CANCEL_OTHERS, sheets.single().key)
-        assertEquals(Provider.RAPIDO, sheets.single().drivers.single().provider)
+        assertEquals("one sheet, re-sent", 1, sheets.map { it.sheetId }.distinct().size)
+        assertTrue(sheets.all { it.key == UiKey.SHEET_CANCEL_OTHERS && it.drivers.single().provider == Provider.RAPIDO })
+        assertEquals("Uber's fee note follows its own driver", FeeNoteKind.FREE_WINDOW, sheets.last().others.single().fee.kind)
+        assertEquals(Provider.UBER, sheets.last().others.single().provider)
         h.yes()
         assertEquals("the second driver's booking is cancelled too", RideState.CANCEL_GUIDED, h.state(Provider.UBER))
         assertEquals(FeeNoteKind.FREE_WINDOW, h.effectsOf<GuardianEffect.CancelCard>().last().fee.kind)
@@ -541,6 +737,27 @@ class GuardianFlowsReplayTest {
         assertEquals(OpenPurpose.PAY, open.purpose)
         assertEquals(pay, open.tapId)
         assertEquals(RideState.PAY_HANDOFF, h.state(Provider.RAPIDO))
+        assertTrue(h.guardian.closeSession())
+        assertClean(h)
+    }
+
+    @Test
+    fun `an ONDC ride that ends offers no app to pay in, only the pay-the-driver note`() = runTest {
+        val h = ReplayHarness(this, providers = listOf(Provider.ONDC))
+        val leg = h.legId(Provider.ONDC)
+        h.guardian.onProtocolEvent(leg, Protocol(ProtocolKind.SEARCH_STARTED))
+        h.act(UserAction.OndcBook(leg, "item-auto-1", h.tap()))
+        h.guardian.onProtocolEvent(leg, Protocol(ProtocolKind.CONFIRMED, messageId = "m1"))
+        h.guardian.onProtocolEvent(leg, Protocol(ProtocolKind.DRIVER_ASSIGNED, etaMin = 4, messageId = "m2"))
+        h.guardian.onProtocolEvent(leg, Protocol(ProtocolKind.TRIP_STARTED, messageId = "m3"))
+        h.guardian.onProtocolEvent(leg, Protocol(ProtocolKind.ENDED, messageId = "m4"))
+        assertEquals(RideState.ENDED, h.state(Provider.ONDC))
+        assertTrue("there is no app to open", h.effectsOf<GuardianEffect.PayHandoffOffer>().isEmpty())
+        assertEquals(GuardianEffect.Banner(leg, Provider.ONDC, UiKey.BANNER_ONDC_PAY_DRIVER), h.effectsOf<GuardianEffect.Banner>().last())
+        val pay = h.act(UserAction.Pay(leg, h.tap()))
+        assertTrue(pay.any { it is GuardianEffect.AnswerRejected })
+        assertTrue(pay.none { it is GuardianEffect.OpenApp })
+        assertEquals(RideState.ENDED, h.state(Provider.ONDC))
         assertTrue(h.guardian.closeSession())
         assertClean(h)
     }

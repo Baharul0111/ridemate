@@ -66,6 +66,54 @@ class StatechartBehaviourTest {
     }
 
     @Test
+    fun `a re-read post that already raised a question does not ask it again`() {
+        val searching = fresh(RideState.BOOK_REQUESTED).on(tpl(NotificationEvent.SEARCHING, key = "ride")).after
+        val pin = UnknownUpdate(UnknownReason.REDACTED, "pin", now.wallMs)
+        val asked = searching.on(pin)
+        assertEquals(RideState.MAYBE_ASSIGNED, asked.after.state)
+        val answered = asked.after.on(UserAnswer(Answer.NOT_YET, TapId("t1"))).after
+        assertEquals(RideState.SEARCHING, answered.state)
+        // The listener reconnects (or the process is restored) and re-reads the same post from the shade.
+        val reread = answered.on(pin.copy(replayed = true))
+        assertEquals(LogReason.IDEMPOTENT, reread.logReason)
+        assertEquals(RideState.SEARCHING, reread.after.state)
+        assertTrue(reread.outputs.none { it is StateOutput.RaisePrompt })
+        // A live (not re-read) repeat on that key, or a re-read of another key, is still a new update.
+        assertEquals(RideState.MAYBE_ASSIGNED, answered.on(pin).after.state)
+        assertEquals(RideState.MAYBE_ASSIGNED, answered.on(UnknownUpdate(UnknownReason.REDACTED, "other", now.wallMs, replayed = true)).after.state)
+
+        // "Still coming" on MAYBE_CHANGED survives a re-read too; after a new driver (generation + 1) the post counts again.
+        val assigned = fresh().on(tpl(NotificationEvent.ASSIGNED, key = "ride", plate = "p1")).after
+        val stillComing = assigned.on(pin).after.on(UserAnswer(Answer.YES, TapId("t2"))).after
+        assertEquals(RideState.ASSIGNED, stillComing.state)
+        assertEquals(LogReason.IDEMPOTENT, stillComing.on(pin.copy(replayed = true)).logReason)
+        val newDriver = stillComing.on(tpl(NotificationEvent.ASSIGNED, key = "ride2", plate = "p2")).after
+        assertEquals(1, newDriver.generation)
+        assertEquals(RideState.MAYBE_CHANGED, newDriver.on(pin.copy(replayed = true)).after.state)
+    }
+
+    @Test
+    fun `did you book - Yes is Booked here, No goes back, a live post answers it`() {
+        val opened = fresh(RideState.QUOTED)
+        val asked = opened.on(UnknownUpdate(UnknownReason.NOT_CLASSIFIED, "u1", now.wallMs))
+        assertEquals(RideState.MAYBE_BOOKED, asked.after.state)
+        assertEquals(listOf<StateOutput>(StateOutput.RaisePrompt(PromptKind.MAYBE_BOOKED)), asked.outputs)
+        assertTrue("not a booking until the user says so", !asked.after.isBooked)
+        assertEquals(RideState.QUOTED, asked.after.underlyingState)
+
+        assertEquals(RideState.BOOK_REQUESTED, asked.after.on(UserAnswer(Answer.BOOKED_HERE, TapId("t"))).after.state)
+        val no = asked.after.on(UserAnswer(Answer.NOT_BOOKED, TapId("t")))
+        assertEquals(RideState.QUOTED, no.after.state)
+        assertNull(no.after.returnState)
+        // Re-read after "No": not asked again for the same post.
+        assertEquals(LogReason.IDEMPOTENT, no.after.on(UnknownUpdate(UnknownReason.REDACTED, "u1", now.wallMs, replayed = true)).logReason)
+
+        val live = asked.after.on(tpl(NotificationEvent.ASSIGNED, key = "u2", plate = "p1", eta = 4))
+        assertEquals(RideState.ASSIGNED, live.after.state)
+        assertEquals(StateOutput.WithdrawPrompt(PromptKind.MAYBE_BOOKED, WithdrawReason.BOOKING_SEEN), live.outputs.first())
+    }
+
+    @Test
     fun `a replayed post older than the leg's evidence is stale`() {
         val searching = fresh(RideState.BOOK_REQUESTED).on(tpl(NotificationEvent.SEARCHING, key = "old", postTime = now.wallMs - 60_000)).after
         val assigned = searching.on(tpl(NotificationEvent.ASSIGNED, key = "new", plate = "p1")).after
@@ -95,7 +143,9 @@ class StatechartBehaviourTest {
         assertEquals(RideState.SEARCHING, fresh(RideState.DRIVER_CANCELLED).on(classified(NotificationEvent.SEARCHING)).after.state)
         assertEquals(RideState.MAYBE_CHANGED, fresh(RideState.ASSIGNED).on(classified(NotificationEvent.SEARCHING)).after.state)
         assertTrue(fresh(RideState.MAYBE_ASSIGNED).on(classified(NotificationEvent.ASSIGNED)).isDupDrop)
-        assertEquals(RideState.OPENED, fresh(RideState.OPENED).on(classified(NotificationEvent.ASSIGNED)).after.state)
+        // On an app RideMate opened, a label only raises "Did you book on <App>?".
+        assertEquals(RideState.MAYBE_BOOKED, fresh(RideState.OPENED).on(classified(NotificationEvent.ASSIGNED)).after.state)
+        assertEquals(RideState.SELECTED, fresh(RideState.SELECTED).on(classified(NotificationEvent.ASSIGNED)).after.state)
         val inChain = fresh(RideState.CANCEL_GUIDED).copy(providerState = RideState.SEARCHING).on(classified(NotificationEvent.ASSIGNED))
         assertEquals(listOf(StateOutput.CheckScreenPrompt), inChain.outputs)
     }

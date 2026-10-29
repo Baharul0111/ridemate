@@ -41,7 +41,7 @@ data class GuardianTap(
     /** The core user action for this tap, or null when the combination is not a guardian answer. */
     fun toUserAction(tap: TapId): UserAction? = when (scope) {
         TapScope.SHEET -> ref?.let { sheetId -> sheetChoice()?.let { UserAction.AnswerSheet(sheetId, it, tap, pickedLegId) } }
-        TapScope.PROMPT -> ref?.let { promptId -> promptAnswer()?.let { UserAction.AnswerPrompt(promptId, it, tap) } }
+        TapScope.PROMPT -> ref?.let { promptId -> promptAnswer()?.let { UserAction.AnswerPrompt(promptId, it, tap, button = action) } }
         TapScope.LEG -> ref?.let { legAction(it, tap) }
         TapScope.SESSION -> if (action == UiAction.COMPARE_AGAIN) UserAction.CompareAgain(tap) else null
     }
@@ -59,6 +59,8 @@ data class GuardianTap(
     private fun promptAnswer(): Answer? = when (action) {
         UiAction.YES, UiAction.YES_CANCEL_OTHERS -> Answer.YES
         UiAction.NOT_YET -> Answer.NOT_YET
+        UiAction.YES_BOOKED -> Answer.BOOKED_HERE
+        UiAction.NOT_BOOKED -> Answer.NOT_BOOKED
         UiAction.DRIVER_CANCELLED -> Answer.DRIVER_CANCELLED
         UiAction.NO_IT_ENDED -> Answer.NO_IT_ENDED
         UiAction.CHECK_SCREEN -> Answer.CHECK_SCREEN

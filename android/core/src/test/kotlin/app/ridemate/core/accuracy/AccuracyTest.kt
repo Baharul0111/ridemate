@@ -45,6 +45,9 @@ import java.time.Instant
  * values: a VERIFIED price, ETA or driver value that differs from the label. Rows a fixture's `expect.rows` marks
  * UNREADABLE (an attacked row) must not be VERIFIED either. It prints only counts and rates, never fare values (L6).
  *
+ * Refusing everything would also give zero wrong values, so the honest reads must keep a VERIFIED rate of at least
+ * [MIN_VERIFIED_RATE]; `eval/harness/summarize.py --min-verified-rate` can check the written result files the same way.
+ *
  * Without fixtures the test is skipped, unless `-PrequireFixtures=true` (system property ridemate.requireFixtures).
  *
  * Every suite's outcomes are written to `android/core/build/accuracy/<suite>.json` in the format of
@@ -156,6 +159,12 @@ class AccuracyTest {
         )
         assertTrue(problems.joinToString("\n"), problems.isEmpty())
         assertEquals(0, honest.wrong + attacked.wrong)
+        if (honest.labelRows > 0) {
+            assertTrue(
+                "VERIFIED rate %.1f%% fell below the %.0f%% floor".format(100 * honest.rate, 100 * MIN_VERIFIED_RATE),
+                honest.rate >= MIN_VERIFIED_RATE,
+            )
+        }
     }
 
     /**
@@ -310,6 +319,9 @@ class AccuracyTest {
 
     private companion object {
         const val NOW = 1_793_000_000_000L
+
+        /** The honest-read VERIFIED rate may not drop below this (it was 80.8%, 97/120, when the floor was set). */
+        const val MIN_VERIFIED_RATE = 0.75
         val NON_WORD = Regex("[^\\p{L}\\p{M}\\p{Nd}]+")
     }
 }

@@ -163,9 +163,22 @@ class GuardianUiReducerTest {
             GuardianTap(TapScope.SHEET, "sheet", UiAction.PICK, pickedLegId = "l2").toUserAction(tap),
         )
         assertNull(GuardianTap(TapScope.SHEET, "sheet", UiAction.PICK).toUserAction(tap))
+        // The tapped button travels with the answer: only "Yes, cancel the others" may start the cancel chain.
         assertEquals(
-            UserAction.AnswerPrompt("p", app.ridemate.core.state.Answer.YES, tap),
+            UserAction.AnswerPrompt("p", app.ridemate.core.state.Answer.YES, tap, button = UiAction.YES_CANCEL_OTHERS),
             GuardianTap(TapScope.PROMPT, "p", UiAction.YES_CANCEL_OTHERS).toUserAction(tap),
+        )
+        assertEquals(
+            UserAction.AnswerPrompt("p", app.ridemate.core.state.Answer.YES, tap, button = UiAction.YES),
+            GuardianTap(TapScope.PROMPT, "p", UiAction.YES).toUserAction(tap),
+        )
+        assertEquals(
+            UserAction.AnswerPrompt("p", app.ridemate.core.state.Answer.BOOKED_HERE, tap, button = UiAction.YES_BOOKED),
+            GuardianTap(TapScope.PROMPT, "p", UiAction.YES_BOOKED).toUserAction(tap),
+        )
+        assertEquals(
+            UserAction.AnswerPrompt("p", app.ridemate.core.state.Answer.NOT_BOOKED, tap, button = UiAction.NOT_BOOKED),
+            GuardianTap(TapScope.PROMPT, "p", UiAction.NOT_BOOKED).toUserAction(tap),
         )
         assertEquals(UserAction.DismissLeg("l", tap), GuardianTap(TapScope.LEG, "l", UiAction.DISMISS).toUserAction(tap))
         assertEquals(UserAction.CompareAgain(tap), GuardianTap(TapScope.SESSION, null, UiAction.COMPARE_AGAIN).toUserAction(tap))

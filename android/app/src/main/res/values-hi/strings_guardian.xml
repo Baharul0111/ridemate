@@ -93,6 +93,7 @@
     <string name="guardian_sheet_replaced">नई जानकारी के साथ अपडेट किया गया।</string>
     <string name="guardian_sheet_closed">वह सवाल बंद किया गया।</string>
 
+    <string name="guardian_prompt_maybe_booked">%1$s का अपडेट आया है। क्या आपने %1$s पर बुक किया?</string>
     <string name="guardian_prompt_maybe_assigned">%1$s का अपडेट आया है। ड्राइवर मिला?</string>
     <string name="guardian_prompt_maybe_changed">%1$s का अपडेट आया है। क्या आपका ड्राइवर अभी भी आ रहा है?</string>
     <string name="guardian_prompt_maybe_changed_captain">%1$s का अपडेट आया है। क्या आपका कैप्टन अभी भी आ रहा है?</string>
@@ -111,6 +112,7 @@
     <string name="guardian_prompt_withdrawn_trip_started">%1$s के अनुसार यात्रा शुरू हुई, इसलिए सवाल बंद किया गया।</string>
     <string name="guardian_prompt_withdrawn_same_driver">%1$s ने पुष्टि की कि वही ड्राइवर अभी भी आ रहा है।</string>
     <string name="guardian_prompt_withdrawn_cancelling">आप %1$s रद्द कर रहे हैं, इसलिए सवाल बंद किया गया।</string>
+    <string name="guardian_prompt_withdrawn_booking_seen">%1$s पर आपकी बुकिंग दिख रही है, इसलिए सवाल बंद किया गया।</string>
     <string name="guardian_prompt_answered">धन्यवाद, नोट कर लिया।</string>
 
     <string name="guardian_open_cancel">रद्द करने के लिए %1$s खोलें</string>
@@ -143,6 +145,8 @@
     <string name="guardian_alert_still_live_body">उसकी राइड सूचना अभी भी है। %1$s खोलें और पक्का करें कि बुकिंग रद्द हो गई है।</string>
     <string name="guardian_alert_check_screen">अभी %1$s देखें</string>
     <string name="guardian_alert_check_screen_body">%1$s ने ऐसा अपडेट भेजा जो RideMate पढ़ नहीं सका। उसे खोलें और देखें कि बुकिंग रद्द हुई है।</string>
+    <string name="guardian_alert_kept_leg_may_be_lost">आपकी %1$s राइड शायद छूट गई है</string>
+    <string name="guardian_alert_kept_leg_may_be_lost_body">ड्राइवर ने रद्द किया और कोई नया ड्राइवर नहीं दिखा। देखने के लिए %1$s खोलें, और बताएँ कि नया ड्राइवर आ रहा है या नहीं।</string>
 
     <string name="guardian_banner_your_ride">आपकी राइड: %1$s</string>
     <string name="guardian_banner_finding_another">%1$s दूसरा ड्राइवर ढूँढ रहा है</string>
@@ -156,6 +160,7 @@
     <string name="guardian_banner_all_cancels_done">सभी अतिरिक्त बुकिंग रद्द हो गईं।</string>
     <string name="guardian_pay_offer">राइड पूरी हुई। भुगतान के लिए %1$s खोलें</string>
     <string name="guardian_pay_offer_body">RideMate कभी पैसे नहीं संभालता। %1$s में भुगतान करें।</string>
+    <string name="guardian_banner_ondc_pay_driver">राइड पूरी हुई। तय हुए तरीके से ड्राइवर को भुगतान करें। RideMate कभी पैसे नहीं संभालता।</string>
     <string name="guardian_compare_again">उसी यात्रा के लिए फिर से तुलना हो रही है</string>
     <string name="guardian_answer_rejected">वह सवाल बदल चुका था। नया अपडेट देखें।</string>
 
@@ -174,6 +179,8 @@
     <string name="guardian_action_keep_current">नहीं, मौजूदा रखें</string>
     <string name="guardian_action_yes">हाँ</string>
     <string name="guardian_action_not_yet">अभी नहीं मिला</string>
+    <string name="guardian_action_yes_booked">हाँ, बुक किया</string>
+    <string name="guardian_action_not_booked">नहीं</string>
     <string name="guardian_action_driver_cancelled">ड्राइवर ने रद्द किया</string>
     <string name="guardian_action_no_it_ended">नहीं, खत्म हो गई</string>
     <string name="guardian_action_check_screen">स्क्रीन जाँचें</string>

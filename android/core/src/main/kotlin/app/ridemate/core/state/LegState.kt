@@ -46,7 +46,7 @@ data class LegState(
     /** Incremented on every state or generation change; timers are bound to it. */
     val stateSeq: Long = 0,
     val enteredAtElapsedMs: Long = 0,
-    /** MAYBE_CHANGED → "Still coming" target, SOFT_CANCEL → "Keep ride" target. */
+    /** MAYBE_CHANGED → "Still coming" target, MAYBE_BOOKED → "No" target, SOFT_CANCEL → "Keep ride" target. */
     val returnState: RideState? = null,
     /** The ride status underneath a user-cancel chain (drives the fee note and the abort target). */
     val providerState: RideState? = null,
@@ -73,6 +73,7 @@ data class LegState(
     /** The ride status as the provider sees it, looking through MAYBE and cancel-chain states. */
     val underlyingState: RideState
         get() = when (state) {
+            RideState.MAYBE_BOOKED -> returnState ?: RideState.OPENED
             RideState.MAYBE_ASSIGNED -> RideState.SEARCHING
             RideState.MAYBE_CHANGED -> returnState ?: RideState.ASSIGNED
             RideState.MAYBE_NEW_DRIVER -> RideState.DRIVER_CANCELLED
@@ -82,7 +83,8 @@ data class LegState(
         }
 
     companion object {
-        val PRE_BOOKING = setOf(RideState.SELECTED, RideState.OPENED, RideState.QUOTED)
+        /** No booking is known yet. MAYBE_BOOKED counts as not booked until the user says "Yes, booked". */
+        val PRE_BOOKING = setOf(RideState.SELECTED, RideState.OPENED, RideState.QUOTED, RideState.MAYBE_BOOKED)
         val ONDC_PRE_CONFIRM = setOf(RideState.SEARCHING_NET, RideState.ON_SELECT, RideState.INIT)
         val CHAIN_STATES = setOf(
             RideState.CANCEL_REQUESTED, RideState.CANCEL_GUIDED,

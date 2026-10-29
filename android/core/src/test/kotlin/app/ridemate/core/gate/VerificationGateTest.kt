@@ -69,6 +69,60 @@ class VerificationGateTest {
     }
 
     @Test
+    fun `rule b - A reading the fixture's struck price as payable shows no number`() {
+        // The Auto row shows ₹110 payable and a struck ₹140; A swaps them.
+        val swapped = verify(perfectRead().withOption(auto) { it.copy(priceMin = 140, priceMax = 140, priceStruckText = "₹110") })
+        assertNotVerified(swapped, "Auto", GateFailure.PRICE_MISMATCH)
+        assertTrue(GateFailure.STRUCK_CONFLICT in swapped.row("Auto").failures)
+        assertTrue("never the struck number", swapped.rows.none { it.price == 140..140 })
+        assertEquals(QuoteStatus.VERIFIED, swapped.row("Bike").status)
+        // A takes the struck ₹140 as payable but leaves price_struck_text empty: still no number.
+        val struckOnly = verify(perfectRead().withOption(auto) { it.copy(priceMin = 140, priceMax = 140, priceStruckText = null) })
+        assertNotVerified(struckOnly, "Auto", GateFailure.PRICE_MISMATCH)
+        assertTrue(struckOnly.rows.none { it.price == 140..140 })
+    }
+
+    @Test
+    fun `rule b - the parser's payable that A names as struck is not shown`() {
+        // Equal heights and no OCR-visible strike: the parser takes the struck ₹150 (FareParserTest), A sees the strike.
+        val unmarked = FrameBuilder().line(150, 600, 40, "Auto")
+            .right("₹150", 1000, 596, 48).right("₹110", 860, 596, 48).build()
+        val honestA = perfectRead(unmarked).withOption(0) { it.copy(priceMin = 110, priceMax = 110, priceStruckText = "₹150") }
+        val result = verify(honestA, unmarked)
+        assertNotVerified(result, "Auto", GateFailure.STRUCK_CONFLICT)
+        assertTrue(GateFailure.PRICE_MISMATCH in result.rows.single().failures)
+        assertNull("another look cannot settle which number is payable", VerificationGate.planReread(result, NOW - 1_000, NOW, false))
+
+        // Even when A's price matches the parser, A naming that same amount as struck blocks it, in any written form.
+        for (struck in listOf("₹150", "Rs 150", "150", "~₹150~", "₹1̶5̶0̶")) {
+            val contradictory = perfectRead(unmarked).withOption(0) { it.copy(priceStruckText = struck) }
+            val row = verify(contradictory, unmarked).rows.single()
+            assertEquals(struck, QuoteStatus.UNREADABLE, row.status)
+            assertEquals(struck, setOf(GateFailure.STRUCK_CONFLICT), row.failures)
+            assertNull(row.price)
+        }
+        // A struck price that differs from the payable one is fine (the fixture's ₹140 next to ₹110).
+        assertEquals(QuoteStatus.VERIFIED, verify(perfectRead()).row("Auto").status)
+        assertEquals("₹140", perfectRead().options[auto].priceStruckText)
+        // Unparseable struck text says nothing about the payable price.
+        assertEquals(QuoteStatus.VERIFIED, verify(perfectRead().withOption(auto) { it.copy(priceStruckText = "was cheaper") }).row("Auto").status)
+    }
+
+    @Test
+    fun `a re-read cannot verify a row whose payable A called struck`() {
+        val unmarked = FrameBuilder().line(150, 600, 40, "Auto")
+            .right("₹150", 1000, 596, 48).right("₹110", 860, 596, 48).build()
+        // The label disagreement alone would be worth a re-read; the struck conflict is not, so no crop is sent and an
+        // answer for the row (agreeing with the parser's ₹150) is ignored.
+        val read = perfectRead(unmarked).withOption(0) { it.copy(labelText = "Bike", priceStruckText = "₹150") }
+        val first = verify(read, unmarked)
+        assertTrue(GateFailure.STRUCK_CONFLICT in first.rows.single().failures)
+        assertNull(VerificationGate.planReread(first, NOW - 1_000, NOW, false))
+        val reread = VerificationGate.applyReread(first, RereadResponse(listOf(RereadRow("r0", VehicleClass.AUTO, "Auto", 150, 150, null))))
+        assertEquals(QuoteStatus.UNREADABLE, reread.rows.single().status)
+    }
+
+    @Test
     fun `rule b - the payable token must sit inside A's box plus 4 percent`() {
         val box = perfectRead().options[auto].bbox!!
         // Shifted 5% sideways and down: the token centre is now outside the tolerance.
