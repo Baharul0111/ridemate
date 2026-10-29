@@ -264,4 +264,13 @@
     <string name="guardian_screen_next_reminder">Next reminder at %1$s (IST)</string>
     <string name="guardian_screen_generation">Driver changes: %1$d</string>
     <string name="guardian_screen_dismiss_notice">Dismiss update</string>
+    <!-- Redesign: short labels for the icon-led guardian screen and sheets. -->
+    <string name="guardian_hero_found">Driver found</string>
+    <string name="guardian_hero_eta">%1$d min</string>
+    <string name="guardian_reminders_open">%1$d still open</string>
+    <string name="guardian_reminders_next">Next %1$s</string>
+    <string name="guardian_why_description">More details</string>
+    <string name="guardian_better_now">Now</string>
+    <string name="guardian_better_new">New</string>
+    <string name="guardian_step_number">Step %1$d</string>
 </resources>

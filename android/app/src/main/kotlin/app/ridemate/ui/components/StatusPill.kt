@@ -80,7 +80,8 @@ val RideState.group: RideStateGroup
         RideState.BOOK_REQUESTED, RideState.SEARCHING, RideState.SEARCHING_NET, RideState.ON_SELECT, RideState.INIT,
         RideState.CONFIRMED,
         -> RideStateGroup.SEARCHING
-        RideState.MAYBE_ASSIGNED, RideState.MAYBE_CHANGED, RideState.MAYBE_NEW_DRIVER, RideState.CANCEL_UNCONFIRMED ->
+        RideState.MAYBE_ASSIGNED, RideState.MAYBE_CHANGED, RideState.MAYBE_NEW_DRIVER, RideState.MAYBE_BOOKED, RideState.CANCEL_UNCONFIRMED,
+        ->
             RideStateGroup.CHECK_APP
         RideState.ASSIGNED, RideState.ARRIVING -> RideStateGroup.DRIVER_COMING
         RideState.ON_TRIP -> RideStateGroup.ON_TRIP
