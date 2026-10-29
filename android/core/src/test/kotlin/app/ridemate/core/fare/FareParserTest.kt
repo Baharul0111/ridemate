@@ -161,6 +161,52 @@ class FareParserTest {
     }
 
     @Test
+    fun `with the rupee glyph dropped or misread, labelled rows take bare amounts from the price column`() {
+        // Real ML Kit output on the phone (eval/recorded/ocr): no ₹ token on the whole screen.
+        val read = parser.parse(
+            fareScreen(
+                listOf(
+                    RowSpec("Bike", "112", struck = "135"),
+                    RowSpec("Auto", "180-210"),
+                    RowSpec("Mini", "7289"),
+                    RowSpec("Cab Economy", "{264"),
+                ),
+            ),
+        )
+        val rows = read.rows
+        assertEquals(listOf(112..112, 180..210, 289..289, 264..264), rows.map { it.price!!.amount.range })
+        assertTrue(AmountFlag.NO_CURRENCY_MARKER in rows[0].price!!.amount.flags)
+        assertTrue(AmountFlag.CURRENCY_FROM_LEADING_TWO in rows[2].price!!.amount.flags)
+        assertTrue(AmountFlag.OCR_CURRENCY_CONFUSION in rows[3].price!!.amount.flags)
+        // The struck price sits on the line below the label: passed over, never the payable.
+        assertEquals(135, rows[0].ignoredPrices.single().price.amount.min)
+
+        // Mixed with ₹ payables, a bare amount must also be at their height.
+        val mixed = parser.parse(fareScreen(listOf(RowSpec("Bike", "₹45"), RowSpec("Auto", "176"), RowSpec("Mini", "T272"))))
+        assertEquals(listOf(45, 176, 272), mixed.rows.map { it.price!!.amount.min })
+        val short = parser.parse(fareScreen(listOf(RowSpec("Bike", "₹45"), RowSpec("Auto", "176", priceHeight = 28))))
+        assertNull(short.rows[1].price)
+    }
+
+    @Test
+    fun `a bare number is never a price on its own or outside the price column`() {
+        // One row: no column to line up with.
+        assertNull(parser.parse(fareScreen(listOf(RowSpec("Auto", "176")))).rows.single().price)
+        // Left half of the screen (a code or a count), even when two rows line up.
+        val left = FrameBuilder()
+            .line(150, 400, 40, "Bike").right("4821", 500, 396, 48)
+            .line(150, 600, 40, "Auto").right("5302", 500, 596, 48)
+            .build()
+        assertTrue(parser.parse(left).rows.all { it.price == null })
+        // Not aligned with anything else: no partner, no price.
+        val ragged = FrameBuilder()
+            .line(150, 400, 40, "Bike").right("112", 1000, 396, 48)
+            .line(150, 600, 40, "Auto").right("180", 800, 596, 48)
+            .build()
+        assertTrue(parser.parse(ragged).rows.all { it.price == null })
+    }
+
+    @Test
     fun `reads Devanagari digits, Hindi ETAs and decimals`() {
         val read = parser.parse(
             fareScreen(

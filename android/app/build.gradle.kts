@@ -26,6 +26,9 @@ android {
         versionCode = 1
         versionName = "1.0.0-hackathon"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        // The on-phone suite runs in a fixed order (fresh-install onboarding first); see app.ridemate.e2e.DeviceTestSuite.
+        // One class can still be run with -Pandroid.testInstrumentationRunnerArguments.class=<class>.
+        testInstrumentationRunnerArguments["class"] = "app.ridemate.e2e.DeviceTestSuite"
         ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a") }
         buildConfigField("String", "GITHUB_REPO", "\"Baharul0111/ridemate\"")
         buildConfigField("String", "PRIVACY_EMAIL", "\"ibaharul567@gmail.com\"")

@@ -130,6 +130,17 @@ class RideWatchPipelineTest {
     }
 
     @Test
+    fun `dedupe is per session - the same post in the next session is an event again`() = runTest {
+        val rig = Rig(this)
+        rig.leg(Fixtures.RAPIDO)
+        assertEquals(PostOutcome.EVENT, rig.post(Fixtures.RAPIDO, "r1", "Looking for a captain", "elapsed 00:02").outcome)
+        assertEquals(PostOutcome.DUPLICATE_DROPPED, rig.post(Fixtures.RAPIDO, "r1", "Looking for a captain", "elapsed 00:03").outcome)
+        // Try the demo twice in a row posts the same words on the same keys: the second run must see them.
+        rig.pipeline.onSessionStarted()
+        assertEquals(PostOutcome.EVENT, rig.post(Fixtures.RAPIDO, "r1", "Looking for a captain", "elapsed 00:04").outcome)
+    }
+
+    @Test
     fun `a new plate with the same masked wording is not a repeat, a new countdown only refreshes numbers`() = runTest {
         val plateSpans = TextMasker { text -> Regex("[A-Z]{2}\\d{2}[A-Z]{2}\\d{4}").findAll(text).map { it.range }.toList() }
         val rig = Rig(this, masker = plateSpans)

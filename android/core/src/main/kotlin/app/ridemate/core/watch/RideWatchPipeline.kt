@@ -115,6 +115,18 @@ class RideWatchPipeline(
             .forEach { process(it, replayed = true) }
     }
 
+    /**
+     * A new ride session starts. Exact-repeat dedupe (§4.5.9) is per session: the last posts of an earlier session must
+     * not make an identical first post of this one look like a repeat — Try the demo posts the same words on the same
+     * keys every run, and a ride app may reuse a key and its wording for the next ride. The demo apps' ongoing posts
+     * ended with their session too (their shade is scripted); live apps' ongoing posts are still in the shade.
+     */
+    fun onSessionStarted() {
+        lastFingerprint.clear()
+        lastIdTag.clear()
+        DEMO_PACKAGES.forEach { ongoing.remove(it) }
+    }
+
     /** The app calls `requestRebind` after this; nothing is lost because reconnect re-reads every active post. */
     fun onListenerDisconnected() {
         listenerConnected = false

@@ -5,10 +5,10 @@ enum class AmountFlag {
     /** Devanagari or Bengali digits were converted. */
     NATIVE_DIGITS,
 
-    /** A leading `Z`, `R` or `%` directly before a digit was read as ₹ (M5). */
+    /** A leading `Z`, `R` or `%` directly before a digit was read as ₹ (M5); in the price column also `{ [ ( < T`. */
     OCR_CURRENCY_CONFUSION,
 
-    /** A leading `2` was read as ₹ because the caller's layout context said so (never on text alone). */
+    /** A leading `2` (or, in the price column, `7`) was read as ₹ because the caller's layout context said so (never on text alone). */
     CURRENCY_FROM_LEADING_TWO,
 
     /** Paise were rounded half-up to whole rupees (see [RupeeParser]). */
@@ -32,6 +32,16 @@ enum class CurrencyContext {
      * ML Kit's misread of ₹ (`₹110` → `2110`). Only the fare parser sets this, from row geometry.
      */
     LEADING_TWO_IS_RUPEE,
+
+    /**
+     * The token sits in the price column of a fare row that has no ₹ token: the phone's ML Kit dropped the ₹ glyph
+     * (`₹176` → `176`) or read it as another glyph (`₹264` → `{264`, `₹272` → `T272`, `₹289` → `7289`), as recorded
+     * in `eval/recorded/ocr`. A leading `{`, `[`, `(`, `<` or `T` before a digit is the ₹; so is a leading `2` or `7`
+     * on a comma-less amount of 4+ digits (Indian apps group amounts from 1,000 up); otherwise the bare number is
+     * the amount ([AmountFlag.NO_CURRENCY_MARKER]). Only the fare parser sets this, from row geometry, and the gate
+     * still needs Channel A's independent read to agree before any number is shown.
+     */
+    PRICE_COLUMN,
 }
 
 /** A parsed rupee amount in whole rupees; [min] == [max] unless the screen showed a range. */
@@ -64,6 +74,8 @@ object RupeeParser {
     private val WESTERN = Regex("^\\d{1,3}(?:,\\d{3})+$")
     private val CONFUSED_MARKER = Regex("^[ZzR%](?=\\d)")
     private val LEADING_TWO = Regex("^2(?=\\d)")
+    private val COLUMN_GLYPH = Regex("^[{\\[(<T](?=\\d)")
+    private val COLUMN_LEADING_DIGIT = Regex("^[27](?=\\d{3,}(?:\\.\\d{1,2})?(?:\\s*(?:-|–|—|−).*)?$)")
     private const val MAX_INT_DIGITS = 9
 
     fun parse(
@@ -83,10 +95,16 @@ object RupeeParser {
         } else if (context == CurrencyContext.LEADING_TWO_IS_RUPEE && LEADING_TWO.containsMatchIn(s)) {
             s = "₹" + s.substring(1)
             flags += AmountFlag.CURRENCY_FROM_LEADING_TWO
+        } else if (context == CurrencyContext.PRICE_COLUMN && COLUMN_GLYPH.containsMatchIn(s)) {
+            s = "₹" + s.substring(1)
+            flags += AmountFlag.OCR_CURRENCY_CONFUSION
+        } else if (context == CurrencyContext.PRICE_COLUMN && COLUMN_LEADING_DIGIT.containsMatchIn(s)) {
+            s = "₹" + s.substring(1)
+            flags += AmountFlag.CURRENCY_FROM_LEADING_TWO
         }
         val m = AMOUNT.matchEntire(s) ?: return null
         if (m.groups[1] == null) {
-            if (requireCurrency) return null
+            if (requireCurrency && context != CurrencyContext.PRICE_COLUMN) return null
             flags += AmountFlag.NO_CURRENCY_MARKER
         }
         val first = number(m.groupValues[2], flags) ?: return null

@@ -451,6 +451,7 @@ class GuardianRuntime(
         require(providers.isNotEmpty()) { "a session needs at least one provider" }
         g.startSession(spec.sessionId, providers, spec.keepSearching, demo)
         pipeline.demoSessionActive = demo
+        pipeline.onSessionStarted()
         startRefused = false
         stopRequested = false
         closedAtUtc = null

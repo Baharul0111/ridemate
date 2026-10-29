@@ -48,7 +48,10 @@ import java.time.Instant
  * Without fixtures the test is skipped, unless `-PrequireFixtures=true` (system property ridemate.requireFixtures).
  *
  * Every suite's outcomes are written to `android/core/build/accuracy/<suite>.json` in the format of
- * `eval/harness/README.md` (enum outcomes and booleans only, never a fare) for `eval/harness/summarize.py`.
+ * `eval/harness/README.md` (enum outcomes and booleans only, never a fare) for `eval/harness/summarize.py`. The
+ * `recorded` suite repeats the demo entries whose OCR is real ML Kit output recorded on the phone
+ * (`eval/recorded/ocr`) and whose Channel A read is a real recorded Muse Spark Open read (`eval/recorded/channel_a`):
+ * the pair the phone itself produces.
  */
 class AccuracyTest {
     private val repoRoot = File(System.getProperty("ridemate.repoRoot") ?: ".")
@@ -139,7 +142,12 @@ class AccuracyTest {
                         tally.verified += result.verifiedCount
                         val wrong = wrongShown(screen, result, read.mustNotVerify + frame.mustNotVerify)
                         tally.wrong += wrong
-                        entries += resultEntry(screen, result, read.mustNotVerify + frame.mustNotVerify)
+                        val entry = resultEntry(screen, result, read.mustNotVerify + frame.mustNotVerify)
+                        entries += entry
+                        // The phone's own pair: real ML Kit OCR recorded on the device × a real Muse Spark Open read.
+                        if (frame.file.isUnder(RECORDED_OCR) && read.file.isUnder(RECORDED_CHANNEL_A)) {
+                            results.getOrPut(RECORDED_SUITE) { mutableListOf() } += entry
+                        }
                         if (wrong > 0) problems += "${frame.file.name} × ${read.file.name}: $wrong wrong-shown"
                     }
                 }
@@ -304,11 +312,16 @@ class AccuracyTest {
         if (requireFixtures) assertTrue("fixtures required: $why", condition) else assumeTrue(why, condition)
     }
 
+    private fun File.isUnder(dir: String): Boolean = parentFile?.canonicalFile == File(repoRoot, dir).canonicalFile
+
     private fun JsonObject.string(key: String): String? = (this[key] as? JsonPrimitive)?.contentOrNull
 
     private fun JsonObject.int(key: String): Int? = (this[key] as? JsonPrimitive)?.intOrNull
 
     private companion object {
+        const val RECORDED_SUITE = "recorded"
+        const val RECORDED_OCR = "eval/recorded/ocr"
+        const val RECORDED_CHANNEL_A = "eval/recorded/channel_a"
         const val NOW = 1_793_000_000_000L
         val NON_WORD = Regex("[^\\p{L}\\p{M}\\p{Nd}]+")
     }

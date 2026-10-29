@@ -228,6 +228,33 @@ class DemoSessionEndToEndTest {
     }
 
     @Test
+    fun `a second demo run in the same process still proves its cancels by rung 2`() {
+        // The script posts the same words on the same keys every run; the first run's posts must not make the second
+        // run's "Trip cancelled" look like a repeat (found on the phone: the second run fell back to rung 3).
+        val c = graph.demoController
+        repeat(2) { run ->
+            assertEquals(DemoStartResult.STARTED, c.start(DemoTrackChoice.MAIN))
+            settle()
+            for (provider in listOf(DEMO_KESTREL, DEMO_PEPPER, DEMO_TAMARIND)) {
+                c.bookedHere(provider)
+                settle()
+            }
+            advance(9_000)
+            val sheet = runtime.uiState.value.items.filterIsInstance<DriverSheetItem>().single()
+            runtime.perform(GuardianTap(TapScope.SHEET, sheet.id, UiAction.YES_CANCEL_OTHERS))
+            settle()
+            eventually("cancel guide, run ${run + 1}") { c.state.value.app?.provider == DEMO_KESTREL && c.state.value.app?.purpose == DemoAppPurpose.CANCEL }
+            c.tapCancelRide(DEMO_KESTREL)
+            advance(2_000)
+            assertEquals("run ${run + 1}", RideState.CANCEL_CONFIRMED, leg(DEMO_KESTREL).state)
+            assertEquals("run ${run + 1}", EvidenceRung.TEMPLATE, leg(DEMO_KESTREL).evidence)
+            c.stop()
+            settle()
+            eventually("demo session ended, run ${run + 1}") { !runtime.status.value.sessionOpen }
+        }
+    }
+
+    @Test
     fun `demo posts are dropped outside a demo session (I7)`() {
         runtime.onDemoPost(BundledAssets.script.track("main")!!.events.first().toSnapshot(1L, 1L))
         settle()

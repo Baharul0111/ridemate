@@ -94,6 +94,29 @@ class RupeeParserTest {
     }
 
     @Test
+    fun `the price column reads ML Kit's rupee-glyph misreads and bare amounts, never text alone`() {
+        // Recorded on the phone (eval/recorded/ocr): ₹264 → {264, ₹272 → T272, ₹289 → 7289, ₹176 → 176.
+        val col = CurrencyContext.PRICE_COLUMN
+        assertEquals(264, RupeeParser.parse("{264", col)!!.min)
+        assertEquals(setOf(OCR_CURRENCY_CONFUSION), RupeeParser.parse("T272", col)!!.flags)
+        assertEquals(272, RupeeParser.parse("T272", col)!!.min)
+        assertEquals(289, RupeeParser.parse("7289", col)!!.min)
+        assertEquals(setOf(CURRENCY_FROM_LEADING_TWO), RupeeParser.parse("7289", col)!!.flags)
+        assertEquals(110, RupeeParser.parse("2110", col)!!.min)
+        assertEquals(setOf(NO_CURRENCY_MARKER), RupeeParser.parse("176", col)!!.flags)
+        assertEquals(180..210, RupeeParser.parse("180-210", col)!!.range)
+        assertEquals(1040, RupeeParser.parse("1,040", col)!!.min)
+        // A leading 2/7 is the ₹ only on a comma-less amount of 4+ digits: 789 and 7,289 stay as written.
+        assertEquals(789, RupeeParser.parse("789", col)!!.min)
+        assertEquals(7289, RupeeParser.parse("7,289", col)!!.min)
+        // Without the layout context none of these is an amount.
+        assertNull(RupeeParser.parse("{264"))
+        assertNull(RupeeParser.parse("T272"))
+        assertNull(RupeeParser.parse("176"))
+        assertEquals(7289, RupeeParser.parse("7289", requireCurrency = false)!!.min)
+    }
+
+    @Test
     fun `bare numbers parse only on request`() {
         assertEquals(123456, RupeeParser.parseNumber("1,23,456"))
         assertEquals(120, RupeeParser.parseNumber("१२०"))

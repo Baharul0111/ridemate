@@ -30,6 +30,13 @@ import kotlin.math.abs
  * In each row the payable price is the tallest ₹ token, then the rightmost. A ₹ token shorter than
  * `strike_height_ratio` × the row's tallest is treated as struck through, as is one crossed by a strike marker
  * token or written with combining strokes; neither is ever selected.
+ *
+ * Price column (real ML Kit output, `eval/recorded/ocr`): the phone's OCR often drops the ₹ glyph or reads it as
+ * another glyph, so a fare screen can carry no ₹ token at all. A labelled row with no ₹ payable may then take a bare
+ * amount ([CurrencyContext.PRICE_COLUMN]) from the right half of the frame, but only when its right edge lines up
+ * (± 3% of the frame width) with a price or bare amount of another labelled row, and, when other rows have ₹
+ * payables, only at their height (± 15%). Amounts on the label's own visual line come first (struck prices sit on
+ * the line below), then the tallest, then the rightmost. A lone bare number is never a price.
  */
 class FareParser(val entry: FareParserEntry) {
     private val labelRules: List<Pair<Pattern, VehicleClass>> =
@@ -70,8 +77,9 @@ class FareParser(val entry: FareParserEntry) {
         fun read(): FareRead {
             val groups = rowGroups()
             val firstPass = groups.map { choosePayable(it.flatMap { i -> candidates[i] }, it.flatMap { i -> markers[i] }) }
+            val withTwo = groups.mapIndexed { g, lineIdx -> withLeadingTwo(g, lineIdx, firstPass) }
             val rows = groups.mapIndexedNotNull { g, lineIdx ->
-                val chosen = withLeadingTwo(g, lineIdx, firstPass)
+                val chosen = withPriceColumn(groups, g, withTwo)
                 val label = lineIdx.firstNotNullOfOrNull { labels[it] }
                 if (label == null && chosen.first == null && chosen.second.isEmpty()) return@mapIndexedNotNull null
                 val ids = lineIdx.flatMap { lines[it].tokenIds }
@@ -162,6 +170,48 @@ class FareParser(val entry: FareParserEntry) {
             }.mapNotNull(::leadingTwoOf)
             if (extra.isEmpty()) return own
             return choosePayable(lineIdx.flatMap { candidates[it] } + extra, lineIdx.flatMap { markers[it] })
+        }
+
+        /**
+         * A labelled row still without a payable: a bare amount from the price column (see the class comment), or
+         * the row as it was. The bare amounts it passes over are kept as ignored prices.
+         */
+        private fun withPriceColumn(
+            groups: List<List<Int>>,
+            group: Int,
+            chosen: List<Pair<PriceToken?, List<IgnoredPrice>>>,
+        ): Pair<PriceToken?, List<IgnoredPrice>> {
+            val own = chosen[group]
+            if (own.first != null) return own
+            val label = groups[group].firstNotNullOfOrNull { labels[it] } ?: return own
+            val mine = columnCandidates(groups[group])
+            if (mine.isEmpty()) return own
+            val marked = chosen.filterIndexed { i, _ -> i != group }.mapNotNull { it.first }
+            val markedHeight = median(marked.map { it.box.height.toDouble() })
+            val partners = marked.map { it.box } + groups.indices.filter { h ->
+                h != group && chosen[h].first == null && groups[h].any { labels[it] != null }
+            }.flatMap { h -> columnCandidates(groups[h]).map { it.price.box } }
+            val inColumn = mine.filter { c ->
+                partners.any { abs(it.r - c.price.box.r) <= LEADING_TWO_COLUMN * frame.width } &&
+                    (markedHeight == null || c.price.box.height / markedHeight in LEADING_TWO_HEIGHT)
+            }
+            if (inColumn.isEmpty()) return own
+            val onLabelLine = inColumn.filter {
+                it.price.box.verticalOverlap(label.box) >= 0.5 * minOf(it.price.box.height, label.box.height).coerceAtLeast(1)
+            }
+            val pool = onLabelLine.ifEmpty { inColumn }
+            val (payable, ignored) = choosePayable(pool, groups[group].flatMap { markers[it] })
+            val passedOver = (inColumn - pool.toSet()).map { IgnoredPrice(it.price, IgnoredReason.NOT_SELECTED) }
+            return payable to (own.second + ignored + passedOver)
+        }
+
+        /** Bare amounts (no ₹ token) in the right half of the frame on [lineIdx], read in the price-column context. */
+        private fun columnCandidates(lineIdx: List<Int>): List<Candidate> = lineIdx.flatMap { pieces[it] }.mapNotNull { piece ->
+            if (piece.ids.any { it in priceTokenIds } || piece.box.l < frame.width / 2) return@mapNotNull null
+            val text = Digits.toAscii(normalizeSpaces(piece.text.trim()))
+            if (!BARE_AMOUNT.matches(text)) return@mapNotNull null
+            val amount = RupeeParser.parse(text, CurrencyContext.PRICE_COLUMN) ?: return@mapNotNull null
+            Candidate(PriceToken(amount, piece.ids, piece.box, piece.text), struckByText = false)
         }
 
         private fun choosePayable(found: List<Candidate>, strikeMarks: List<Box>): Pair<PriceToken?, List<IgnoredPrice>> {
@@ -306,6 +356,9 @@ class FareParser(val entry: FareParserEntry) {
         private val ENDS_DASH = Regex("\\d\\s*(?:-|–|—|−)$")
         private val DECIMAL_TAIL = Regex("^\\.\\d{1,2}(?!\\d)")
         private val LEADING_TWO = Regex("^2\\d[\\d,]*(?:\\.\\d{1,2})?$")
+
+        /** A bare amount or range, optionally led by one glyph ML Kit makes of ₹ (`{264`, `T272`, `180-210`). */
+        private val BARE_AMOUNT = Regex("^[{\\[(<T]?\\d[\\d,]*(?:\\.\\d{1,2})?(?:\\s*(?:-|–|—|−)\\s*\\d[\\d,]*(?:\\.\\d{1,2})?)?$")
         private val STRIKE_MARKER = Regex("^[-–—―−_~=]+$")
         private val TILDE_WRAPPED = Regex("^~.+~$")
         private const val STROKES = "̵̶̸"
