@@ -9,15 +9,12 @@
     <string name="home_warnings_heading">Before you compare</string>
     <string name="home_continue_anyway">Continue anyway</string>
     <string name="home_check_close">Close</string>
-
-    <string name="home_demo_title">Try the demo</string>
     <string name="home_demo_body">See RideMate read prices, find a driver, guide a cancel and offer a better ride, using made-up sample screens. No ride app or sign-in needed.</string>
     <string name="home_demo_off">The demo is switched off for now. Try again later.</string>
     <string name="home_try_demo">Try the demo</string>
     <string name="home_try_demo_cd">Try the demo with made-up sample screens</string>
 
     <string name="home_session_title">Ride in progress</string>
-    <string name="home_session_body">To %1$s · %2$s · started %3$s</string>
     <string name="home_session_open">Open ride guardian</string>
 
     <string name="home_update_download">Download update</string>
@@ -37,8 +34,6 @@
     <string name="home_ai_retry">Check again</string>
     <string name="home_sign_in">Sign in with Google</string>
     <string name="home_guardian_keeps_working">The ride guardian and cancel reminders keep working.</string>
-
-    <string name="home_status_heading">Feature status</string>
     <string name="home_switch_on">On</string>
     <string name="home_switch_off">Off</string>
     <string name="home_switch_ai">AI reading</string>
@@ -68,4 +63,13 @@
     <string name="home_issue_offline_title">You\'re offline</string>
     <string name="home_issue_offline_body">Ride apps and AI reading need the internet. Connect, then check again.</string>
     <string name="home_issue_offline_action">Check again</string>
+
+    <!-- Redesigned Home (one glance, one tap). -->
+    <string name="home_about_cd">How RideMate works</string>
+    <string name="home_about_title">How RideMate works</string>
+    <string name="home_about_close">Got it</string>
+    <string name="home_session_to">To %1$s</string>
+    <string name="home_session_started">Started %1$s</string>
+    <string name="home_why_cd">Why: %1$s</string>
+    <string name="home_recent_area">Recent</string>
 </resources>

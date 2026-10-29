@@ -42,4 +42,5 @@
 
     <string name="precheck_fix_description">%1$s: %2$s</string>
     <string name="precheck_settings_missing">This phone has no such settings screen. Open Settings, find RideMate and change it there.</string>
+    <string name="precheck_why_cd">Why: %1$s</string>
 </resources>
