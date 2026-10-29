@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Hero: permissions. A phone with three switches (two on) and a bell. In-house art. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="240dp" android:height="160dp"
+    android:viewportWidth="240" android:viewportHeight="160">
+    <path android:fillColor="@color/rm_illo_bg"
+        android:pathData="M50,84a70,70 0 1,0 140,0a70,70 0 1,0 -140,0z" />
+    <!-- Phone -->
+    <path android:fillColor="@color/rm_illo_ink"
+        android:pathData="M96,16h48a12,12 0 0,1 12,12v104a12,12 0 0,1 -12,12h-48a12,12 0 0,1 -12,-12v-104a12,12 0 0,1 12,-12z" />
+    <path android:fillColor="@color/rm_illo_sheet"
+        android:pathData="M95,26h50a6,6 0 0,1 6,6v98a6,6 0 0,1 -6,6h-50a6,6 0 0,1 -6,-6v-98a6,6 0 0,1 6,-6z" />
+    <!-- Rows: icon, label, switch -->
+    <path android:fillColor="@color/rm_illo_brand_soft"
+        android:pathData="M97,48a6,6 0 1,0 12,0a6,6 0 1,0 -12,0zM97,78a6,6 0 1,0 12,0a6,6 0 1,0 -12,0zM97,108a6,6 0 1,0 12,0a6,6 0 1,0 -12,0z" />
+    <path android:fillColor="@color/rm_illo_muted"
+        android:pathData="M114,46h10a2,2 0 0,1 0,4h-10a2,2 0 0,1 0,-4zM114,76h10a2,2 0 0,1 0,4h-10a2,2 0 0,1 0,-4zM114,106h10a2,2 0 0,1 0,4h-10a2,2 0 0,1 0,-4z" />
+    <path android:fillColor="@color/rm_illo_brand"
+        android:pathData="M135,42h6a6,6 0 0,1 0,12h-6a6,6 0 0,1 0,-12zM135,72h6a6,6 0 0,1 0,12h-6a6,6 0 0,1 0,-12z" />
+    <path android:fillColor="@color/rm_illo_line"
+        android:pathData="M135,102h6a6,6 0 0,1 0,12h-6a6,6 0 0,1 0,-12z" />
+    <path android:fillColor="@color/rm_illo_sheet"
+        android:pathData="M137,48a4,4 0 1,0 8,0a4,4 0 1,0 -8,0zM137,78a4,4 0 1,0 8,0a4,4 0 1,0 -8,0z" />
+    <path android:fillColor="@color/rm_illo_muted"
+        android:pathData="M131,108a4,4 0 1,0 8,0a4,4 0 1,0 -8,0z" />
+    <!-- Bell -->
+    <path android:fillColor="@color/rm_illo_accent"
+        android:pathData="M150,30a14,14 0 1,0 28,0a14,14 0 1,0 -28,0z" />
+    <path android:fillColor="@color/rm_illo_ink"
+        android:pathData="M164,21c-3.3,0 -6,2.7 -6,6v4l-2,2v1h16v-1l-2,-2v-4c0,-3.3 -2.7,-6 -6,-6zM161.5,35.5h5a2.5,2.5 0 0,1 -5,0z" />
+    <!-- Dots -->
+    <path android:fillColor="@color/rm_illo_brand"
+        android:pathData="M61,52a3,3 0 1,0 6,0a3,3 0 1,0 -6,0z" />
+    <path android:fillColor="@color/rm_illo_brand_soft"
+        android:pathData="M176,118a4,4 0 1,0 8,0a4,4 0 1,0 -8,0z" />
+    <path android:fillColor="@color/rm_illo_accent"
+        android:pathData="M55.5,116a2.5,2.5 0 1,0 5,0a2.5,2.5 0 1,0 -5,0z" />
+</vector>

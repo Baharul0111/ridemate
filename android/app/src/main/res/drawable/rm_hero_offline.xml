@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Hero: offline. A cloud crossed out. In-house art. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="240dp" android:height="160dp"
+    android:viewportWidth="240" android:viewportHeight="160">
+    <path android:fillColor="@color/rm_illo_bg"
+        android:pathData="M50,84a70,70 0 1,0 140,0a70,70 0 1,0 -140,0z" />
+    <!-- Cloud: three circles over a flat base -->
+    <path android:fillColor="@color/rm_illo_muted"
+        android:pathData="M78,88a22,22 0 1,0 44,0a22,22 0 1,0 -44,0zM100,74a28,28 0 1,0 56,0a28,28 0 1,0 -56,0zM136,90a20,20 0 1,0 40,0a20,20 0 1,0 -40,0zM100,88v22h56v-22z" />
+    <!-- Slash with a gap so it reads on the cloud -->
+    <path android:strokeColor="@color/rm_illo_bg" android:strokeWidth="16" android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M90,44L156,118" />
+    <path android:strokeColor="@color/rm_illo_warn" android:strokeWidth="8" android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M90,44L156,118" />
+    <!-- Dots -->
+    <path android:fillColor="@color/rm_illo_accent"
+        android:pathData="M181,46a4,4 0 1,0 8,0a4,4 0 1,0 -8,0z" />
+    <path android:fillColor="@color/rm_illo_brand_soft"
+        android:pathData="M52,118a3,3 0 1,0 6,0a3,3 0 1,0 -6,0zM184,120a3,3 0 1,0 6,0a3,3 0 1,0 -6,0z" />
+</vector>

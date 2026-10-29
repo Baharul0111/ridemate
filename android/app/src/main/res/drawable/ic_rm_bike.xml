@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- RideMate in-house glyph: motorbike, side view facing right: seat and tank, engine, fork and handlebar
+     (24 dp grid). Tinted by the caller. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp" android:height="24dp"
+    android:viewportWidth="24" android:viewportHeight="24">
+    <!-- Wheels -->
+    <path android:fillColor="#FF000000" android:fillType="evenOdd"
+        android:pathData="M1.8,16.5a3.2,3.2 0 1,0 6.4,0a3.2,3.2 0 1,0 -6.4,0zM3.6,16.5a1.4,1.4 0 1,1 2.8,0a1.4,1.4 0 1,1 -2.8,0zM15.8,16.5a3.2,3.2 0 1,0 6.4,0a3.2,3.2 0 1,0 -6.4,0zM17.6,16.5a1.4,1.4 0 1,1 2.8,0a1.4,1.4 0 1,1 -2.8,0z" />
+    <!-- Seat and tank -->
+    <path android:fillColor="#FF000000"
+        android:pathData="M4.5,12.1V11.2C4.5,10.6 5,10.2 5.6,10.2H10L11.2,9.2H14.6C15.3,9.2 15.8,9.7 15.8,10.4V11.6L13.4,13.6H6C5.2,13.6 4.5,12.9 4.5,12.1Z" />
+    <!-- Engine -->
+    <path android:fillColor="#FF000000"
+        android:pathData="M9,13.4H13.4L12.4,16H9.6Z" />
+    <!-- Swingarm, fork and handlebar -->
+    <path android:strokeColor="#FF000000" android:strokeWidth="1.8" android:strokeLineCap="round"
+        android:strokeLineJoin="round" android:fillColor="#00000000"
+        android:pathData="M5,16.5L9.4,14.6M19,16.5L16.2,8.6M15,8.4H17.6" />
+</vector>

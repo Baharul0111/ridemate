@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Design tokens for XML-only surfaces (window background, illustrations). Compose reads Theme.kt. -->
+<resources>
+    <color name="rm_canvas">#FFF5F7F6</color>
+    <color name="rm_sheet">#FFFFFFFF</color>
+    <!-- Hero illustration palette (docs/design/ui-redesign.md §2), light. -->
+    <color name="rm_illo_bg">#FFE3F2EC</color>
+    <color name="rm_illo_brand">#FF0E6B57</color>
+    <color name="rm_illo_brand_soft">#FF9FD8C6</color>
+    <color name="rm_illo_accent">#FFF2B33D</color>
+    <color name="rm_illo_ink">#FF26302C</color>
+    <color name="rm_illo_sheet">#FFFFFFFF</color>
+    <color name="rm_illo_line">#FFDCE3DF</color>
+    <color name="rm_illo_muted">#FFA9B4AF</color>
+    <color name="rm_illo_good">#FF1E8E4E</color>
+    <color name="rm_illo_warn">#FFB26A00</color>
+</resources>

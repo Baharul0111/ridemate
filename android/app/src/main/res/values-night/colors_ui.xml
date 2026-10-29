@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="rm_canvas">#FF0E1110</color>
+    <color name="rm_sheet">#FF181C1A</color>
+    <!-- Hero illustration palette, dark. -->
+    <color name="rm_illo_bg">#FF13302A</color>
+    <color name="rm_illo_brand">#FF6FD3B8</color>
+    <color name="rm_illo_brand_soft">#FF2F7D6A</color>
+    <color name="rm_illo_accent">#FFF5C25E</color>
+    <color name="rm_illo_ink">#FF3A4440</color>
+    <color name="rm_illo_sheet">#FF1F2523</color>
+    <color name="rm_illo_line">#FF34403B</color>
+    <color name="rm_illo_muted">#FF6E7A75</color>
+    <color name="rm_illo_good">#FF5FD08F</color>
+    <color name="rm_illo_warn">#FFFFB74D</color>
+</resources>

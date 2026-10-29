@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Hero: privacy. A shield with a tick in front of a short notice. In-house art. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="240dp" android:height="160dp"
+    android:viewportWidth="240" android:viewportHeight="160">
+    <path android:fillColor="@color/rm_illo_bg"
+        android:pathData="M50,84a70,70 0 1,0 140,0a70,70 0 1,0 -140,0z" />
+    <!-- Notice card -->
+    <path android:fillColor="@color/rm_illo_sheet" android:strokeColor="@color/rm_illo_line" android:strokeWidth="2"
+        android:pathData="M66,40h48a8,8 0 0,1 8,8v72a8,8 0 0,1 -8,8h-48a8,8 0 0,1 -8,-8v-72a8,8 0 0,1 8,-8z" />
+    <path android:fillColor="@color/rm_illo_line"
+        android:pathData="M70,54h30a2,2 0 0,1 0,4h-30a2,2 0 0,1 0,-4zM70,66h36a2,2 0 0,1 0,4h-36a2,2 0 0,1 0,-4zM70,78h24a2,2 0 0,1 0,4h-24a2,2 0 0,1 0,-4zM70,90h32a2,2 0 0,1 0,4h-32a2,2 0 0,1 0,-4zM70,102h20a2,2 0 0,1 0,4h-20a2,2 0 0,1 0,-4z" />
+    <!-- Shield -->
+    <path android:fillColor="@color/rm_illo_brand"
+        android:pathData="M140,34L176,48V80C176,104 160,124 140,134C120,124 104,104 104,80V48Z" />
+    <path android:fillColor="@color/rm_illo_brand_soft" android:fillAlpha="0.45"
+        android:pathData="M140,34L176,48V80C176,104 160,124 140,134Z" />
+    <path android:strokeColor="@color/rm_illo_sheet" android:strokeWidth="8" android:strokeLineCap="round"
+        android:strokeLineJoin="round" android:fillColor="#00000000"
+        android:pathData="M124,84L136,96L158,72" />
+    <!-- Dots -->
+    <path android:fillColor="@color/rm_illo_accent"
+        android:pathData="M182,40a4,4 0 1,0 8,0a4,4 0 1,0 -8,0zM187,112a3,3 0 1,0 6,0a3,3 0 1,0 -6,0z" />
+    <path android:fillColor="@color/rm_illo_brand_soft"
+        android:pathData="M48,126a3,3 0 1,0 6,0a3,3 0 1,0 -6,0z" />
+</vector>

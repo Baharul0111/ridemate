@@ -17,4 +17,60 @@
 
     <string name="ui_update_required_title">Update RideMate</string>
     <string name="ui_update_required_body">This version can no longer compare prices or watch rides safely. Download the update below to keep using RideMate. Your privacy settings stay available meanwhile.</string>
+
+    <!-- Design-system components (app.ridemate.ui.components). Buttons are verbs, labels 1–3 words. -->
+    <string name="rm_where_to">Where to?</string>
+    <string name="rm_where_to_cd">Search where to go</string>
+    <string name="rm_voice_search">Say where to go</string>
+    <string name="rm_pickup">Pickup</string>
+    <string name="rm_drop">Drop</string>
+    <string name="rm_pickup_cd">Pickup: %1$s</string>
+    <string name="rm_drop_cd">Drop: %1$s</string>
+    <string name="rm_edit_place">Change</string>
+
+    <string name="rm_cheapest">Cheapest</string>
+    <string name="rm_check_in_app">Check in app</string>
+    <string name="rm_unreadable_cd">Couldn\'t read the price. Check in app</string>
+    <string name="rm_entered_by_you">You typed</string>
+    <string name="rm_network_quote">Network</string>
+    <string name="rm_seen_at">Seen %1$s</string>
+    <plurals name="rm_minutes_ago">
+        <item quantity="one">%d min ago</item>
+        <item quantity="other">%d min ago</item>
+    </plurals>
+    <string name="rm_old_price">Old price</string>
+    <string name="rm_refresh_price">Refresh %1$s price</string>
+    <string name="rm_type_price">Type price</string>
+    <string name="rm_open_app">Open %1$s</string>
+    <string name="rm_eta_min">%1$d min</string>
+    <string name="rm_eta_cd">Pickup in %1$d min</string>
+
+    <string name="rm_vehicle_bike">Bike</string>
+    <string name="rm_vehicle_auto">Auto</string>
+    <string name="rm_vehicle_cab">Cab</string>
+    <string name="rm_vehicle_cab_premium">Premium</string>
+    <string name="rm_vehicle_cab_xl">Cab XL</string>
+    <string name="rm_vehicle_other">Other</string>
+    <string name="rm_provider_demo_cd">%1$s, demo</string>
+
+    <string name="rm_state_not_booked">Not booked</string>
+    <string name="rm_state_searching">Searching</string>
+    <string name="rm_state_check_app">Check app</string>
+    <string name="rm_state_driver_coming">Driver coming</string>
+    <string name="rm_state_on_trip">On trip</string>
+    <string name="rm_state_cancelling">Cancelling</string>
+    <string name="rm_state_cancelled">Cancelled</string>
+    <string name="rm_state_driver_cancelled">Driver cancelled</string>
+    <string name="rm_state_ended">Trip ended</string>
+    <string name="rm_state_closed">No ride</string>
+
+    <string name="rm_leg_proven">Confirmed</string>
+    <string name="rm_leg_not_proven">Not confirmed yet</string>
+
+    <string name="rm_why">Why?</string>
+    <string name="rm_close">Close</string>
+    <string name="rm_dismiss">Dismiss</string>
+    <string name="rm_step_of">Step %1$d of %2$d</string>
+    <string name="rm_offline">Offline</string>
+    <string name="rm_retry">Retry</string>
 </resources>
