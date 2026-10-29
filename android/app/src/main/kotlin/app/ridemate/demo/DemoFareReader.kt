@@ -77,6 +77,8 @@ data class DemoReadResult(
     val seenAtMs: Long,
     /** SHA-256 of the uploaded bytes (equal to the bundled asset's). */
     val imageSha256: String,
+    /** The model the server says produced Channel A's read (live or cached); null without a server read. */
+    val model: String? = null,
 )
 
 /**
@@ -159,6 +161,7 @@ class DemoFareReader(
             issue = channelA.issue,
             seenAtMs = seenAt,
             imageSha256 = sha,
+            model = channelA.model,
         )
     }
 
@@ -168,6 +171,7 @@ class DemoFareReader(
         val recordedOnPhone: Boolean,
         val failure: ApiResult<*>?,
         val issue: DemoReadIssue,
+        val model: String? = null,
     )
 
     private suspend fun channelA(
@@ -185,7 +189,9 @@ class DemoFareReader(
         val result = api.readScreen(ReadScreenRequest(provider, width, height, bytes, sessionId, demo = true), budget)
         if (result is ApiResult.Ok) {
             val read = ChannelARead.fromJsonOrNull(result.body.read.toString())
-            if (read != null) return ChannelAOutcome(read, sourceOf(result.body.source), false, null, DemoReadIssue.NONE)
+            if (read != null) {
+                return ChannelAOutcome(read, sourceOf(result.body.source), false, null, DemoReadIssue.NONE, result.body.model)
+            }
             return recordedOrNone(sha, failure = ApiResult.Http(200, MALFORMED), aiOff = aiOff)
         }
         return recordedOrNone(sha, failure = result, aiOff = aiOff)

@@ -103,6 +103,37 @@ kotlin { jvmToolchain(17) }
 
 room { schemaDirectory("$projectDir/schemas") }
 
+/**
+ * The fictional demo screens' ground truth (`eval/demo_labels.json`, already public) as an asset of the on-phone test
+ * APK only (`e2e/demo_labels.json`), so DemoEndToEndTest can check every VERIFIED price against the label. The app
+ * itself never contains it.
+ */
+abstract class DemoLabelsAsset : DefaultTask() {
+    @get:InputFile
+    @get:PathSensitive(PathSensitivity.NONE)
+    abstract val labels: RegularFileProperty
+
+    @get:OutputDirectory
+    abstract val outputDir: DirectoryProperty
+
+    @TaskAction
+    fun copy() {
+        val dir = outputDir.get().asFile.resolve("e2e").apply { mkdirs() }
+        labels.get().asFile.copyTo(dir.resolve("demo_labels.json"), overwrite = true)
+    }
+}
+
+val demoLabelsAsset = tasks.register<DemoLabelsAsset>("demoLabelsAsset") {
+    labels.set(rootProject.file("../eval/demo_labels.json"))
+    outputDir.set(layout.buildDirectory.dir("generated/e2eAssets"))
+}
+
+androidComponents {
+    onVariants { variant ->
+        variant.androidTest?.sources?.assets?.addGeneratedSourceDirectory(demoLabelsAsset, DemoLabelsAsset::outputDir)
+    }
+}
+
 dependencies {
     implementation(project(":core"))
 

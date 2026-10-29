@@ -1,11 +1,13 @@
 package app.ridemate.e2e
 
+import android.app.NotificationManager
 import android.os.SystemClock
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.uiautomator.By
 import app.ridemate.R
 import app.ridemate.auth.AuthState
 import app.ridemate.core.gate.ComparisonList
+import app.ridemate.core.guardian.LegRole
 import app.ridemate.core.guardian.UiAction
 import app.ridemate.core.guardian.UiKey
 import app.ridemate.core.model.EvidenceRung
@@ -30,6 +32,7 @@ import app.ridemate.e2e.DeviceE2e.waitObject
 import app.ridemate.notify.BetterRideItem
 import app.ridemate.notify.CancelCardItem
 import app.ridemate.notify.DriverSheetItem
+import app.ridemate.notify.GuardianChannels
 import app.ridemate.notify.GuardianUiState
 import app.ridemate.notify.PayItem
 import app.ridemate.notify.ReminderItem
@@ -37,13 +40,21 @@ import app.ridemate.onboarding.HealthCheckOutcome
 import app.ridemate.onboarding.OnboardingFlow
 import app.ridemate.onboarding.OnboardingStep
 import app.ridemate.onboarding.SignInChoice
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
+import org.json.JSONObject
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Assert.fail
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -60,6 +71,11 @@ import org.junit.runner.RunWith
  * - [keepSearchingTrack_betterRideOffer_yes_cancelsTheOthers_payHandoff]: keep searching on — driver found → Keep
  *   searching → better-ride offer → Yes, switch → the old ride is guided to cancel; the new driver is close, so the
  *   still-searching Kestrel gets "Cancel the others?" → Yes → rung-2 proof for both → pay hand-off in the better ride.
+ *
+ * What is checked beyond the walk itself: Channel A's read is Muse Spark Open's (the server's `model`), every VERIFIED
+ * price and ETA equals the labelled truth of that exact screen (`eval/demo_labels.json`, in the test APK only), the
+ * first reminder arrives 30 s after the Yes and is posted as RideMate's own heads-up, reminders stop once every extra
+ * booking is proven, and the better-ride offer shows both drivers' ETA and distance and changes nothing before Yes (I4).
  *
  * The script runs at its real pace (reminders at 30 s, rides ending 45 s after the last cancel), so no time-scale hook is
  * needed. Live AI reads: 3 (the main track's three fare screens); the keep-searching track books without reading.
@@ -143,6 +159,14 @@ class DemoEndToEndTest {
         assertEquals(setOf(Provider.DEMO_KESTREL, Provider.DEMO_TAMARIND), sheet.others.map { it.provider }.toSet())
         waitObject(By.text(str(R.string.guardian_sheet_cancel_others)).pkg(DeviceE2e.PKG), "the sheet's title on screen")
         assertTrue(demo.state.value.progress.driverFound)
+        // Goal 13: the first reminder comes 30 s after the extra bookings become pending (the Yes). Its arrival is
+        // timed by a watcher on the guardian's state, so the UI steps below cannot blur it.
+        val firstReminder = CompletableDeferred<Pair<Long, ReminderItem>>()
+        val watcher = CoroutineScope(Dispatchers.Default).launch {
+            val state = guardian.uiState.first { s -> s.items.any { it is ReminderItem } }
+            firstReminder.complete(SystemClock.elapsedRealtime() to state.items.filterIsInstance<ReminderItem>().first())
+        }
+        val yesAt = SystemClock.elapsedRealtime()
         tapSheetAction(str(R.string.guardian_action_yes_cancel_others))
 
         // ---- the cancel chain: Kestrel first, with its cancel card; reminders while both are pending
@@ -159,15 +183,28 @@ class DemoEndToEndTest {
         assertTrue(reminder.attempt >= 1)
         assertEquals(setOf(Provider.DEMO_KESTREL, Provider.DEMO_TAMARIND), reminder.legs.map { it.provider }.toSet())
         assertTrue(ui().remindersSent >= 1)
+        val (firstAt, first) = runBlocking { withTimeout(5_000) { firstReminder.await() } }
+        val sinceYes = firstAt - yesAt
+        assertEquals("the first reminder is attempt 1", 1, first.attempt)
+        assertTrue("first reminder $sinceYes ms after Yes (goal 13: after 30 s)", sinceYes in FIRST_REMINDER_MS)
+        // It reaches Android as RideMate's own heads-up notification, not only the in-app list.
+        waitUntil("the reminder posted on RideMate's reminders channel", 5_000) { ownNotificationOn(GuardianChannels.REMINDERS) }
         waitUntil("reminder counted in the demo checklist", 5_000) { demo.state.value.progress.reminders >= 1 }
-        log("reminder ${reminder.attempt} fired while Kestrel and Tamarind were pending")
+        log("reminder ${first.attempt} fired ${sinceYes} ms after Yes while Kestrel and Tamarind were pending")
 
         cancelAndProve(Provider.DEMO_KESTREL)
+        // One extra booking is still pending: the reminders keep going (I8).
+        assertTrue("reminders stay on while Tamarind is pending", ui().items.any { it is ReminderItem })
         waitUntil("Tamarind's cancel screen", 15_000) { appIs(Provider.DEMO_TAMARIND, DemoAppPurpose.CANCEL) }
         val second = waitFor("Tamarind's cancel card", 10_000) { cancelCard(Provider.DEMO_TAMARIND) }
         assertEquals(2, second.position)
         cancelAndProve(Provider.DEMO_TAMARIND)
         assertEquals(2, demo.state.value.progress.cancelsProven)
+        // Every extra booking proven cancelled: the reminders stop, in the app and in the notification shade.
+        waitUntil("reminders stop once every extra booking is proven", 5_000) {
+            ui().items.none { it is ReminderItem } && !ownNotificationOn(GuardianChannels.REMINDERS)
+        }
+        watcher.cancel()
 
         // ---- Pepper's ride ends → pay hand-off in Pepper Rides
         payAndFinish(Provider.DEMO_PEPPER)
@@ -203,9 +240,22 @@ class DemoEndToEndTest {
         }
         assertEquals(Provider.DEMO_PEPPER, offer.current.provider)
         assertEquals(Provider.DEMO_TAMARIND, offer.candidate.provider)
+        // Goal 16: both drivers' time and distance (the demo's notifications: 9 min · 2.8 km vs 2 min · 0.6 km).
+        assertTrue("current ETA ${offer.current.etaMin}", offer.current.etaMin in 8..9)
+        assertEquals(2800, offer.current.distanceMeters)
         assertTrue("candidate ETA ${offer.candidate.etaMin}", (offer.candidate.etaMin ?: 99) <= 2)
+        assertEquals(600, offer.candidate.distanceMeters)
         waitObject(By.text(str(R.string.guardian_sheet_better_ride)).pkg(DeviceE2e.PKG), "the better-ride sheet on screen")
         assertTrue(demo.state.value.progress.betterRideOffered)
+        // I4: the offer changes nothing by itself. For a few seconds with no tap: no cancel guide, no app opened to
+        // cancel, both drivers still assigned and nothing marked extra.
+        holdsFor("nothing switches without Yes", 3_000) {
+            ui().items.none { it is CancelCardItem } &&
+                demo.state.value.app?.purpose != DemoAppPurpose.CANCEL &&
+                ui().legs.none { it.role == LegRole.EXTRA } &&
+                ui().legs.filter { it.provider == Provider.DEMO_PEPPER || it.provider == Provider.DEMO_TAMARIND }
+                    .all { it.state == RideState.ASSIGNED }
+        }
         tapSheetAction(str(R.string.guardian_action_switch))
         // §4.8 Yes → guided cancel of the old leg (Pepper) first. The new driver is ≤ 2 min away, so better-ride
         // alerts stop and Kestrel (still searching) gets "Cancel the others?" → Yes.
@@ -247,13 +297,15 @@ class DemoEndToEndTest {
 
     /** The two-reader gate's output for one demo screen (I2): VERIFIED numbers only, cheapest only among them. */
     private fun assertGatedRead(provider: Provider, read: DemoReadResult) {
-        log("LIVE_READ provider=${provider.wireId} source=${read.source} issue=${read.issue} rows=${read.rows.size} verified=${read.rows.count { it.status == QuoteStatus.VERIFIED }} " +
+        log("LIVE_READ provider=${provider.wireId} source=${read.source} model=${read.model} issue=${read.issue} rows=${read.rows.size} verified=${read.rows.count { it.status == QuoteStatus.VERIFIED }} " +
             "gate=${read.rows.map { "${it.vehicleClass}:${it.status}:${it.failures.sorted()}" }}")
         assertTrue("$provider: Channel A must be the real model via the backend (live or cache), was ${read.source}",
             read.source == ReadSource.LIVE || read.source == ReadSource.CACHE)
         assertFalse("$provider: not the recorded read bundled in the app", read.recordedOnPhone)
         assertNull("$provider: the server answered", read.apiFailure)
         assertEquals(DemoReadIssue.NONE, read.issue)
+        assertEquals("$provider: the server says Muse Spark Open made Channel A's read", MUSE_SPARK_OPEN, read.model)
+        assertVerifiedRowsMatchLabels(provider, read)
         // Collected rather than thrown, so one provider without a VERIFIED price still lets the rest of the walk run;
         // the test fails at the end with the gate's reasons (enums only).
         if (read.rows.none { it.status == QuoteStatus.VERIFIED && it.price != null }) {
@@ -272,6 +324,35 @@ class DemoEndToEndTest {
             if (entry.cheapest) assertEquals("cheapest only among VERIFIED", QuoteStatus.VERIFIED, entry.row.status)
             if (entry.row.status != QuoteStatus.VERIFIED) assertNull(entry.priceText)
         }
+    }
+
+    /**
+     * Goal 5 "never show a wrong price", on the phone: every VERIFIED row is a labelled option of this exact screen, with
+     * the labelled price (and ETA, when one shows). The ground truth is `eval/demo_labels.json`, bundled in the test APK
+     * only. Messages name the row, never a value (logs carry no fares).
+     */
+    private fun assertVerifiedRowsMatchLabels(provider: Provider, read: DemoReadResult) {
+        val truth = labelledRows(read.imageSha256)
+        for (row in read.rows.filter { it.status == QuoteStatus.VERIFIED }) {
+            val label = truth[row.vehicleClass.wireId]
+            assertNotNull("$provider ${row.vehicleClass}: a VERIFIED row is a labelled option of this screen", label)
+            val min = label!!.getInt("price_min")
+            val max = if (label.isNull("price_max")) min else label.getInt("price_max")
+            assertTrue("$provider ${row.vehicleClass}: the VERIFIED price equals the labelled price", row.price == min..max)
+            if (row.eta != null && !label.isNull("eta_min")) {
+                assertTrue("$provider ${row.vehicleClass}: the shown ETA equals the labelled ETA", row.eta == label.getInt("eta_min"))
+            }
+        }
+    }
+
+    /** The labelled rows of the demo screen with this SHA-256, by vehicle-class wire id. */
+    private fun labelledRows(sha256: String): Map<String, JSONObject> {
+        val screens = instrumentation.context.assets.open(LABELS_ASSET).bufferedReader().use { JSONObject(it.readText()) }
+            .getJSONArray("screens")
+        val screen = (0 until screens.length()).map(screens::getJSONObject).firstOrNull { it.getString("sha256") == sha256 }
+        assertNotNull("a label for the demo screen ${sha256.take(12)}", screen)
+        val rows = screen!!.getJSONArray("rows")
+        return (0 until rows.length()).map(rows::getJSONObject).associateBy { it.getString("vehicle_class") }
     }
 
     /** The same rows on screen: the source label, a price only on VERIFIED rows, "cheapest" only on them. */
@@ -384,6 +465,23 @@ class DemoEndToEndTest {
 
     private fun ui(): GuardianUiState = guardian.uiState.value
 
+    /** Fails unless [condition] stays true for the whole of [durationMs] (a negative check: nothing happens unasked). */
+    private fun holdsFor(what: String, durationMs: Long, condition: () -> Boolean) {
+        val until = SystemClock.uptimeMillis() + durationMs
+        while (SystemClock.uptimeMillis() < until) {
+            if (!condition()) {
+                log("STATE when broken ($what): ${describe()}")
+                fail("did not hold for $durationMs ms: $what")
+            }
+            SystemClock.sleep(100)
+        }
+    }
+
+    /** True while RideMate itself has a notification showing on [channelId] (its own notifications only). */
+    private fun ownNotificationOn(channelId: String): Boolean =
+        DeviceE2e.context.getSystemService(NotificationManager::class.java).activeNotifications
+            .any { it.notification.channelId == channelId }
+
     private fun appIs(provider: Provider, purpose: DemoAppPurpose): Boolean =
         demo.state.value.app?.let { it.provider == provider && it.purpose == purpose } == true
 
@@ -422,5 +520,16 @@ class DemoEndToEndTest {
         store.setHealthCheck(HealthCheckOutcome.SKIPPED)
         store.markCompleted()
         SystemClock.sleep(200)
+    }
+
+    private companion object {
+        /** The pinned model (backend `PINNED_MODEL_ID`, architecture §4.10). */
+        const val MUSE_SPARK_OPEN = "meta-models/Muse-Spark-Open-816B-A42B"
+
+        /** `eval/demo_labels.json`, copied into the test APK's assets by the `demoLabelsAsset` Gradle task. */
+        const val LABELS_ASSET = "e2e/demo_labels.json"
+
+        /** When the first reminder may arrive after the Yes: 30 s (goal 13), with a little room for the tap and the wake. */
+        val FIRST_REMINDER_MS = 29_000L..45_000L
     }
 }
