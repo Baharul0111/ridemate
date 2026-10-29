@@ -58,6 +58,11 @@
     <string name="compare_booked_done">Marked as booked in %1$s. RideMate is watching that ride.</string>
     <string name="compare_booked_failed">Couldn\'t mark the booking in %1$s. Open RideMate\'s trip screen and try again.</string>
     <string name="compare_type_price">Type a price</string>
+    <!-- Goal 3: open each selected app with the route ready, also before it has a price. -->
+    <string name="compare_open_heading">Compare in each app</string>
+    <!-- %1$s: ride app name -->
+    <string name="compare_open_app">Open %1$s</string>
+    <string name="compare_open_app_description">Open %1$s with your route ready, then tap Read fares on the bubble</string>
     <plurals name="compare_eta_minutes">
         <item quantity="one">Pickup in %1$d min</item>
         <item quantity="other">Pickup in %1$d min</item>

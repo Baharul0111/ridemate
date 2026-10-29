@@ -38,6 +38,14 @@ class AndroidPrecheckProbes(
         return Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU || granted(Manifest.permission.POST_NOTIFICATIONS)
     }
 
+    /** None of the questions, alerts and reminders channels is set to "off" (a channel not created yet is fine). */
+    override fun guardianChannelsAllowed(): Boolean {
+        val manager = NotificationManagerCompat.from(context)
+        return GUARDIAN_CHANNELS.none { id ->
+            manager.getNotificationChannelCompat(id)?.importance == NotificationManagerCompat.IMPORTANCE_NONE
+        }
+    }
+
     override fun online(): Boolean {
         val cm = context.getSystemService(ConnectivityManager::class.java) ?: return false
         val caps = cm.activeNetwork?.let(cm::getNetworkCapabilities) ?: return false
@@ -52,6 +60,12 @@ class AndroidPrecheckProbes(
 
     private fun granted(permission: String): Boolean =
         ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
+
+    companion object {
+        /** The channels a live session cannot do without: sheets and questions, loud alerts, cancel reminders. */
+        val GUARDIAN_CHANNELS: List<String> =
+            listOf(app.ridemate.notify.GuardianChannels.PROMPTS, app.ridemate.notify.GuardianChannels.ALERTS, app.ridemate.notify.GuardianChannels.REMINDERS)
+    }
 }
 
 /** The settings screen each fix-it button opens; null for in-app actions (demo, choose apps, retry, …). */
@@ -68,10 +82,9 @@ object FixIntents {
             FixAction.OPEN_NOTIFICATION_SETTINGS ->
                 Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, pkg)
             FixAction.OPEN_INTERNET_SETTINGS -> Intent(Settings.Panel.ACTION_INTERNET_CONNECTIVITY)
-            FixAction.REQUEST_LOCATION -> Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, "package:$pkg".toUri())
-            FixAction.TRY_DEMO, FixAction.CHOOSE_APPS, FixAction.RETRY_READ, FixAction.TYPE_PRICE,
-            FixAction.CONTINUE_WITHOUT_ONDC,
-            -> null
+            FixAction.REQUEST_LOCATION, FixAction.OPEN_APP_INFO ->
+                Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, "package:$pkg".toUri())
+            FixAction.TRY_DEMO, FixAction.CHOOSE_APPS -> null
         }
         return intent?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
     }

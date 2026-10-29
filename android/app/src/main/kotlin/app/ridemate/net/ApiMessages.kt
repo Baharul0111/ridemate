@@ -4,7 +4,7 @@ import android.content.Context
 import androidx.annotation.StringRes
 import app.ridemate.R
 import app.ridemate.data.StorageWarning
-import app.ridemate.util.Ist
+import app.ridemate.ui.UiFormat
 import java.util.Locale
 
 /** User-facing wording for platform outcomes (strings_platform.xml); every text says what to do next. */
@@ -13,7 +13,7 @@ object ApiMessages {
     /** The message for a failed call, or null for [ApiResult.Ok]. */
     fun text(context: Context, result: ApiResult<*>, locale: Locale = Locale.getDefault()): String? {
         if (result is ApiResult.AiPaused) {
-            val resumeAt = Ist.formatResumeAt(result.resumeAtIst, locale)
+            val resumeAt = UiFormat.resumeAtIst(result.resumeAtIst)
             if (resumeAt != null) return context.getString(R.string.platform_ai_paused_until, resumeAt)
         }
         return resFor(result)?.let(context::getString)

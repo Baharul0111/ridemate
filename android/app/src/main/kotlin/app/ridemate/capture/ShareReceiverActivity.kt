@@ -2,7 +2,6 @@ package app.ridemate.capture
 
 import android.os.Bundle
 import android.widget.Toast
-import androidx.activity.ComponentActivity
 import androidx.lifecycle.lifecycleScope
 import app.ridemate.R
 import app.ridemate.RideMateApp
@@ -15,7 +14,7 @@ import kotlinx.coroutines.withContext
  * screen capture. The share itself is the user's tap (I6 counts from the moment it arrives). The image is read in
  * memory and handed to the fare reader for the comparison's current app; nothing is saved.
  */
-class ShareReceiverActivity : ComponentActivity() {
+class ShareReceiverActivity : app.ridemate.settings.LocalizedActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)

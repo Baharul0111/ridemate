@@ -42,14 +42,23 @@ class ComparisonStarter(
     private val scope: CoroutineScope,
     private val onError: (Throwable) -> Unit = {},
     private val newSessionId: () -> String = { UUID.randomUUID().toString() },
+    /** Says why a new comparison waits for a live open-network booking ("cancel it or let it finish first"). */
+    private val onNetworkBookingLive: () -> Unit = {},
 ) {
     /**
      * Starts the comparison of [plan]; returns its session id (the comparison screen shows it), or null when the
      * previous session still has bookings to cancel (I8). The guardian then keeps that session and says why (its
      * "finish cancelling first" notice); no app is opened and no network search starts for a session that won't exist.
+     *
+     * A booked open-network ride that is still live also keeps the previous session: a new one would close it, and the
+     * ride could then no longer be cancelled from RideMate (the network would answer a new search "busy").
      */
     fun start(plan: TripPlan, keepSearching: Boolean = keepSearchingDefault()): String? {
         val previous = guardian.status.value
+        if (networkBookingLive(previous, guardian.uiState.value)) {
+            onNetworkBookingLive()
+            return null
+        }
         val refused = previous.sessionOpen && previous.needsForegroundService
         val sessionId = newSessionId()
         val spec = SessionSpec(
@@ -86,6 +95,11 @@ class ComparisonStarter(
     }
 
     companion object {
+        /** The open live session has an open-network booking that is not over (not cancelled, ended or dismissed). */
+        fun networkBookingLive(status: app.ridemate.session.GuardianStatus, ui: app.ridemate.notify.GuardianUiState): Boolean =
+            status.sessionOpen && !status.demo && ui.sessionId == status.sessionId &&
+                ui.legs.any { it.provider.isNetwork && it.booked && !it.dismissed && !it.state.isTerminal }
+
         /** Stored for a place whose coordinates are unknown (typed, not looked up). */
         val UNKNOWN_POINT: LatLng = app.ridemate.compare.RoomActiveComparison.UNKNOWN_POINT
 

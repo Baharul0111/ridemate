@@ -23,7 +23,7 @@ class BubbleActionsTest {
             NotificationMirror.actionsFor(comparing).map { it.action },
         )
         val guide = BubbleState.cancelGuide(InstructionCard("Cancel", emptyList()), showMe = true)
-        assertEquals(listOf(BubbleAction.SHOW_ME, BubbleAction.DONE, BubbleAction.STOP), NotificationMirror.actionsFor(guide).map { it.action })
+        assertEquals(listOf(BubbleAction.SHOW_ME, BubbleAction.I_CANCELLED_IT, BubbleAction.STOP), NotificationMirror.actionsFor(guide).map { it.action })
         assertEquals(listOf(BubbleAction.STOP), NotificationMirror.actionsFor(BubbleState.watching()).map { it.action })
         // Same labels, descriptions and icons as the bubble.
         NotificationMirror.actionsFor(comparing).forEach {

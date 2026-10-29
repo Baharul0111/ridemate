@@ -135,7 +135,7 @@ class BubbleView(
         val actions = state.actions.distinct()
         if (BubbleAction.PASTE_DROP in actions) panel.addView(chip(BubbleAction.PASTE_DROP))
         actions.filter { it != BubbleAction.PASTE_DROP }.forEach { action ->
-            panel.addView(actionButton(action, enabled = !(busy && action == BubbleAction.READ_FARES)))
+            panel.addView(actionButton(action, enabled = !(busy && action == BubbleAction.READ_FARES), label = state.labelFor(action)))
         }
         shownActions = actions
     }
@@ -238,10 +238,11 @@ class BubbleView(
         layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT).apply { bottomMargin = dp(6) }
     }
 
-    private fun actionButton(action: BubbleAction, enabled: Boolean): View = Button(context).apply {
+    private fun actionButton(action: BubbleAction, enabled: Boolean, label: String? = null): View = Button(context).apply {
         tag = action
-        text = context.getString(action.labelRes)
-        contentDescription = context.getString(action.descriptionRes)
+        text = label ?: context.getString(action.labelRes)
+        // A label that names the app says everything; the generic description would contradict it ("this app").
+        contentDescription = label ?: context.getString(action.descriptionRes)
         isAllCaps = false
         isEnabled = enabled
         gravity = Gravity.START or Gravity.CENTER_VERTICAL

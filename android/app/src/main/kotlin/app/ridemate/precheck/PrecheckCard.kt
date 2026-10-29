@@ -31,13 +31,16 @@ import app.ridemate.R
 
 /**
  * One fix-it card: an icon *and* a severity word (never colour alone), a title, what to do next, and one button per
- * fix. The comparison area reuses it for "no fares found" / "no ONDC results".
+ * fix. With [restrictedSettings] (sideloaded on Android 13+) the notification-access and overlay cards also say how to
+ * "Allow restricted settings" and offer "Open App info", because their switch is greyed out until then.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun PrecheckCard(issue: PrecheckIssue, onFix: (FixAction) -> Unit, modifier: Modifier = Modifier) {
+fun PrecheckCard(issue: PrecheckIssue, onFix: (FixAction) -> Unit, modifier: Modifier = Modifier, restrictedSettings: Boolean = false) {
     val severityText = stringResource(PrecheckMessages.severityLabel(issue.severity))
     val title = stringResource(PrecheckMessages.title(issue.kind))
+    val restricted = restrictedSettings && issue.kind in PrecheckMessages.RESTRICTED_SWITCHES
+    val fixes = if (restricted) (issue.fixes + FixAction.OPEN_APP_INFO).distinct() else issue.fixes
     val colors = when (issue.severity) {
         IssueSeverity.BLOCKING -> CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)
         IssueSeverity.WARNING -> CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
@@ -62,8 +65,12 @@ fun PrecheckCard(issue: PrecheckIssue, onFix: (FixAction) -> Unit, modifier: Mod
                 modifier = Modifier.semantics { heading() },
             )
             Text(stringResource(PrecheckMessages.body(issue.kind)), style = MaterialTheme.typography.bodyMedium)
+            if (restricted) {
+                Text(stringResource(R.string.precheck_restricted_hint), style = MaterialTheme.typography.bodyMedium)
+                Text(stringResource(R.string.onb_restricted_steps), style = MaterialTheme.typography.bodyMedium)
+            }
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                issue.fixes.forEachIndexed { index, fix ->
+                fixes.forEachIndexed { index, fix ->
                     val label = stringResource(PrecheckMessages.fixLabel(fix))
                     val description = stringResource(R.string.precheck_fix_description, label, title)
                     val buttonModifier = Modifier

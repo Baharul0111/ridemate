@@ -57,6 +57,9 @@ class SessionBubbleTest {
         override fun copyDropAgain() {
             calls += "paste"
         }
+        override fun openNextApp(provider: Provider, legId: String) {
+            calls += "open:${provider.name}:$legId"
+        }
     }
 
     private val deps = Deps(context)
@@ -74,7 +77,14 @@ class SessionBubbleTest {
         assertNull("Try the demo draws its own screens", bubble.stateFor(open.copy(demo = true), booking, pasteDrop = false))
 
         val comparing = bubble.stateFor(open, booking, pasteDrop = true)!!
-        assertEquals(listOf(BubbleAction.READ_FARES, BubbleAction.PASTE_DROP, BubbleAction.BOOKED_HERE, BubbleAction.STOP), comparing.actions)
+        // Ola is still SELECTED: "Next: Ola" opens it with the route (goal 3).
+        assertEquals(
+            listOf(BubbleAction.READ_FARES, BubbleAction.PASTE_DROP, BubbleAction.NEXT_APP, BubbleAction.BOOKED_HERE, BubbleAction.STOP),
+            comparing.actions,
+        )
+        assertEquals("Next: Ola", comparing.labelFor(BubbleAction.NEXT_APP))
+        // Nothing opened yet: "Booked here" names the first unbooked app it would record.
+        assertEquals("Booked in Uber", comparing.labelFor(BubbleAction.BOOKED_HERE))
 
         val card = CancelCardItem(
             "s1:uber", Provider.UBER, RideState.SEARCHING, FeeNote(FeeNoteKind.FREE_WHILE_SEARCHING), 1, 1,
@@ -87,9 +97,10 @@ class SessionBubbleTest {
         )
         val guide = bubble.stateFor(open.copy(stopRequested = true, needsForegroundService = true), chain, pasteDrop = false)!!
         assertTrue("Stop with a pending cancel keeps guiding it (I8)", guide.card != null)
-        assertEquals(listOf(BubbleAction.SHOW_ME, BubbleAction.DONE, BubbleAction.STOP), guide.actions)
+        // "I cancelled it", never a "Done" that would end the session while the kept ride is still coming.
+        assertEquals(listOf(BubbleAction.SHOW_ME, BubbleAction.I_CANCELLED_IT, BubbleAction.STOP), guide.actions)
         deps.showMe = false
-        assertEquals(listOf(BubbleAction.DONE, BubbleAction.STOP), bubble.stateFor(open, chain, pasteDrop = false)!!.actions)
+        assertEquals(listOf(BubbleAction.I_CANCELLED_IT, BubbleAction.STOP), bubble.stateFor(open, chain, pasteDrop = false)!!.actions)
 
         val kept = GuardianUiState(sessionId = "s1", legs = listOf(leg(Provider.OLA, RideState.ASSIGNED, LegRole.KEPT, booked = true)))
         assertEquals(listOf(BubbleAction.STOP), bubble.stateFor(open, kept, pasteDrop = false)!!.actions)
@@ -106,14 +117,16 @@ class SessionBubbleTest {
         bubble.onBubbleAction(BubbleAction.SHOW_ME, "t2")
         bubble.onBubbleAction(BubbleAction.BOOKED_HERE, "t3")
         bubble.onBubbleAction(BubbleAction.PASTE_DROP, "t4")
-        bubble.onBubbleAction(BubbleAction.DONE, "t5")
-        bubble.onBubbleAction(BubbleAction.STOP, "t6")
+        bubble.onBubbleAction(BubbleAction.I_CANCELLED_IT, "t5")
+        bubble.onBubbleAction(BubbleAction.DONE, "t6")
+        bubble.onBubbleAction(BubbleAction.STOP, "t7")
         assertEquals(
             listOf(
                 "read:t1",
                 UserAction.ShowMe("s1:uber", TapId("t2")),
                 SessionOp(SessionOpKind.BOOKED_HERE),
                 "paste",
+                UserAction.ICancelledIt("s1:uber", TapId("t5")),
                 "endCapture", SessionOp(SessionOpKind.DONE),
                 "endCapture", SessionOp(SessionOpKind.STOP),
             ),
@@ -121,4 +134,92 @@ class SessionBubbleTest {
         )
         assertTrue("no bubble window without the service", !bubble.isVisible)
     }
+
+    @Test
+    fun `Next app opens the next selected app with its leg, and Booked here records the app it names`() {
+        deps.status.value = open.copy(openedLegId = "s1:uber")
+        deps.uiState.value = GuardianUiState(
+            sessionId = "s1",
+            legs = listOf(leg(Provider.UBER, RideState.QUOTED), leg(Provider.OLA, RideState.SELECTED), leg(Provider.RAPIDO, RideState.SELECTED)),
+        )
+        val state = bubble.stateFor(deps.status.value, deps.uiState.value, pasteDrop = false)!!
+        assertEquals("Next: Ola", state.labelFor(BubbleAction.NEXT_APP))
+        assertEquals("Booked in Uber", state.labelFor(BubbleAction.BOOKED_HERE))
+
+        bubble.onBubbleAction(BubbleAction.NEXT_APP, "t1")
+        bubble.onBubbleAction(BubbleAction.BOOKED_HERE, "t2")
+        assertEquals(listOf("open:OLA:s1:ola", SessionOp(SessionOpKind.BOOKED_HERE, "s1:uber")), deps.calls)
+
+        // Once Ola is opened (the app on screen), the next one is Rapido and "Booked here" means Ola.
+        val afterOla = GuardianUiState(
+            sessionId = "s1",
+            legs = listOf(leg(Provider.UBER, RideState.QUOTED), leg(Provider.OLA, RideState.OPENED), leg(Provider.RAPIDO, RideState.SELECTED)),
+        )
+        val next = bubble.stateFor(open.copy(openedLegId = "s1:ola"), afterOla, pasteDrop = false)!!
+        assertEquals("Next: Rapido", next.labelFor(BubbleAction.NEXT_APP))
+        assertEquals("Booked in Ola", next.labelFor(BubbleAction.BOOKED_HERE))
+
+        // Every app opened: no Next button.
+        val allOpened = afterOla.copy(legs = afterOla.legs.map { it.copy(state = RideState.OPENED) })
+        assertTrue(BubbleAction.NEXT_APP !in bubble.stateFor(open, allOpened, pasteDrop = false)!!.actions)
+    }
+
+    @Test
+    fun `a stale-row refresh arms the bubble's Read fares for that app`() {
+        val booking = GuardianUiState(sessionId = "s1", legs = listOf(leg(Provider.UBER, RideState.QUOTED), leg(Provider.OLA, RideState.QUOTED)))
+        val state = bubble.stateFor(open, booking, pasteDrop = false, refresh = Provider.OLA)!!
+        assertEquals("Refresh Ola price", state.labelFor(BubbleAction.READ_FARES))
+        assertTrue(state.status!!.text.contains("Refresh Ola price"))
+        assertNull(bubble.stateFor(open, booking, pasteDrop = false)!!.labelFor(BubbleAction.READ_FARES))
+    }
+
+    @Test
+    fun `the Show me arrow goes when the chain moves on to the next app`() {
+        val shown = BubbleControllerHarness(context)
+        val hosted = SessionBubble(deps, Dispatchers.Unconfined) { _, actions -> shown.controller(actions) }
+        deps.status.value = open
+        fun card(legId: String, provider: Provider) =
+            CancelCardItem(legId, provider, RideState.SEARCHING, FeeNote(FeeNoteKind.FREE_WHILE_SEARCHING), 1, 2, listOf(UiAction.SHOW_ME))
+        deps.uiState.value = GuardianUiState(
+            sessionId = "s1",
+            legs = listOf(
+                leg(Provider.UBER, RideState.CANCEL_GUIDED, LegRole.EXTRA, booked = true),
+                leg(Provider.OLA, RideState.SEARCHING, LegRole.EXTRA, booked = true),
+                leg(Provider.RAPIDO, RideState.ASSIGNED, LegRole.KEPT, booked = true),
+            ),
+            items = listOf(card("s1:uber", Provider.UBER)),
+        )
+        hosted.attach(context)
+        val controller = shown.last!!
+        val metrics = context.resources.displayMetrics
+        val target = app.ridemate.core.ocr.Box(metrics.widthPixels / 2, metrics.heightPixels / 2, metrics.widthPixels / 2 + 80, metrics.heightPixels / 2 + 40)
+        assertTrue(controller.showPointer(target, "Cancel is here"))
+        assertTrue(controller.pointerParams != null)
+
+        // "I cancelled it" on Uber: the chain guides Ola now, and the arrow placed for Uber's Cancel goes.
+        deps.uiState.value = deps.uiState.value.copy(
+            legs = listOf(
+                leg(Provider.UBER, RideState.USER_SAYS_CANCELLED, LegRole.EXTRA, booked = true),
+                leg(Provider.OLA, RideState.CANCEL_GUIDED, LegRole.EXTRA, booked = true),
+                leg(Provider.RAPIDO, RideState.ASSIGNED, LegRole.KEPT, booked = true),
+            ),
+            items = listOf(card("s1:ola", Provider.OLA)),
+        )
+        assertNull(controller.pointerParams)
+        hosted.detach()
+    }
+}
+
+/** Builds real [app.ridemate.bubble.BubbleController]s over fake overlay windows (the overlay is allowed). */
+private class BubbleControllerHarness(private val context: Context) {
+    var last: app.ridemate.bubble.BubbleController? = null
+
+    fun controller(actions: app.ridemate.bubble.BubbleActions): app.ridemate.bubble.BubbleController =
+        app.ridemate.bubble.BubbleController(
+            context = context,
+            actions = actions,
+            windows = app.ridemate.bubble.FakeOverlayWindows(context),
+            canDrawOverlays = { true },
+            animationsEnabled = { false },
+        ).also { last = it }
 }

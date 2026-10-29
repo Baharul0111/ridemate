@@ -371,7 +371,8 @@ private fun ReadRows(read: DemoReadResult, booked: Boolean, nowMs: () -> Long) {
                 modifier = Modifier.semantics { heading() },
             )
             DemoText.issue(read)?.let { Text(stringResource(it), style = MaterialTheme.typography.bodySmall) }
-            val list = ComparisonList.build(read.rows, nowMs())
+            // As in the live list, "Other" (parcel, rentals…) is never a vehicle type to compare.
+            val list = ComparisonList.build(app.ridemate.compare.ComparisonData.chosen(read.rows, emptyList()), nowMs())
             list.groups.flatMap { it.entries }.forEach { entry ->
                 val description = context.getString(R.string.demo_row_description_with_app, DemoText.rowDescription(context, entry, booked), name)
                 Row(

@@ -60,6 +60,12 @@ class HomeActions(
     val fix: (PreSessionIssue) -> Unit = {},
     val continueAnyway: () -> Unit = {},
     val dismissCheck: () -> Unit = {},
+    /**
+     * Sideloaded on Android 13+: the notification-access and overlay switches may be greyed out until "Allow
+     * restricted settings" (in App info). Their fix-it cards then say how, with an "Open App info" button.
+     */
+    val restrictedSettings: Boolean = false,
+    val openAppInfo: () -> Unit = {},
 )
 
 @Composable
@@ -153,8 +159,8 @@ private fun CompareCheckSection(check: CompareCheck, actions: HomeActions) {
                 style = MaterialTheme.typography.titleSmall,
                 modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
             )
-            check.report.blocking.forEach { IssueCard(it, ChipTone.BAD, actions.fix) }
-            check.report.warnings.forEach { IssueCard(it, ChipTone.WARNING, actions.fix) }
+            check.report.blocking.forEach { IssueCard(it, ChipTone.BAD, actions.fix, actions) }
+            check.report.warnings.forEach { IssueCard(it, ChipTone.WARNING, actions.fix, actions) }
             TextAction(stringResource(R.string.home_check_close), actions.dismissCheck)
         }
         is CompareCheck.Warnings -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -163,7 +169,7 @@ private fun CompareCheckSection(check: CompareCheck, actions: HomeActions) {
                 style = MaterialTheme.typography.titleSmall,
                 modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
             )
-            check.report.warnings.forEach { IssueCard(it, ChipTone.WARNING, actions.fix) }
+            check.report.warnings.forEach { IssueCard(it, ChipTone.WARNING, actions.fix, actions) }
             SecondaryButton(stringResource(R.string.home_continue_anyway), actions.continueAnyway)
         }
     }
@@ -171,20 +177,27 @@ private fun CompareCheckSection(check: CompareCheck, actions: HomeActions) {
 
 /** A pre-session problem as a fix-it card: what is wrong, why it matters, one button that fixes it. */
 @Composable
-fun IssueCard(issue: PreSessionIssue, tone: ChipTone, onFix: (PreSessionIssue) -> Unit) {
+fun IssueCard(issue: PreSessionIssue, tone: ChipTone, onFix: (PreSessionIssue) -> Unit, actions: HomeActions = HomeActions()) {
     val copy = PreSessionCopy.of(issue)
+    val restricted = actions.restrictedSettings && issue in PreSessionCopy.RESTRICTED_SWITCHES
+    val body = stringResource(copy.body)
     FixItCard(
         title = stringResource(copy.title),
-        body = stringResource(copy.body),
+        body = if (restricted) body + "\n\n" + stringResource(R.string.precheck_restricted_hint) + "\n" + stringResource(R.string.onb_restricted_steps) else body,
         actionLabel = stringResource(copy.action),
         onAction = { onFix(issue) },
         tone = tone,
+        secondaryLabel = if (restricted) stringResource(R.string.onb_restricted_open_app_info) else null,
+        onSecondary = if (restricted) actions.openAppInfo else null,
     )
 }
 
 /** Wording of each pre-session issue (strings_home.xml). */
 object PreSessionCopy {
     data class Copy(val title: Int, val body: Int, val action: Int)
+
+    /** The switches Android 13+ greys out for sideloaded apps until "Allow restricted settings". */
+    val RESTRICTED_SWITCHES: Set<PreSessionIssue> = setOf(PreSessionIssue.LISTENER_OFF, PreSessionIssue.OVERLAY_OFF)
 
     fun of(issue: PreSessionIssue): Copy = when (issue) {
         PreSessionIssue.LISTENER_OFF -> Copy(R.string.home_issue_listener_title, R.string.home_issue_listener_body, R.string.home_issue_listener_action)

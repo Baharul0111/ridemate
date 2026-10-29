@@ -28,6 +28,7 @@ class PreSessionCheckTest {
         var overlay: Boolean = true,
         var battery: Boolean = true,
         var notifications: Boolean = true,
+        var channels: Boolean = true,
         var online: Boolean = true,
         var location: Boolean = true,
         var installed: Set<Provider> = Provider.LIVE_APPS.toSet(),
@@ -38,6 +39,7 @@ class PreSessionCheckTest {
         override fun overlayAllowed() = v(overlay)
         override fun batteryExempt() = v(battery)
         override fun notificationsAllowed() = v(notifications)
+        override fun guardianChannelsAllowed() = v(channels)
         override fun online() = v(online)
         override fun locationAllowed() = v(location)
         override fun installedRideApps() = v(installed)
@@ -167,12 +169,24 @@ class PreSessionCheckTest {
     }
 
     @Test
-    fun `notifications off is a warning while the bubble can still remind`() = runTest {
+    fun `notifications off block a live comparison even with the bubble, because sheets and alerts are notifications`() = runTest {
         probes.notifications = false
         val issue = run(dispatcherScope = this).issues.single()
         assertEquals(PrecheckKind.NOTIFICATIONS_OFF, issue.kind)
-        assertEquals(IssueSeverity.WARNING, issue.severity)
+        assertEquals(IssueSeverity.BLOCKING, issue.severity)
         assertEquals(listOf(FixAction.OPEN_NOTIFICATION_SETTINGS), issue.fixes)
+        // Try the demo draws its own screens: only a warning there.
+        val demo = run(PrecheckRequest(emptySet(), demo = true), this).issues.single { it.kind == PrecheckKind.NOTIFICATIONS_OFF }
+        assertEquals(IssueSeverity.WARNING, demo.severity)
+    }
+
+    @Test
+    fun `a blocked guardian channel counts as notifications off`() = runTest {
+        probes.channels = false
+        val issue = run(dispatcherScope = this).issues.single()
+        assertEquals(PrecheckKind.NOTIFICATIONS_OFF, issue.kind)
+        assertEquals(IssueSeverity.BLOCKING, issue.severity)
+        assertTrue("the demo needs no guardian channel", run(PrecheckRequest(emptySet(), demo = true), this).issues.none { it.kind == PrecheckKind.NOTIFICATIONS_OFF })
     }
 
     @Test
@@ -257,20 +271,8 @@ class PreSessionCheckTest {
     }
 
     @Test
-    fun `the later session outcomes have their own cards`() {
-        assertEquals(
-            PrecheckIssue(PrecheckKind.NO_FARES_FOUND, IssueSeverity.WARNING, listOf(FixAction.RETRY_READ, FixAction.TYPE_PRICE)),
-            PreSessionCheck.noFaresFound(),
-        )
-        assertEquals(
-            PrecheckIssue(PrecheckKind.NO_ONDC_RESULTS, IssueSeverity.WARNING, listOf(FixAction.CONTINUE_WITHOUT_ONDC)),
-            PreSessionCheck.noOndcResults(),
-        )
-    }
-
-    @Test
     fun `every kind is distinct and reachable`() {
         assertEquals(PrecheckKind.entries.size, PrecheckKind.entries.map { it.name }.toSet().size)
-        assertEquals(11, PrecheckKind.entries.size)
+        assertEquals(9, PrecheckKind.entries.size)
     }
 }

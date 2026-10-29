@@ -605,4 +605,253 @@ class GuardianRuntimeTest {
         r.serviceTick()
         assertTrue(r.crashBackend.recorded.toString(), r.crashBackend.recorded.isEmpty())
     }
+
+    /** The real session bubble, wired to this runtime as the graph wires it. */
+    private fun bubbleOf(r: GuardianTestRig): app.ridemate.integration.SessionBubble = app.ridemate.integration.SessionBubble(
+        deps = object : app.ridemate.integration.SessionBubbleDeps {
+            override val status get() = r.runtime.status
+            override val uiState get() = r.runtime.uiState
+            override val pasteDrop = kotlinx.coroutines.flow.MutableStateFlow<Any?>(null)
+            override fun presenter() = r.presenter()
+            override fun showMeAvailable(provider: Provider) = true
+            override fun readFares(tapId: String) = Unit
+            override fun userAction(action: app.ridemate.core.guardian.UserAction) = r.runtime.onUserAction(action)
+            override fun sessionOp(op: SessionOp) = r.runtime.perform(op)
+            override fun endCapture() = Unit
+            override fun copyDropAgain() = Unit
+        },
+        main = kotlinx.coroutines.Dispatchers.Unconfined,
+    )
+
+    @Test
+    fun `the bubble's I cancelled it records the answer and schedules the +60 s check, and never ends the session`() = runBlocking {
+        val r = rig()
+        r.firstDriverChain()
+        val uber = r.legId(Provider.UBER)
+        val bubble = bubbleOf(r)
+        assertEquals(
+            listOf(app.ridemate.bubble.BubbleAction.SHOW_ME, app.ridemate.bubble.BubbleAction.I_CANCELLED_IT, app.ridemate.bubble.BubbleAction.STOP),
+            bubble.stateFor(r.status, r.ui, pasteDrop = false)!!.actions,
+        )
+
+        bubble.onBubbleAction(app.ridemate.bubble.BubbleAction.I_CANCELLED_IT, "tap-bubble")
+        r.idle()
+        assertEquals(RideState.USER_SAYS_CANCELLED, r.ui.leg(uber)!!.state)
+        assertTrue(r.outboxRepository.pending().any { it.kind == OutboxKind.FOLLOWUP_CHECK && it.legId == uber })
+        assertTrue(r.status.sessionOpen)
+        assertFalse("not a stop request", r.status.stopRequested)
+        // Rapido (kept) is still watched: a captain cancel still reaches the user.
+        assertEquals(RideState.ASSIGNED, r.ui.leg(r.legId(Provider.RAPIDO))!!.state)
+    }
+
+    @Test
+    fun `Done keeps watching a kept ride that still has a driver, Stop ends it once I8 allows`() = runBlocking {
+        val r = rig()
+        var ended = 0
+        r.bindings.endFareCapture = { ended++ }
+        r.firstDriverChain()
+        r.post(Provider.UBER, "u2", UBER_CANCELLED.first, UBER_CANCELLED.second, ongoing = false)
+        assertFalse(r.status.needsForegroundService)
+        ended = 0
+
+        r.runtime.perform(SessionOp(SessionOpKind.DONE))
+        r.idle()
+        assertTrue("the kept Rapido ride is still coming", r.status.sessionOpen)
+        assertEquals("Done ends the fare-reading projection at once", 1, ended)
+
+        r.runtime.perform(SessionOp(SessionOpKind.STOP))
+        r.idle()
+        assertFalse(r.status.sessionOpen)
+        assertTrue("the projection ends with the comparison", ended >= 2)
+    }
+
+    @Test
+    fun `a new comparison ends the previous comparison's screen projection`() = runBlocking {
+        val r = rig()
+        var ended = 0
+        r.bindings.endFareCapture = { ended++ }
+        r.startSession(Provider.UBER, Provider.OLA)
+        val first = ended
+        assertTrue("a live session start ends any projection left running", first >= 1)
+        r.startSession(Provider.UBER, Provider.OLA, id = "s2")
+        assertTrue(ended > first)
+        // Try the demo reads its bundled screens and never touches the live capture.
+        val beforeDemo = ended
+        r.startSession(Provider.DEMO_KESTREL, demo = true, id = "d1")
+        assertEquals(beforeDemo, ended)
+    }
+
+    @Test
+    fun `a second still-looks-active alert for the same leg is a new alert that sounds again`() = runBlocking {
+        val r = rig()
+        r.firstDriverChain()
+        val uber = r.legId(Provider.UBER)
+        r.runtime.perform(GuardianTap(TapScope.LEG, uber, UiAction.I_CANCELLED_IT))
+        r.idle()
+        r.advance(60_000)
+        r.serviceTick()
+        val alertId = "alert:$uber:${UiKey.ALERT_STILL_LIVE.name}"
+        val first = r.ui.items.filterIsInstance<app.ridemate.notify.AlertItem>().single { it.id == alertId }
+        assertEquals(1, first.occurrence)
+        assertNotNull(r.notification(alertId))
+
+        // Uber says the ride is live again: another loud alert, posted again (not swallowed as "unchanged").
+        r.post(Provider.UBER, "u1", "Uber", "Your driver Amit is 5 mins away")
+        val second = r.ui.items.filterIsInstance<app.ridemate.notify.AlertItem>().single { it.id == alertId }
+        assertEquals(2, second.occurrence)
+        val presented = r.presenter().present(second)
+        assertTrue(presented.alertAgain)
+        assertNotNull(r.notification(alertId))
+    }
+
+    @Test
+    fun `a stale Show me tap is never reused for a capture RideMate asks for by itself`() = runBlocking {
+        val r = rig()
+        val requests = java.util.concurrent.CopyOnWriteArrayList<Pair<app.ridemate.core.guardian.CaptureReason, app.ridemate.core.state.TapId?>>()
+        r.bindings.capture = CaptureRequester { _, _, reason, tap -> requests += reason to tap }
+        r.firstDriverChain()
+        val uber = r.legId(Provider.UBER)
+
+        r.runtime.perform(GuardianTap(TapScope.LEG, uber, UiAction.SHOW_ME))
+        r.idle()
+        assertEquals(app.ridemate.core.guardian.CaptureReason.SHOW_ME, requests.single().first)
+        assertNotNull(requests.single().second)
+
+        // The user taps Cancel in Uber a few seconds later; Uber removes its post: RideMate asks to look by itself.
+        r.advance(5_000)
+        r.remove(Provider.UBER, "u1")
+        val (reason, tap) = requests.last()
+        assertEquals(app.ridemate.core.guardian.CaptureReason.CANCEL_PROOF, reason)
+        assertNull("no surprise consent dialog with an old tap", tap)
+
+        // The capture card's own "Check screen" drives it, and proves the cancel.
+        val capture = r.ui.items.filterIsInstance<app.ridemate.notify.CaptureItem>().single()
+        r.runtime.perform(r.presenter().present(capture).actions.single().target)
+        r.idle()
+        val fresh = requests.last().second
+        assertNotNull(fresh)
+        r.runtime.captureVerdict(Provider.UBER, true, fresh!!, r.clock.elapsed + 300)
+        r.idle()
+        assertEquals(RideState.CANCEL_CONFIRMED, r.ui.leg(uber)!!.state)
+    }
+
+    @Test
+    fun `Booked here records the app it names and says so in a short notice`() = runBlocking {
+        val r = rig()
+        r.startSession(Provider.UBER, Provider.RAPIDO)
+        r.runtime.appOpened(Provider.UBER)
+        r.runtime.appOpened(Provider.RAPIDO)
+        r.idle()
+        assertEquals(r.legId(Provider.RAPIDO), r.status.openedLegId)
+        // The user switched back to Uber with Recents; the bubble named "Booked in Uber" from its ref.
+        r.runtime.perform(SessionOp(SessionOpKind.BOOKED_HERE, r.legId(Provider.UBER)))
+        r.idle()
+        assertEquals(RideState.BOOK_REQUESTED, r.ui.leg(r.legId(Provider.UBER))!!.state)
+        assertEquals(RideState.OPENED, r.ui.leg(r.legId(Provider.RAPIDO))!!.state)
+        val notice = r.notification("booked:${r.legId(Provider.UBER)}")!!
+        assertEquals("Recorded: booked in Uber", r.title(notice))
+    }
+
+    @Test
+    fun `a plate read on a checked screen is matched with a template's plate, so the same driver on two apps is noticed`() = runBlocking {
+        val r = rig()
+        val requests = java.util.concurrent.CopyOnWriteArrayList<Pair<app.ridemate.core.guardian.CaptureReason, app.ridemate.core.state.TapId?>>()
+        r.bindings.capture = CaptureRequester { _, _, reason, tap -> requests += reason to tap }
+        r.startSession(Provider.UBER, Provider.RAPIDO)
+        r.book(Provider.UBER, Provider.RAPIDO)
+        r.post(Provider.UBER, "u1", UBER_SEARCHING.first, UBER_SEARCHING.second)
+        // Rapido's template carries the plate (hashed in memory, never kept raw).
+        r.post(Provider.RAPIDO, "r1", RAPIDO_SEARCHING.first, RAPIDO_SEARCHING.second)
+        r.post(Provider.RAPIDO, "r1", "Rapido", "Your captain Ravi is on the way. 4 min away. AS 01 AB 1234")
+        // Uber's update is unreadable: the user checks the screen, which shows the same plate.
+        r.post(Provider.UBER, "u1", "Uber", "Amit will reach you soon")
+        val prompt = r.ui.items.filterIsInstance<PromptItem>().single { it.legId == r.legId(Provider.UBER) }
+        r.runtime.perform(GuardianTap(TapScope.PROMPT, prompt.id, UiAction.CHECK_SCREEN))
+        r.idle()
+        val tap = requests.last().second!!
+        val plate = app.ridemate.core.mask.PlateHash.of("Amit · AS-01-AB-1234 · 5 min")
+        assertNotNull(plate)
+        r.runtime.verifiedDriverReading(Provider.UBER, 5, 1_200, tap, r.clock.elapsed + 400, plate)
+        r.idle()
+
+        val uberRow = r.db.legDao().get(r.legId(Provider.UBER))!!
+        val rapidoRow = r.db.legDao().get(r.legId(Provider.RAPIDO))!!
+        assertNotNull(rapidoRow.plateHash)
+        assertEquals("the screen's plate and the template's plate are the same driver", rapidoRow.plateHash, uberRow.plateHash)
+        val sameDriver = r.ui.items.filterIsInstance<DriverSheetItem>().any { it.key == UiKey.SHEET_SAME_DRIVER_KEEP_ONE } ||
+            r.ui.notices.any { it.key == UiKey.BANNER_SAME_DRIVER }
+        assertTrue(r.ui.items.toString(), sameDriver)
+    }
+
+    @Test
+    fun `keep searching in Try the demo changes the demo session only, never the saved default`() = runBlocking {
+        val r = rig()
+        r.startSession(Provider.DEMO_KESTREL, Provider.DEMO_PEPPER, demo = true)
+        r.runtime.perform(SessionOp(SessionOpKind.TOGGLE_KEEP_SEARCHING))
+        r.idle()
+        assertTrue(r.ui.keepSearching)
+        assertFalse(r.keepSearching.enabled)
+    }
+
+    @Test
+    fun `a live ride that ends offers the pay hand-off, and Pay opens that ride app`() = runBlocking {
+        val r = rig()
+        r.installApp(Provider.RAPIDO)
+        r.appInForeground = true
+        r.firstDriverChain()
+        r.post(Provider.UBER, "u2", UBER_CANCELLED.first, UBER_CANCELLED.second, ongoing = false)
+        org.robolectric.Shadows.shadowOf(r.context as android.app.Application).clearNextStartedActivities()
+        r.post(Provider.RAPIDO, "r1", "Rapido", "Your ride has started")
+        r.post(Provider.RAPIDO, "r1", "Rapido", "Your ride has ended. Thanks for riding")
+        val rapido = r.legId(Provider.RAPIDO)
+        val pay = r.ui.items.filterIsInstance<app.ridemate.notify.PayItem>().single()
+        assertEquals(rapido, pay.legId)
+        assertEquals("Ride ended. Open Rapido to pay", r.title(r.notification(pay.id)))
+
+        r.runtime.perform(GuardianTap(TapScope.LEG, rapido, UiAction.PAY))
+        r.idle()
+        runBlocking { r.outboxDriver.tick() }
+        r.idle()
+        val started = org.robolectric.Shadows.shadowOf(r.context as android.app.Application).nextStartedActivity
+        assertEquals(Provider.RAPIDO.packageName, started?.component?.packageName)
+    }
+
+    @Test
+    fun `with RideMate in the background and no bubble, Pay asks with a heads-up whose tap opens the app`() = runBlocking {
+        val r = rig()
+        r.installApp(Provider.RAPIDO)
+        r.firstDriverChain()
+        r.post(Provider.UBER, "u2", UBER_CANCELLED.first, UBER_CANCELLED.second, ongoing = false)
+        r.post(Provider.RAPIDO, "r1", "Rapido", "Your ride has started")
+        r.post(Provider.RAPIDO, "r1", "Rapido", "Your ride has ended. Thanks for riding")
+        val rapido = r.legId(Provider.RAPIDO)
+        r.runtime.perform(GuardianTap(TapScope.LEG, rapido, UiAction.PAY))
+        r.idle()
+        runBlocking { r.outboxDriver.tick() }
+        r.idle()
+        val open = r.notification("open:$rapido")
+        assertNotNull(open)
+        assertNotNull(open!!.contentIntent)
+    }
+
+    @Test
+    fun `the fee rules of the pickup's state apply once it is known`() = runBlocking {
+        val rules = app.ridemate.core.guardian.FeeRules.parse(
+            """{"schema":"1.0","default":{"pct":10,"max_inr":100,"free_while_searching":true},
+               "apps":{"com.ubercab":{"free_within_s_after_accept":0,"max_inr":100}},
+               "states":{"XX":{"max_inr":20}}}""",
+        )
+        var state: String? = null
+        val fees = LiveFeeEstimator({ rules }) { state }
+        val query = app.ridemate.core.guardian.FeeQuery(Provider.UBER, RideState.ASSIGNED, 0L, 5, 600_000L)
+        val before = fees.note(query)
+        state = "XX"
+        val after = fees.note(query)
+        assertEquals(20, after.upToInr)
+        assertTrue(before.upToInr != after.upToInr)
+        assertEquals("AS", IndianStateCodes.codeOf("Assam"))
+        assertEquals("DL", IndianStateCodes.codeOf("National Capital Territory of Delhi"))
+        assertEquals("JK", IndianStateCodes.codeOf("Jammu & Kashmir"))
+        assertNull(IndianStateCodes.codeOf("Atlantis"))
+    }
 }

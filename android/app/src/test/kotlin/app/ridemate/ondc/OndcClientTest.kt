@@ -96,6 +96,29 @@ class OndcClientTest {
             }
         }
 
+        /**
+         * The real demo seller (backend mock_bpp): `on_confirm` has no driver yet; only a `status` request assigns one
+         * (and from then on a cancel costs the seller's fee).
+         */
+        fun realSeller(cancelFee: Long = 30) {
+            var assigned = false
+            api.afterOndcStep = { step ->
+                when (step) {
+                    "select" -> source.write("t1", OndcDocs.doc("ON_SELECT", selected = "auto-1"))
+                    "init" -> source.write("t1", OndcDocs.doc("INIT", selected = "auto-1"))
+                    "confirm" -> source.write("t1", OndcDocs.doc("CONFIRMED", selected = "auto-1", driver = null))
+                    "status" -> {
+                        assigned = true
+                        source.write("t1", OndcDocs.doc("CONFIRMED", selected = "auto-1", driver = driver))
+                    }
+                    "cancel.soft" -> source.write(
+                        "t1",
+                        OndcDocs.doc("SOFT_CANCEL", selected = "auto-1", driver = driver, fee = mapOf("amount" to if (assigned) cancelFee else 0L, "currency" to "INR")),
+                    )
+                }
+            }
+        }
+
         fun ondcCalls() = api.calls.filter { it.startsWith("ondc.") }
 
         /** Search, quotes, the user's Book tap, and a cooperative seller up to CONFIRMED (driver 4 min, 1.1 km). */
@@ -169,6 +192,56 @@ class OndcClientTest {
         assertEquals("auto-1", view.selectedItemId)
         assertEquals(4, view.driverEtaMin)
         assertTrue(Invariants.checkGuardian(e.guardian).ok)
+    }
+
+    @Test
+    fun `a booked ride's status is asked for until it has a driver, so the ride progresses and a cancel shows the real fee`() = runTest {
+        val e = Env(this)
+        e.realSeller(cancelFee = 30)
+        e.search()
+        e.source.write("t1", OndcDocs.doc("SEARCHING_NET"))
+        e.guardian.onUserAction(UserAction.OndcBook(e.legId, "auto-1", e.tap()))
+        e.run()
+        // Confirmed, but the seller reports no driver on confirm.
+        assertEquals(OndcPhase.BOOKED, e.client.view.value.phase)
+        assertNull(e.client.view.value.driverEtaMin)
+        assertFalse("ondc.status:t1" in e.api.calls)
+
+        // The phone asks for the status (it is never pushed): the driver arrives as protocol data.
+        e.advance(OndcClient.STATUS_POLL_MS)
+        assertTrue("ondc.status:t1" in e.api.calls)
+        assertEquals(RideState.ASSIGNED, e.leg.state)
+        assertEquals(4, e.leg.driver.etaMin)
+        assertEquals(EtaSource.NETWORK, e.leg.driver.etaSource)
+        assertEquals(4, e.client.view.value.driverEtaMin)
+
+        // With a driver assigned the seller charges its fee, and the user sees it before confirming.
+        e.guardian.onUserAction(UserAction.OndcCancel(e.legId, e.tap()))
+        e.run()
+        assertEquals(OndcPhase.CANCEL_FEE_SHOWN, e.client.view.value.phase)
+        assertEquals(30, e.client.view.value.feeInr)
+        assertEquals(30, e.effects.filterIsInstance<GuardianEffect.OndcCancelFee>().single().feeInr)
+
+        // A soft cancel pauses the polling; stop() ends it for good.
+        val calls = e.api.calls.count { it == "ondc.status:t1" }
+        e.advance(OndcClient.STATUS_POLL_MS * 3)
+        assertEquals(calls, e.api.calls.count { it == "ondc.status:t1" })
+        e.client.stop()
+        e.advance(OndcClient.STATUS_POLL_MS * 3)
+        assertEquals(calls, e.api.calls.count { it == "ondc.status:t1" })
+    }
+
+    @Test
+    fun `status polling stops when the transaction stops`() = runTest {
+        val e = Env(this)
+        e.realSeller()
+        e.search()
+        e.source.write("t1", OndcDocs.doc("SEARCHING_NET"))
+        e.guardian.onUserAction(UserAction.OndcBook(e.legId, "auto-1", e.tap()))
+        e.run()
+        e.client.stop()
+        e.advance(OndcClient.STATUS_POLL_MS * 3)
+        assertFalse("ondc.status:t1" in e.api.calls)
     }
 
     @Test

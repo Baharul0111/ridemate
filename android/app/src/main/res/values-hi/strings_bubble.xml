@@ -12,6 +12,14 @@
     <string name="bubble_action_paste_drop_description">ड्रॉप पेस्ट करें: अपना ड्रॉप पता फिर से कॉपी करें, फिर ऐप के गंतव्य बॉक्स को देर तक दबाकर Paste टैप करें</string>
     <string name="bubble_action_stop">रोकें</string>
     <string name="bubble_action_stop_description">इस यात्रा के लिए RideMate रोकें</string>
+    <string name="bubble_action_i_cancelled_it">मैंने रद्द कर दिया</string>
+    <string name="bubble_action_i_cancelled_it_description">मैंने रद्द कर दिया: आपने ऐप में यह बुकिंग रद्द की। RideMate एक मिनट में फिर जाँचेगा, फिर अगले ऐप में मदद करेगा</string>
+    <string name="bubble_action_next_app">अगला ऐप</string>
+    <string name="bubble_action_next_app_description">अगला राइड ऐप आपके रास्ते के साथ खोलें</string>
+    <string name="bubble_action_next_app_named">अगला: %1$s</string>
+    <string name="bubble_action_booked_in">%1$s में बुक किया</string>
+    <string name="bubble_action_refresh_price">%1$s का दाम ताज़ा करें</string>
+    <string name="bubble_status_refresh_pending">%1$s की दाम सूची पर, नया दाम पढ़ने के लिए %1$s का दाम ताज़ा करें टैप करें।</string>
 
     <string name="bubble_head_description">RideMate नियंत्रण। खोलने या बंद करने के लिए दो बार टैप करें। हटाने के लिए खींचें।</string>
     <string name="bubble_head_open">खुला</string>

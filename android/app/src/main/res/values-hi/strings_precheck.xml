@@ -22,10 +22,8 @@
     <string name="precheck_offline_body">RideMate फिर भी ऐप खोल सकता है और आपकी राइड पर नज़र रख सकता है। किराया खुद लिखें, या अपने आप पढ़ने के लिए इंटरनेट से जुड़ें।</string>
     <string name="precheck_location_title">पिकअप वही पता है जो आपने लिखा</string>
     <string name="precheck_location_body">RideMate के लिए लोकेशन बंद है, इसलिए यह आपका लिखा पिकअप इस्तेमाल करता है। जाँच लें कि वह सही है, या लोकेशन की अनुमति दें।</string>
-    <string name="precheck_no_fares_title">इस स्क्रीन पर कोई किराया नहीं मिला</string>
-    <string name="precheck_no_fares_body">वह स्क्रीन खोलें जिसमें किराए दिखते हैं और फिर से किराया पढ़ें, या किराया खुद लिखें।</string>
-    <string name="precheck_no_ondc_title">ओपन नेटवर्क पर कोई राइड नहीं</string>
-    <string name="precheck_no_ondc_body">इस यात्रा के लिए अभी ओपन नेटवर्क पर कोई राइड नहीं है। बाकी ऐप के साथ आगे बढ़ें।</string>
+    <string name="precheck_restricted_hint">स्विच धुंधला है? Play Store के बाहर से इंस्टॉल किए गए ऐप्स के लिए Android इसे तब तक रोकता है जब तक आप प्रतिबंधित सेटिंग्स की अनुमति न दें।</string>
+    <string name="precheck_compare_again_heading">फिर से तुलना करने से पहले</string>
 
     <string name="precheck_fix_notification_access">सूचना एक्सेस खोलें</string>
     <string name="precheck_fix_overlay">फ़्लोटिंग बटन की अनुमति दें</string>
@@ -35,9 +33,6 @@
     <string name="precheck_fix_location">लोकेशन की अनुमति दें</string>
     <string name="precheck_fix_demo">डेमो आज़माएँ</string>
     <string name="precheck_fix_choose_apps">ऐप चुनें</string>
-    <string name="precheck_fix_retry_read">फिर से किराया पढ़ें</string>
-    <string name="precheck_fix_type_price">किराया खुद लिखें</string>
-    <string name="precheck_fix_without_ondc">ओपन नेटवर्क के बिना आगे बढ़ें</string>
 
     <string name="precheck_fix_description">%1$s: %2$s</string>
     <string name="precheck_settings_missing">इस फ़ोन पर यह सेटिंग स्क्रीन नहीं है। Settings खोलें, RideMate ढूँढें और वहीं बदलें।</string>

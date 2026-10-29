@@ -98,6 +98,7 @@ import app.ridemate.watch.RideWatchStatus
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
@@ -267,17 +268,22 @@ class AppGraph(
     }
 
     // ---- fare reading (bubble, capture, OCR + masking, Read fares, comparison list) ----
+    /** Opens ride apps with the active comparison's route: the list's Open / Book / refresh and the bubble's Next app. */
+    val routeFareLauncher: RouteFareLauncher by lazy {
+        RouteFareLauncher(
+            launcher = { appLauncher },
+            db = { db },
+            installed = { installedApps },
+            legIdFor = { guardianRuntime.legIdFor(it) },
+            scope = appScope,
+            onError = { crashReporter.recordNonFatal(it, CrashSite.OTHER) },
+        )
+    }
+
     val fareReading: FareReadingModule by lazy {
         FareReadingModule(this).also { module ->
             module.sessionCommands = GuardianCompareCommands { guardianRuntime }
-            module.appLauncher = RouteFareLauncher(
-                launcher = { appLauncher },
-                db = { db },
-                installed = { installedApps },
-                legIdFor = { guardianRuntime.legIdFor(it) },
-                scope = appScope,
-                onError = { crashReporter.recordNonFatal(it, CrashSite.OTHER) },
-            )
+            module.appLauncher = routeFareLauncher
             module.capture.foregroundHost = GuardianCaptureHost { guardianRuntime }
             // "Read fares" reads the app RideMate opened last (the guardian's notion, shared with "Booked here").
             module.activeComparison = ActiveComparison { RoomActiveComparison(db) { guardianRuntime.openedLegId }.current() }
@@ -326,11 +332,23 @@ class AppGraph(
                 override fun keepRide(legId: String) = ondcClient.keepRide(legId)
             }
             b.compareAgain = CompareAgainHandler { sessionId ->
+                // Goal 20: the comparison screen runs the pre-session check before any app is opened again.
+                comparePrecheck.value = sessionId
                 guardian.notifier.openRideMate(GuardianIntents.DESTINATION_COMPARE, sessionId)
             }
             b.fareReader = FareReadRequester { fareReading.coordinator.onReadFaresTap(TapIds.newTapId()) }
+            b.endFareCapture = {
+                fareReading.endCapture()
+                fareReading.coordinator.clearRefresh()
+            }
         }
     }
+
+    /**
+     * The session whose "Compare again (same trip)" still waits for its pre-session check (permissions can be switched
+     * off at any time); the comparison screen runs it and shows the fix-it cards before the apps open again.
+     */
+    val comparePrecheck: MutableStateFlow<String?> = MutableStateFlow(null)
 
     /** The floating bubble the session service hosts (guardian card, fare reader status, Show me arrow). */
     val sessionBubble: SessionBubble by lazy {
@@ -339,7 +357,11 @@ class AppGraph(
                 override val status get() = guardianRuntime.status
                 override val uiState get() = guardianRuntime.uiState
                 override val pasteDrop get() = appLauncher.pasteDrop
+                override val refreshPending get() = fareReading.coordinator.refreshPending
                 override fun presenter() = guardian.presenter()
+                override fun openNextApp(provider: Provider, legId: String) {
+                    routeFareLauncher.openNext(provider, legId)
+                }
                 override fun showMeAvailable(provider: Provider): Boolean =
                     configRepository.boolean(ConfigKeys.POINT_SUPPORTED, true) && fareReading.showMe.isAvailable(provider)
                 override fun readFares(tapId: String) {
@@ -397,6 +419,7 @@ class AppGraph(
             keepSearchingDefault = { appShell.settingsStore.keepSearchingDefault.value },
             scope = mainScope,
             onError = { crashReporter.recordNonFatal(it, CrashSite.OTHER) },
+            onNetworkBookingLive = { guardian.notifier.post(guardian.presenter().startBlockedByNetwork()) },
         )
     }
     val rideWatchStatus: RideWatchStatus by lazy { RideWatchStatus(app, clock) }

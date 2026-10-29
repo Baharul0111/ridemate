@@ -5,6 +5,12 @@ import android.os.LocaleList
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.ridemate.R
+import app.ridemate.RideMateApp
+import app.ridemate.capture.CaptureConsentActivity
+import app.ridemate.capture.ShareReceiverActivity
+import app.ridemate.compare.ComparisonActivity
+import app.ridemate.launch.OpenRideAppActivity
+import app.ridemate.session.RideSessionService
 import app.ridemate.auth.AuthState
 import app.ridemate.config.KillSwitches
 import app.ridemate.onboarding.AppPermission
@@ -153,6 +159,68 @@ class SettingsModelTest {
         } finally {
             java.util.Locale.setDefault(saved)
         }
+    }
+
+    @Test
+    fun `on Android 10-12 a language change reaches everything built from the application context at once`() {
+        val saved = java.util.Locale.getDefault()
+        val app = context.applicationContext
+        try {
+            assertEquals("Prices", app.getString(R.string.compare_title))
+            // What the Settings picker runs on Android 10–12 (StoredLocaleBackend's change hook).
+            LegacyLocale.applyToProcess(app, "hi", sdkInt = 31)
+            assertEquals("hi", app.resources.configuration.locales[0].language)
+            // Notifications, toasts, the bubble's status lines and the guardian's texts all use the application.
+            assertEquals(
+                context.createConfigurationContext(
+                    android.content.res.Configuration(context.resources.configuration).apply { setLocales(LocaleList.forLanguageTags("hi")) },
+                ).getString(R.string.compare_title),
+                app.getString(R.string.compare_title),
+            )
+            assertEquals("आपकी गोपनीयता", app.getString(R.string.onb_notice_title))
+            assertEquals("hi", java.util.Locale.getDefault().language)
+
+            // Android 13+ never gets here (the system per-app locale does it).
+            LegacyLocale.applyToProcess(app, "en", sdkInt = 33)
+            assertEquals("hi", app.resources.configuration.locales[0].language)
+
+            // Back to the phone's language.
+            LegacyLocale.applyToProcess(app, null, sdkInt = 31, systemLocale = { java.util.Locale.ENGLISH })
+            assertEquals("Prices", app.getString(R.string.compare_title))
+        } finally {
+            LegacyLocale.applyToProcess(app, null, sdkInt = 31, systemLocale = { saved })
+            java.util.Locale.setDefault(saved)
+        }
+    }
+
+    @Test
+    fun `the stored-locale backend applies a change to the running process`() {
+        val store = SettingsStore(InMemoryKeyValueStore())
+        val changed = mutableListOf<String?>()
+        val legacy = DefaultLanguageController(StoredLocaleBackend(store) { changed += it }, store)
+        legacy.set(AppLanguage.HINDI)
+        legacy.set(AppLanguage.SYSTEM)
+        assertEquals(listOf("hi", null), changed)
+    }
+
+    @Test
+    fun `RideMate's other activities and the session service show the in-app language on Android 10-12`() {
+        // ComparisonActivity, CaptureConsentActivity, OpenRideAppActivity and ShareReceiverActivity share this base.
+        listOf(
+            ComparisonActivity::class.java,
+            CaptureConsentActivity::class.java,
+            OpenRideAppActivity::class.java,
+            ShareReceiverActivity::class.java,
+        ).forEach { assertTrue(it.simpleName, LocalizedActivity::class.java.isAssignableFrom(it)) }
+        assertEquals(
+            "the session service wraps its base context",
+            RideSessionService::class.java,
+            RideSessionService::class.java.getDeclaredMethod("attachBaseContext", Context::class.java).declaringClass,
+        )
+        assertEquals(
+            RideMateApp::class.java,
+            RideMateApp::class.java.getDeclaredMethod("attachBaseContext", Context::class.java).declaringClass,
+        )
     }
 
     @Test

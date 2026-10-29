@@ -12,6 +12,7 @@ import app.ridemate.compare.ShowMeUseCase
 import app.ridemate.core.guardian.CancelledKeywords
 import app.ridemate.core.guardian.CaptureReason
 import app.ridemate.core.model.EtaSource
+import app.ridemate.core.mask.PlateHash
 import app.ridemate.core.model.Provider
 import app.ridemate.core.state.TapId
 import app.ridemate.ocr.OcrEngine
@@ -107,7 +108,8 @@ class ScreenCheck(
                     val driver = (read as? ReadFaresResult.Read)?.driver
                     val eta = driver?.etaMin?.takeIf { driver.etaSource == EtaSource.VERIFIED }
                     if (eta != null || driver?.distanceMeters != null) {
-                        commands().verifiedDriverReading(provider, eta, driver?.distanceMeters, tap, f.capturedAtElapsedMs)
+                        // Same-driver detection (goal 15): the plate on this verified frame, as a hash only.
+                        commands().verifiedDriverReading(provider, eta, driver?.distanceMeters, tap, f.capturedAtElapsedMs, PlateHash.of(text))
                         return
                     }
                 }

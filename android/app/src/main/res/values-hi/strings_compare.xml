@@ -49,6 +49,9 @@
     <string name="compare_booked_done">%1$s में बुकिंग दर्ज हुई। RideMate उस राइड पर नज़र रख रहा है।</string>
     <string name="compare_booked_failed">%1$s में बुकिंग दर्ज नहीं हो सकी। RideMate की यात्रा स्क्रीन खोलकर फिर से कोशिश करें।</string>
     <string name="compare_type_price">दाम टाइप करें</string>
+    <string name="compare_open_heading">हर ऐप में तुलना करें</string>
+    <string name="compare_open_app">%1$s खोलें</string>
+    <string name="compare_open_app_description">%1$s को आपके रास्ते के साथ खोलें, फिर बबल पर किराया पढ़ें टैप करें</string>
     <plurals name="compare_eta_minutes">
         <item quantity="one">%1$d मिनट में पिकअप</item>
         <item quantity="other">%1$d मिनट में पिकअप</item>

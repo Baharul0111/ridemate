@@ -19,6 +19,9 @@ import app.ridemate.core.watch.PostSource
 import app.ridemate.core.watch.RemovalReason
 import app.ridemate.core.watch.RemovalSource
 import app.ridemate.notify.GuardianChannels
+import app.ridemate.onboarding.AndroidSelfTestNotifier
+import app.ridemate.onboarding.HealthCheck
+import app.ridemate.onboarding.HealthResult
 import app.ridemate.testing.FakeClock
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -192,7 +195,9 @@ class RideWatchAdapterTest {
         val manager = context.getSystemService(NotificationManager::class.java)
         val reader = SbnPostReader(VersionCodeLookup { null })
 
-        val result = async(Dispatchers.Default) { status.selfTest(timeoutMs = 5_000) }
+        // The one self-test: onboarding's HealthCheck posts on rm_selftest and polls what the listener saw.
+        val check = HealthCheck({ true }, AndroidSelfTestNotifier(context), { status })
+        val result = async(Dispatchers.Default) { check.run(timeoutMs = 5_000, pollMs = 10) }
         val posted: StatusBarNotification = withTimeout(5_000) {
             var found: StatusBarNotification? = null
             while (found == null) {
@@ -208,28 +213,30 @@ class RideWatchAdapterTest {
         )
         adapter.onPosted(SbnListenerPost(delivered, reader))
 
-        assertEquals(SelfTestResult.PASSED, result.await())
+        assertEquals(HealthResult.SEEN, result.await())
         assertTrue(manager.activeNotifications.none { it.notification.channelId == GuardianChannels.SELFTEST })
     }
 
     @Test
-    fun `the self-test and ping report notification access that is off`() = runBlocking {
+    fun `the ping and health report notification access that is off`() = runBlocking {
         // NotificationManagerCompat caches the enabled list across tests; an empty value refreshes it.
         Settings.Secure.putString(context.contentResolver, "enabled_notification_listeners", "")
         assertFalse(status.isAccessGranted())
         assertFalse("the pre-session ping fails", status.ping())
-        assertEquals(SelfTestResult.ACCESS_OFF, status.selfTest(timeoutMs = 100))
         assertEquals(WatchHealth.ACCESS_OFF, status.health())
     }
 
     @Test
-    fun `the self-test times out when the listener never sees its post`() = runBlocking {
+    fun `the self-test is not seen when the listener never sees its post, and its post is removed`() = runBlocking {
         shadowOf(context as Application).grantPermissions(Manifest.permission.POST_NOTIFICATIONS)
         Settings.Secure.putString(
             context.contentResolver, "enabled_notification_listeners",
             ComponentName(context, RideWatchService::class.java).flattenToString(),
         )
-        assertEquals(SelfTestResult.TIMED_OUT, status.selfTest(timeoutMs = 50))
+        val check = HealthCheck({ true }, AndroidSelfTestNotifier(context), { status })
+        assertEquals(HealthResult.NOT_SEEN, check.run(timeoutMs = 50, pollMs = 10))
+        val manager = context.getSystemService(NotificationManager::class.java)
+        assertTrue(manager.activeNotifications.none { it.notification.channelId == GuardianChannels.SELFTEST })
         assertEquals(WatchHealth.NOT_CONNECTED, status.health())
         status.onConnected {}
         assertEquals(WatchHealth.OK, status.health())

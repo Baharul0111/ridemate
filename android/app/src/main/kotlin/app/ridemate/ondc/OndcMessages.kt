@@ -9,6 +9,12 @@ import app.ridemate.core.model.VehicleClass
 /** User-facing wording for the ONDC row and sheet (strings_ondc.xml, English + Hindi); every failure says what to do next. */
 object OndcMessages {
 
+    /** The panel's title: "Open ride network (ONDC)", plus "ONDC demo seller" in every phase for the mock seller. */
+    fun title(context: Context, demoSeller: Boolean): String {
+        val name = context.getString(R.string.ondc_name)
+        return if (demoSeller) context.getString(R.string.ondc_row_label, name, context.getString(R.string.ondc_label_demo_seller)) else name
+    }
+
     /** The quote's labels: always "network quote", plus "ONDC demo seller" for the hackathon's mock seller. */
     fun quoteLabel(context: Context, quote: OndcQuoteView): String {
         val network = context.getString(R.string.ondc_label_network_quote)

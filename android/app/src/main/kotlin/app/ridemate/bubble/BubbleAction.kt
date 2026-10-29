@@ -19,8 +19,13 @@ enum class BubbleAction(
 ) {
     READ_FARES(R.string.bubble_action_read_fares, R.string.bubble_action_read_fares_description, R.drawable.ic_bubble_read_fares, 0),
     SHOW_ME(R.string.bubble_action_show_me, R.string.bubble_action_show_me_description, R.drawable.ic_bubble_show_me, 1),
+    /** "I cancelled it" during a guided cancel: RideMate checks a minute later, then guides the next app. */
+    I_CANCELLED_IT(R.string.bubble_action_i_cancelled_it, R.string.bubble_action_i_cancelled_it_description, R.drawable.ic_bubble_done, 1),
     BOOKED_HERE(R.string.bubble_action_booked_here, R.string.bubble_action_booked_here_description, R.drawable.ic_bubble_booked_here, 2),
     DONE(R.string.bubble_action_done, R.string.bubble_action_done_description, R.drawable.ic_bubble_done, 3),
+
+    /** "Next: <app>": opens the next selected ride app with the route ready (goal 3). */
+    NEXT_APP(R.string.bubble_action_next_app, R.string.bubble_action_next_app_description, R.drawable.ic_bubble_paste_drop, 3),
     PASTE_DROP(R.string.bubble_action_paste_drop, R.string.bubble_action_paste_drop_description, R.drawable.ic_bubble_paste_drop, 4),
     STOP(R.string.bubble_action_stop, R.string.bubble_action_stop_description, R.drawable.ic_bubble_stop, 5),
 }

@@ -3,7 +3,6 @@ package app.ridemate.capture
 import android.app.Activity
 import android.content.ActivityNotFoundException
 import android.os.Bundle
-import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
 import app.ridemate.RideMateApp
 
@@ -12,7 +11,7 @@ import app.ridemate.RideMateApp
  * itself: it launches the system dialog, hands the answer to [CaptureManager.onConsentResult] and finishes. The
  * projection token never leaves the process and is used once.
  */
-class CaptureConsentActivity : ComponentActivity() {
+class CaptureConsentActivity : app.ridemate.settings.LocalizedActivity() {
 
     private val capture: CaptureManager
         get() = RideMateApp.graph(this).fareReading.capture

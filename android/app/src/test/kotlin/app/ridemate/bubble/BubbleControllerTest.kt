@@ -151,7 +151,7 @@ class BubbleControllerTest {
         val spans = (step.text as Spanned).getSpans(0, step.text.length, StyleSpan::class.java)
         assertEquals("Cancel", step.text.subSequence((step.text as Spanned).getSpanStart(spans.single()), (step.text as Spanned).getSpanEnd(spans.single())).toString())
         assertNotNull(texts.firstOrNull { it.text.toString() == "A fee may apply, up to ₹50" })
-        assertEquals(listOf(BubbleAction.SHOW_ME, BubbleAction.DONE, BubbleAction.STOP), controller.bubbleView!!.shownActions)
+        assertEquals(listOf(BubbleAction.SHOW_ME, BubbleAction.I_CANCELLED_IT, BubbleAction.STOP), controller.bubbleView!!.shownActions)
     }
 
     @Test

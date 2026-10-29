@@ -51,6 +51,14 @@ class RideSessionService : LifecycleService() {
     /** The ongoing notification as last posted. */
     private var lastOngoing: GuardianCard? = null
 
+    /** Keeps the CPU awake while I8 holds, so reminders and the +60 s check fire with the screen off. */
+    private val wakeKeeper by lazy { ReminderWakeKeeper(this) }
+
+    override fun attachBaseContext(newBase: Context) {
+        // Android 10–12: the bubble (built with this service's context) shows the in-app language.
+        super.attachBaseContext(app.ridemate.settings.LegacyLocale.wrap(newBase))
+    }
+
     override fun onCreate() {
         super.onCreate()
         running = this
@@ -89,6 +97,7 @@ class RideSessionService : LifecycleService() {
     override fun onDestroy() {
         running = null
         tickJob?.cancel()
+        wakeKeeper.release()
         graph.sessionActivity.setActive(false)
         try {
             graph.guardianBindings.bubble.detach()
@@ -120,7 +129,7 @@ class RideSessionService : LifecycleService() {
     }
 
     private fun promote(): Boolean {
-        val card = module.presenter().ongoing(module.runtime.uiState.value)
+        val card = module.presenter().ongoing(module.runtime.uiState.value, module.runtime.status.value.openedLegId)
         lastOngoing = card
         val notification = module.notifier.ongoing(card)
         return try {
@@ -159,9 +168,12 @@ class RideSessionService : LifecycleService() {
         }
         // A stopping service must not re-post its notification: it would outlive the service.
         if (stopping) return
+        // The 1 s ticker is a Handler delay, which does not run while the CPU sleeps: while I8 holds, keep the CPU up
+        // and set a while-idle alarm for the next reminder or +60 s check as a backstop.
+        wakeKeeper.update(status.needsForegroundService, status.nextDueElapsedMs)
         // Re-post only what changed: Android drops a package's notification updates above its enqueue rate, and the
         // reminders are updates too.
-        val card = module.presenter().ongoing(ui)
+        val card = module.presenter().ongoing(ui, status.openedLegId)
         if (card == lastOngoing) return
         lastOngoing = card
         module.notifier.updateOngoing(ONGOING_NOTIFICATION_ID, card)
@@ -171,6 +183,7 @@ class RideSessionService : LifecycleService() {
         if (stopping) return
         stopping = true
         tickJob?.cancel()
+        wakeKeeper.release()
         ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
         // Only when no newer start arrived meanwhile (that start's onStartCommand decides again).
         stopSelfResult(lastStartId)

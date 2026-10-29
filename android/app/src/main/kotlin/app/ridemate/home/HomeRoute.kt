@@ -60,6 +60,8 @@ fun HomeRoute(graph: AppGraph, navigator: FeatureNavigator) {
             },
             continueAnyway = { model.continueAnyway(navigator::tripInput) },
             dismissCheck = model::dismissCompareCheck,
+            restrictedSettings = shell.device.restrictedSettingsPossible,
+            openAppInfo = { SystemIntents.startFirst(context, *PermissionIntents.appInfo(context).toTypedArray()) },
         ),
     )
 }

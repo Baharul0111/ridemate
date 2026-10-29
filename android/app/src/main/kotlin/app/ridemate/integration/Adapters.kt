@@ -67,6 +67,8 @@ class PrecheckGate(
         val blocking = mutableListOf<PreSessionIssue>()
         val warnings = mutableListOf<PreSessionIssue>()
         for (issue in report.issues) {
+            // Info notes (location denied: type the pickup) need no answer; the trip screen ignores them too.
+            if (issue.severity == IssueSeverity.INFO) continue
             val mapped = issueOf(issue.kind) ?: continue
             val list = if (issue.severity == IssueSeverity.BLOCKING) blocking else warnings
             if (mapped !in list) list += mapped
@@ -83,8 +85,8 @@ class PrecheckGate(
             PrecheckKind.BATTERY_RESTRICTED -> PreSessionIssue.BATTERY_OPTIMISED
             PrecheckKind.OFFLINE -> PreSessionIssue.OFFLINE
             PrecheckKind.LOCATION_DENIED -> PreSessionIssue.LOCATION_OFF
-            // Chosen on the trip screen, or reported later in the session.
-            PrecheckKind.NO_APP_SELECTED, PrecheckKind.NO_FARES_FOUND, PrecheckKind.NO_ONDC_RESULTS -> null
+            // Chosen on the trip screen.
+            PrecheckKind.NO_APP_SELECTED -> null
         }
     }
 }
@@ -97,6 +99,11 @@ class GuardianCompareCommands(private val runtime: () -> GuardianRuntime) : app.
         val legId = r.legIdFor(provider) ?: return false
         r.onUserAction(UserAction.BookedHere(legId, TapId(tapId)))
         return true
+    }
+
+    override suspend fun recordBookedFare(provider: Provider, fareInr: Int) {
+        val r = runtime()
+        r.legIdFor(provider)?.let { r.recordBookedFareLeg(it, fareInr) }
     }
 }
 
@@ -118,7 +125,16 @@ class RouteFareLauncher(
     private val scope: CoroutineScope,
     private val onError: (Throwable) -> Unit = {},
 ) : FareAppLauncher {
-    override fun open(provider: Provider): Boolean {
+    /** "Open <app>" / "Book in <app>" / a stale row's refresh on RideMate's own screen: the user's tap opens it now. */
+    override fun open(provider: Provider): Boolean = launch(provider, legId = null, userTap = true)
+
+    /**
+     * The bubble's "Next: <app>" (goal 3): AppLauncher's non-tap path, which opens the app directly while the bubble
+     * is on screen and otherwise posts its "open the next ride app" heads-up for the user to tap.
+     */
+    fun openNext(provider: Provider, legId: String): Boolean = launch(provider, legId, userTap = false)
+
+    private fun launch(provider: Provider, legId: String?, userTap: Boolean): Boolean {
         if (provider.isDemo || provider.isNetwork) return false
         if (provider !in runCatching { installed().installedRideApps() }.getOrDefault(emptyList())) return false
         scope.launch {
@@ -126,8 +142,9 @@ class RouteFareLauncher(
                 val session = db().sessionDao().active().firstOrNull() ?: return@runCatching
                 val pickup = ComparisonStarter.tripPlaceOf(session.pickup.toPlace())
                 val drop = ComparisonStarter.tripPlaceOf(session.drop.toPlace())
-                val legId = legIdFor(provider) ?: GuardianRuntime.legIdOf(session.id, provider)
-                launcher().openFromUserTap(LaunchRequest(provider, pickup, drop, legId))
+                val leg = legId ?: legIdFor(provider) ?: GuardianRuntime.legIdOf(session.id, provider)
+                val request = LaunchRequest(provider, pickup, drop, leg)
+                if (userTap) launcher().openFromUserTap(request) else launcher().open(request)
             }.onFailure(onError)
         }
         return true

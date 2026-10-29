@@ -17,6 +17,9 @@ import java.util.UUID
  */
 fun interface RideWatchSelfTest {
     fun hasSeen(token: String): Boolean
+
+    /** The post went unseen within the time limit: RideWatch asks Android to bind the listener again. */
+    fun onNotSeen() = Unit
 }
 
 /** Posts and removes the self-test notification. */
@@ -98,6 +101,7 @@ class HealthCheck(
                 while (!watch.hasSeen(token)) delay(pollMs)
                 true
             }
+            if (seen != true) runCatching { watch.onNotSeen() }
             return if (seen == true) HealthResult.SEEN else HealthResult.NOT_SEEN
         } finally {
             notifier.cancel(token)

@@ -10,11 +10,16 @@ import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.os.PowerManager
 import android.provider.Settings
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithContentDescription
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
+import androidx.compose.foundation.verticalScroll
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.ridemate.R
@@ -126,7 +131,9 @@ class AndroidPrecheckTest {
             Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
             FixIntents.forAction(context, FixAction.REQUEST_LOCATION)!!.action,
         )
-        listOf(FixAction.TRY_DEMO, FixAction.CHOOSE_APPS, FixAction.RETRY_READ, FixAction.TYPE_PRICE, FixAction.CONTINUE_WITHOUT_ONDC)
+        assertEquals(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, FixIntents.forAction(context, FixAction.OPEN_APP_INFO)!!.action)
+        assertEquals("package:${context.packageName}", FixIntents.forAction(context, FixAction.OPEN_APP_INFO)!!.dataString)
+        listOf(FixAction.TRY_DEMO, FixAction.CHOOSE_APPS)
             .forEach { assertNull(it.name, FixIntents.forAction(context, it)) }
         FixAction.entries.mapNotNull { FixIntents.forAction(context, it) }
             .forEach { assertTrue(it.flags and Intent.FLAG_ACTIVITY_NEW_TASK != 0) }
@@ -158,11 +165,55 @@ class AndroidPrecheckTest {
     @Test
     fun `the fix-it card shows the severity in words and calls back with the fix`() {
         val clicked = mutableListOf<FixAction>()
-        compose.setContent { PrecheckCard(PreSessionCheck.noFaresFound(), onFix = { clicked += it }) }
+        val issue = PrecheckIssue(PrecheckKind.BATTERY_RESTRICTED, IssueSeverity.WARNING, listOf(FixAction.REQUEST_BATTERY_EXEMPTION))
+        compose.setContent { PrecheckCard(issue, onFix = { clicked += it }) }
         compose.onNodeWithText("Warning").assertExists()
-        compose.onNodeWithText("No prices found on this screen").assertExists()
-        compose.onNodeWithContentDescription("Type the price: No prices found on this screen").assertHasClickAction().performClick()
-        compose.onNodeWithContentDescription("Read fares again: No prices found on this screen").performClick()
-        assertEquals(listOf(FixAction.TYPE_PRICE, FixAction.RETRY_READ), clicked)
+        compose.onNodeWithText("Battery saving may delay reminders").assertExists()
+        compose.onNodeWithContentDescription("Remove battery limits: Battery saving may delay reminders").assertHasClickAction().performClick()
+        assertEquals(listOf(FixAction.REQUEST_BATTERY_EXEMPTION), clicked)
+    }
+
+    @Test
+    fun `sideloaded on Android 13+, the notification-access and overlay cards explain restricted settings`() {
+        val clicked = mutableListOf<FixAction>()
+        val listener = PrecheckIssue(PrecheckKind.LISTENER_OFF, IssueSeverity.BLOCKING, listOf(FixAction.OPEN_NOTIFICATION_ACCESS))
+        val overlay = PrecheckIssue(PrecheckKind.OVERLAY_OFF, IssueSeverity.WARNING, listOf(FixAction.OPEN_OVERLAY_SETTINGS))
+        val battery = PrecheckIssue(PrecheckKind.BATTERY_RESTRICTED, IssueSeverity.WARNING, listOf(FixAction.REQUEST_BATTERY_EXEMPTION))
+        compose.setContent {
+            androidx.compose.foundation.layout.Column(androidx.compose.ui.Modifier.verticalScroll(androidx.compose.foundation.rememberScrollState())) {
+                PrecheckCard(listener, onFix = { clicked += it }, restrictedSettings = true)
+                PrecheckCard(overlay, onFix = { clicked += it }, restrictedSettings = true)
+                PrecheckCard(battery, onFix = { clicked += it }, restrictedSettings = true)
+            }
+        }
+        val hint = context.getString(R.string.precheck_restricted_hint)
+        compose.onAllNodesWithText(hint).assertCountEquals(2)
+        compose.onAllNodesWithText(context.getString(R.string.onb_restricted_steps)).assertCountEquals(2)
+        compose.onNodeWithContentDescription("Open App info: Turn on notification access").performScrollTo().performClick()
+        compose.onNodeWithContentDescription("Open App info: Floating button is off").performScrollTo().performClick()
+        assertEquals(listOf(FixAction.OPEN_APP_INFO, FixAction.OPEN_APP_INFO), clicked)
+    }
+
+    @Test
+    fun `a store install sees no restricted-settings help`() {
+        val listener = PrecheckIssue(PrecheckKind.LISTENER_OFF, IssueSeverity.BLOCKING, listOf(FixAction.OPEN_NOTIFICATION_ACCESS))
+        compose.setContent { PrecheckCard(listener, onFix = {}, restrictedSettings = false) }
+        compose.onAllNodesWithText(context.getString(R.string.precheck_restricted_hint)).assertCountEquals(0)
+        compose.onAllNodesWithContentDescription("Open App info: Turn on notification access").assertCountEquals(0)
+    }
+
+    @Test
+    fun `a guardian channel switched off is reported, a missing or quiet one is not`() {
+        val manager = context.getSystemService(NotificationManager::class.java)
+        assertTrue("no channel created yet", probes.guardianChannelsAllowed())
+        manager.createNotificationChannel(
+            android.app.NotificationChannel(app.ridemate.notify.GuardianChannels.PROMPTS, "Questions", NotificationManager.IMPORTANCE_HIGH),
+        )
+        assertTrue(probes.guardianChannelsAllowed())
+        // What Android stores when the user switches the channel off in settings.
+        manager.createNotificationChannel(
+            android.app.NotificationChannel(app.ridemate.notify.GuardianChannels.ALERTS, "Alerts", NotificationManager.IMPORTANCE_NONE),
+        )
+        assertFalse(probes.guardianChannelsAllowed())
     }
 }

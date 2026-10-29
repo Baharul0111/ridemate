@@ -104,6 +104,7 @@ class GuardianPresenter(val text: GuardianText, private val cancelSteps: CancelS
     }
 
     fun notice(notice: NoticeItem): GuardianCard {
+        sameDriver(notice)?.let { return it }
         val lines = buildList {
             notice.driver?.let { add(text.driverDetails(it)) }
             if (notice.key == UiKey.BANNER_CANCEL_CONFIRMED || notice.key == UiKey.BANNER_USER_SAYS_CANCELLED) {
@@ -121,6 +122,27 @@ class GuardianPresenter(val text: GuardianText, private val cancelSteps: CancelS
         )
     }
 
+    /**
+     * The same driver turned up on another booking while a ride is kept (goal 15): a heads-up, not a quiet update, with
+     * [Open <App>] (to cancel that booking there) and [Dismiss] for the other booking.
+     */
+    private fun sameDriver(notice: NoticeItem): GuardianCard? {
+        if (notice.key != UiKey.BANNER_SAME_DRIVER) return null
+        val legId = notice.legId ?: return null
+        // The reducer lists the other booking's app first.
+        val other = notice.providers.firstOrNull() ?: return null
+        return GuardianCard(
+            id = notice.id,
+            channel = GuardianChannels.PROMPTS,
+            title = text.title(notice.key, notice.providers),
+            lines = listOf(text.string(R.string.guardian_same_driver_body, text.provider(other))),
+            actions = legActions(legId, other, listOf(UiAction.OPEN_APP, UiAction.DISMISS)),
+            style = CardStyle.HEADS_UP,
+            timeoutMs = GuardianUiReducer.NOTICE_TTL_MS,
+            open = CardOpen.RideApp(other, OpenPurpose.CANCEL),
+        )
+    }
+
     /** The heads-up "Open <App> to cancel" used when the background-start rule forbids opening the app directly. */
     fun openApp(legId: String, provider: Provider, purpose: OpenPurpose, hasApp: Boolean): GuardianCard = GuardianCard(
         id = "open:$legId",
@@ -135,9 +157,10 @@ class GuardianPresenter(val text: GuardianText, private val cancelSteps: CancelS
     /**
      * The ongoing notification, mirroring the bubble's actions (fallback when an app hides overlays): before a driver
      * is kept [Read fares] [Booked here] [Stop]; during the cancel chain [I cancelled it] [Show me] [Stop]; otherwise
-     * [Done] [Stop].
+     * [Done] [Stop]. "Booked here" names the app it records ([openedLegId], the app RideMate opened last, while it is
+     * still before booking; else the first unbooked app): "Booked in Rapido".
      */
-    fun ongoing(state: GuardianUiState): GuardianCard {
+    fun ongoing(state: GuardianUiState, openedLegId: String? = null): GuardianCard {
         val guided = state.legs.firstOrNull { it.state == RideState.CANCEL_GUIDED && !it.dismissed }
         val kept = state.legs.firstOrNull { it.role == LegRole.KEPT }
         val booked = state.legs.count { it.booked }
@@ -163,8 +186,9 @@ class GuardianPresenter(val text: GuardianText, private val cancelSteps: CancelS
             )
             kept == null -> listOfNotNull(
                 sessionAction(SessionOpKind.READ_FARES),
-                sessionAction(SessionOpKind.BOOKED_HERE).takeIf {
-                    state.legs.any { !it.booked && !it.state.isTerminal && it.provider != Provider.ONDC }
+                bookTarget(state, openedLegId)?.let { leg ->
+                    val label = text.string(R.string.guardian_action_booked_in, text.provider(leg.provider))
+                    CardAction(SessionOp(SessionOpKind.BOOKED_HERE, leg.legId), label, label)
                 },
                 sessionAction(SessionOpKind.STOP),
             )
@@ -179,6 +203,23 @@ class GuardianPresenter(val text: GuardianText, private val cancelSteps: CancelS
             style = CardStyle.QUIET,
         )
     }
+
+    /** The leg "Booked here" records: the app opened last while still before booking, else the first unbooked app. */
+    private fun bookTarget(state: GuardianUiState, openedLegId: String?): LegUi? {
+        fun bookable(leg: LegUi) = !leg.booked && !leg.dismissed && !leg.state.isTerminal && !leg.provider.isNetwork
+        return state.legs.firstOrNull { it.legId == openedLegId && bookable(it) } ?: state.legs.firstOrNull(::bookable)
+    }
+
+    /** "Booked here" was recorded for [provider]: a short notice names the app, so a wrong one is noticed at once. */
+    fun bookedRecorded(legId: String, provider: Provider): GuardianCard = GuardianCard(
+        id = "booked:$legId",
+        channel = GuardianChannels.GUARDIAN,
+        title = text.string(R.string.guardian_booked_recorded, text.provider(provider)),
+        lines = listOf(text.string(R.string.guardian_booked_recorded_body)),
+        actions = emptyList(),
+        style = CardStyle.QUIET,
+        timeoutMs = GuardianUiReducer.NOTICE_TTL_MS,
+    )
 
     /** Android refused to restart the guardian from the background: one tap on this brings it back. */
     fun resume(): GuardianCard = GuardianCard(
@@ -195,6 +236,17 @@ class GuardianPresenter(val text: GuardianText, private val cancelSteps: CancelS
         id = START_BLOCKED_ID,
         channel = GuardianChannels.PROMPTS,
         title = text.string(R.string.guardian_start_blocked),
+        lines = emptyList(),
+        actions = emptyList(),
+        style = CardStyle.HEADS_UP,
+        timeoutMs = GuardianUiReducer.NOTICE_TTL_MS,
+    )
+
+    /** A new comparison waits for a live open-network booking: cancel it in RideMate, or let it finish, first. */
+    fun startBlockedByNetwork(): GuardianCard = GuardianCard(
+        id = START_BLOCKED_ID,
+        channel = GuardianChannels.PROMPTS,
+        title = text.string(R.string.guardian_start_blocked_network),
         lines = emptyList(),
         actions = emptyList(),
         style = CardStyle.HEADS_UP,
@@ -291,13 +343,20 @@ class GuardianPresenter(val text: GuardianText, private val cancelSteps: CancelS
 
     private fun reminder(item: ReminderItem): GuardianCard {
         val first = item.legs.firstOrNull()
+        // A leg the user already said they cancelled can't take "I cancelled it" again (the guardian would reject it);
+        // what helps there is the proof: "Check screen".
+        val actions = if (first != null && first.state in USER_SAID_CANCELLED) {
+            item.actions.map { if (it == UiAction.I_CANCELLED_IT) UiAction.CHECK_SCREEN else it }.distinct()
+        } else {
+            item.actions
+        }
         return GuardianCard(
             id = item.id,
             channel = GuardianChannels.REMINDERS,
             title = text.title(UiKey.REMINDER_CANCEL_PENDING, item.legs.map { it.provider }),
             lines = listOf(text.string(R.string.guardian_reminder_body, item.attempt)) +
                 item.legs.map { text.string(R.string.guardian_line, text.provider(it.provider), text.state(it.state, it.provider)) },
-            actions = if (first == null) emptyList() else legActions(first.legId, first.provider, item.actions),
+            actions = if (first == null) emptyList() else legActions(first.legId, first.provider, actions),
             style = CardStyle.HEADS_UP,
             alertAgain = true,
             open = first?.let { CardOpen.RideApp(it.provider, OpenPurpose.CANCEL) } ?: CardOpen.Guardian,
@@ -350,6 +409,9 @@ class GuardianPresenter(val text: GuardianText, private val cancelSteps: CancelS
     companion object {
         /** I10: the states in which a leg is "your ride" (its current generation has a driver). */
         val RIDE_STATES: Set<RideState> = setOf(RideState.ASSIGNED, RideState.ARRIVING)
+
+        /** The user already answered "I cancelled it" for a leg in these states; only proof moves it on. */
+        val USER_SAID_CANCELLED: Set<RideState> = setOf(RideState.USER_SAYS_CANCELLED, RideState.CANCEL_UNCONFIRMED)
 
         const val ONGOING_ID = "ongoing"
         const val RESUME_ID = "resume"

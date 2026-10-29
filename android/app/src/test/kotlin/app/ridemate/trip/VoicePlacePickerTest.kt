@@ -110,6 +110,44 @@ class VoicePlacePickerTest {
     }
 
     @Test
+    fun `a spoken sentence is looked up by its place, and the model still hears the whole sentence`() = runTest {
+        // A geocoder that knows the place only by its name, as the real one does for a sentence.
+        geocoder.answer = { q -> GeocodeResult.Found(if (q == "गुवाहाटी एयरपोर्ट" || q == "airport") airportPlaces else emptyList()) }
+
+        val hindi = picker.pick("मुझे गुवाहाटी एयरपोर्ट जाना है", VoiceLanguage.HINDI, near) as PlacePickOutcome.Picked
+        assertEquals("गुवाहाटी एयरपोर्ट", geocoder.calls.last().query)
+        assertEquals("Airport Road, Barpeta", hindi.pick.label)
+        assertEquals("मुझे गुवाहाटी एयरपोर्ट जाना है", api.requests.last().transcript)
+
+        val english = picker.pick("Take me to the airport, please", VoiceLanguage.ENGLISH, near) as PlacePickOutcome.Picked
+        assertEquals("airport", geocoder.calls.last().query)
+        assertEquals(3, english.candidates.size)
+    }
+
+    @Test
+    fun `when the place phrase finds nothing the whole transcript is tried`() = runTest {
+        geocoder.answer = { q -> GeocodeResult.Found(if (q == "go to market") airportPlaces else emptyList()) }
+        picker.pick("go to market", VoiceLanguage.ENGLISH, near)
+        assertEquals(listOf("market", "go to market"), geocoder.calls.map { it.query })
+    }
+
+    @Test
+    fun `the place phrase of sentences in each voice language`() {
+        assertEquals("गुवाहाटी एयरपोर्ट", SpokenPlace.phrase("मुझे गुवाहाटी एयरपोर्ट जाना है।"))
+        assertEquals("पलटन बाज़ार", SpokenPlace.phrase("पलटन बाज़ार ले चलो"))
+        assertEquals("Paltan Bazaar", SpokenPlace.phrase("mujhe Paltan Bazaar jana hai"))
+        assertEquals("airport", SpokenPlace.phrase("I want to go to the airport"))
+        assertEquals("LGBI Airport", SpokenPlace.phrase("drop me at LGBI Airport please"))
+        assertEquals("গুৱাহাটী বিমানবন্দৰ", SpokenPlace.phrase("মই গুৱাহাটী বিমানবন্দৰ লৈ যাব বিচাৰো"))
+        assertEquals("হাওড়া স্টেশন", SpokenPlace.phrase("আমি হাওড়া স্টেশন যেতে চাই"))
+        // A bare place name, or a sentence with nothing else in it, stays as it is.
+        assertEquals("Fancy Bazaar", SpokenPlace.phrase("Fancy Bazaar"))
+        assertEquals("take me to", SpokenPlace.phrase("take me to"))
+        assertTrue(SpokenPlace.isSentence("take me to the airport"))
+        assertTrue(!SpokenPlace.isSentence("Airport Road"))
+    }
+
+    @Test
     fun `nothing found, no geocoder, a failed lookup and an empty transcript`() = runTest {
         geocoder.answer = { GeocodeResult.Found(emptyList()) }
         assertEquals(PlacePickOutcome.NoCandidates, picker.pick("xyzzy", VoiceLanguage.ENGLISH, near))

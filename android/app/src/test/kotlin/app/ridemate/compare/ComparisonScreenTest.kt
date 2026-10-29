@@ -9,6 +9,8 @@ import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.assertHasClickAction
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -185,6 +187,82 @@ class ComparisonScreenTest {
 
         assertEquals(listOf(Triple(Provider.OLA, VehicleClass.AUTO, "₹105")), typed)
         compose.onNodeWithText("Saved. It shows as \"entered by you\".").assertIsDisplayed()
+    }
+
+    @Test
+    fun `every selected app can be opened with the route ready, also before it has a price`() {
+        val opening = ComparisonData(
+            sessionId = "s1",
+            legs = listOf(
+                TestData.leg("l1", "s1", Provider.UBER, RideState.QUOTED),
+                TestData.leg("l2", "s1", Provider.OLA, RideState.SELECTED),
+                TestData.leg("l3", "s1", Provider.RAPIDO, RideState.SELECTED),
+                TestData.leg("l4", "s1", Provider.ONDC, RideState.SEARCHING_NET),
+            ),
+            rows = listOf(verified(Provider.UBER, VehicleClass.AUTO, "Uber Auto", 120)),
+        )
+        compose.setContent { ComparisonScreen(opening, seenAt + 1_000, null, callbacks) }
+
+        compose.onNodeWithTag(ComparisonTags.openApp(Provider.OLA)).assertIsDisplayed().performClick()
+        compose.onNodeWithTag(ComparisonTags.openApp(Provider.RAPIDO)).performClick()
+        compose.onNodeWithText("Open Uber").assertIsDisplayed()
+        assertEquals(listOf(Provider.OLA, Provider.RAPIDO), booked)
+        // The open network is booked inside RideMate, never opened as an app.
+        compose.onAllNodesWithText("Open Open network (ONDC)").assertCountEquals(0)
+    }
+
+    @Test
+    fun `open-network quotes are list rows with seen-at, demo label, Book, and a stale tap that searches again`() {
+        val bookedNetwork = mutableListOf<String>()
+        val withNetwork = data.copy(rows = rows.filter { it.status != QuoteStatus.NETWORK })
+            .withNetworkRows(listOf(GatedRow.network(VehicleClass.AUTO, "Demo Seller Autos", 95, 4, seenAt).copy(rowId = "ondc:auto-1")), demoSeller = true)
+        compose.setContent {
+            ComparisonScreen(withNetwork, seenAt + 60_000, null, callbacks.copy(onBookNetwork = { bookedNetwork += it }))
+        }
+        val tag = rowTag(Provider.ONDC, VehicleClass.AUTO)
+        compose.onNodeWithTag(tag, useUnmergedTree = true)
+            .assert(hasAnyDescendant(hasText("network quote · ONDC demo seller")))
+            .assert(hasAnyDescendant(hasText("seen in Open network (ONDC) at ${IstTime.seenAt(seenAt)}")))
+            .assert(hasAnyDescendant(hasText("old, tap to refresh")))
+        compose.onNodeWithContentDescription("Book Demo Seller Autos on the open network for ₹95").assertHasClickAction().performClick()
+        assertEquals(listOf("ondc:auto-1"), bookedNetwork)
+        compose.onNodeWithTag(tag).performClick()
+        assertEquals(listOf(Provider.ONDC), refreshed)
+    }
+
+    @Test
+    fun `only the chosen vehicle types are listed, and cheapest is decided among them`() {
+        val stored = listOf(
+            verified(Provider.UBER, VehicleClass.BIKE, "Uber Moto", 40),
+            verified(Provider.UBER, VehicleClass.AUTO, "Uber Auto", 120),
+            verified(Provider.OLA, VehicleClass.AUTO, "Ola Auto", 110),
+            verified(Provider.RAPIDO, VehicleClass.OTHER, "Parcel", 30),
+        )
+        val chosen = ComparisonData.chosen(stored, listOf(VehicleClass.AUTO))
+        assertEquals(listOf(VehicleClass.AUTO, VehicleClass.AUTO), chosen.map { it.vehicleClass })
+        // "Other" (parcel, rentals…) is never offered on the trip screen: dropped even when nothing was stored.
+        assertEquals(3, ComparisonData.chosen(stored, emptyList()).size)
+        val network = ComparisonData("s1", emptyList(), chosen, vehicleClasses = listOf(VehicleClass.AUTO))
+            .withNetworkRows(listOf(GatedRow.network(VehicleClass.BIKE, "Bikes", 20, null, seenAt)), demoSeller = false)
+        assertEquals("a network bike quote is not listed for an Auto trip", 2, network.rows.size)
+
+        compose.setContent { ComparisonScreen(ComparisonData("s1", emptyList(), chosen, vehicleClasses = listOf(VehicleClass.AUTO)), seenAt, null, callbacks) }
+        compose.onAllNodesWithText("Bike").assertCountEquals(0)
+        compose.onNodeWithTag(rowTag(Provider.OLA, VehicleClass.AUTO), useUnmergedTree = true).assert(hasAnyDescendant(hasText("cheapest")))
+        compose.onAllNodesWithText("cheapest").assertCountEquals(1)
+    }
+
+    @Test
+    fun `the price form offers only the chosen vehicle types`() {
+        val autoTrip = data.copy(vehicleClasses = listOf(VehicleClass.AUTO))
+        compose.setContent { ComparisonScreen(autoTrip, seenAt, ManualPrompt(null, Provider.OLA), callbacks) }
+        compose.onNodeWithTag(ComparisonTags.MANUAL_FORM, useUnmergedTree = true)
+            .assert(!hasAnyDescendant(hasText("Bike")))
+            .assert(!hasAnyDescendant(hasText("Cab")))
+        compose.onNodeWithTag(ComparisonTags.PRICE_FIELD).performTextInput("120")
+        compose.onNodeWithText("Save price").performClick()
+        // The only chosen type is preselected.
+        assertEquals(listOf(Triple(Provider.OLA, VehicleClass.AUTO, "120")), typed)
     }
 
     @Test

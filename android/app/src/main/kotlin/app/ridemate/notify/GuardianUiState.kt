@@ -7,6 +7,7 @@ import app.ridemate.core.guardian.GuardianEffect
 import app.ridemate.core.guardian.GuardianState
 import app.ridemate.core.guardian.LegRecord
 import app.ridemate.core.guardian.LegRole
+import app.ridemate.core.guardian.TimerKind
 import app.ridemate.core.guardian.UiAction
 import app.ridemate.core.guardian.UiKey
 import app.ridemate.core.model.EtaSource
@@ -80,6 +81,11 @@ data class LegUi(
     /** The proof behind a cancel (rungs 1–3), or USER while "I cancelled it" awaits its +60 s check. */
     val evidence: EvidenceRung? = null,
     val driver: DriverUi? = null,
+    /**
+     * The +60 s check after "I cancelled it" is still to come. Once it ran quietly (the ride post was gone), the leg
+     * waits for the app's proof instead, and no longer says "checking again in a minute".
+     */
+    val followUpPending: Boolean = true,
 )
 
 /** Something that needs the user: a sheet, a prompt, a card or an alert. Shown in-app and as a notification. */
@@ -168,7 +174,14 @@ data class ReminderItem(val attempt: Int, val legs: List<LegRefUi>, val actions:
 
 @Serializable
 @SerialName("alert")
-data class AlertItem(override val legId: String, val provider: Provider, val key: UiKey, val actions: List<UiAction>) : UiItem {
+data class AlertItem(
+    override val legId: String,
+    val provider: Provider,
+    val key: UiKey,
+    val actions: List<UiAction>,
+    /** Which loud alert this is for the leg and key (1, 2, …): a repeat is a new item, so it is posted and sounds. */
+    val occurrence: Int = 1,
+) : UiItem {
     override val id: String get() = "alert:$legId:${key.name}"
 }
 
@@ -301,14 +314,23 @@ object GuardianUiReducer {
         is GuardianEffect.Reminder -> state.upsert(
             ReminderItem(effect.attempt, effect.legs.map { LegRefUi(it.legId, it.provider, it.state) }, effect.actions),
         ).copy(remindersSent = effect.attempt)
-        is GuardianEffect.LoudAlert -> state.upsert(AlertItem(effect.legId, effect.provider, effect.key, effect.actions))
+        is GuardianEffect.LoudAlert -> {
+            // Every loud alert is a new occurrence (a second "still looks active" for the same leg must sound again,
+            // even if the first notification was swiped away), so it never equals the one already shown.
+            val prior = state.items.filterIsInstance<AlertItem>().firstOrNull { it.legId == effect.legId && it.key == effect.key }
+            state.upsert(AlertItem(effect.legId, effect.provider, effect.key, effect.actions, occurrence = (prior?.occurrence ?: 0) + 1))
+        }
         is GuardianEffect.RideBanner -> state.notice(
             UiKey.BANNER_YOUR_RIDE, effect.driver.legId, listOf(effect.driver.provider), DriverUi.of(effect.driver), nowWallMs,
         )
         is GuardianEffect.Banner -> banner(state, effect, nowWallMs)
-        is GuardianEffect.SameDriverNotice -> state.notice(
-            UiKey.BANNER_SAME_DRIVER, null, effect.legIds.mapNotNull { state.leg(it)?.provider }, nowWallMs = nowWallMs,
-        )
+        // The same driver on a booking besides the kept one: the notice names that other booking, so it can offer
+        // [Open <App>] and [Dismiss] for it.
+        is GuardianEffect.SameDriverNotice -> {
+            val other = effect.legIds.firstOrNull { state.leg(it)?.role != LegRole.KEPT }
+            val ordered = listOfNotNull(other) + effect.legIds.filter { it != other }
+            state.notice(UiKey.BANNER_SAME_DRIVER, other, ordered.mapNotNull { state.leg(it)?.provider }, nowWallMs = nowWallMs)
+        }
         is GuardianEffect.PayHandoffOffer -> state.upsert(PayItem(effect.legId, effect.provider, effect.actions))
         is GuardianEffect.OndcCommand -> state.notice(effect.key, effect.legId, listOf(Provider.ONDC), nowWallMs = nowWallMs)
         is GuardianEffect.OndcCancelFee -> state.upsert(OndcFeeItem(effect.legId, effect.feeInr, effect.actions))
@@ -361,7 +383,12 @@ object GuardianUiReducer {
                 is CheckScreenItem -> live && rec!!.leg.state in LegState.CHAIN_STATES
                 is CaptureItem -> live && nowWallMs - item.atWallMs < CAPTURE_TTL_MS
                 is ReminderItem -> guardian.reminders != null
-                is AlertItem -> if (item.key == UiKey.ALERT_KEPT_LEG_LOST) rec != null && session?.closed != true else live
+                is AlertItem -> when {
+                    item.key == UiKey.ALERT_KEPT_LEG_LOST -> rec != null && session?.closed != true
+                    // The user is cancelling again (guided, or "I cancelled it"): the old "still looks active" goes.
+                    item.key == UiKey.ALERT_STILL_LIVE && rec?.leg?.state in RECANCELLING -> false
+                    else -> live
+                }
                 is PayItem -> rec?.leg?.state == RideState.ENDED
                 is OndcFeeItem -> rec?.leg?.state == RideState.SOFT_CANCEL
             }
@@ -397,6 +424,9 @@ object GuardianUiReducer {
 
     private val CARD_STATES = setOf(RideState.CANCEL_REQUESTED, RideState.CANCEL_GUIDED)
 
+    /** A leg the user is cancelling again: an earlier "still looks active" alert for it is answered. */
+    private val RECANCELLING = setOf(RideState.CANCEL_GUIDED, RideState.USER_SAYS_CANCELLED)
+
     private fun legUi(rec: LegRecord, guardian: GuardianState, nowElapsedMs: Long): LegUi {
         val leg = rec.leg
         val userRung = leg.state == RideState.USER_SAYS_CANCELLED || leg.state == RideState.CANCEL_UNCONFIRMED
@@ -414,6 +444,7 @@ object GuardianUiReducer {
             endedByApp = leg.endedByApp,
             evidence = evidence,
             driver = DriverUi.of(leg, nowElapsedMs + guardian.elapsedOffsetMs),
+            followUpPending = guardian.timers.any { it.kind == TimerKind.FOLLOW_UP_CHECK && it.legId == rec.legId },
         )
     }
 

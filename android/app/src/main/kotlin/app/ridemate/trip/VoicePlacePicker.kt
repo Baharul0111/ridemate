@@ -51,10 +51,18 @@ class VoicePlacePicker(
     suspend fun pick(transcript: String, language: VoiceLanguage, near: LatLng?, sessionId: String? = null): PlacePickOutcome {
         val text = transcript.trim()
         if (text.isEmpty()) return PlacePickOutcome.NoCandidates
-        val candidates = when (val found = geocoder.search(text, maxCandidates, near)) {
-            is GeocodeResult.Found -> found.places.take(maxCandidates).mapIndexed { i, p -> PlaceSuggestion("c${i + 1}", p.label, p.point) }
-            GeocodeResult.Unavailable -> return PlacePickOutcome.GeocoderUnavailable
-            GeocodeResult.Failed -> return PlacePickOutcome.LookupFailed
+        // A spoken sentence ("take me to the airport", "मुझे एयरपोर्ट जाना है") is looked up by its place phrase; the
+        // whole transcript is tried too when the phrase finds nothing.
+        val phrase = SpokenPlace.phrase(text)
+        val queries = if (phrase != text) listOf(phrase, text) else listOf(text)
+        var candidates: List<PlaceSuggestion> = emptyList()
+        for (query in queries) {
+            candidates = when (val found = geocoder.search(query, maxCandidates, near)) {
+                is GeocodeResult.Found -> found.places.take(maxCandidates).mapIndexed { i, p -> PlaceSuggestion("c${i + 1}", p.label, p.point) }
+                GeocodeResult.Unavailable -> return PlacePickOutcome.GeocoderUnavailable
+                GeocodeResult.Failed -> return PlacePickOutcome.LookupFailed
+            }
+            if (candidates.isNotEmpty()) break
         }
         if (candidates.isEmpty()) return PlacePickOutcome.NoCandidates
         if (candidates.size == 1) return PlacePickOutcome.Choose(candidates, ChooseReason.SINGLE_CANDIDATE, null)

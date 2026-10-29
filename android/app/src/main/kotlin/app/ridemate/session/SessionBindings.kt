@@ -33,6 +33,14 @@ class SessionBindings(context: Context) {
 
     @Volatile
     var fareReader: FareReadRequester? = null
+
+    /**
+     * Ends fare reading's screen projection (called on the main thread). A projection belongs to one comparison: Done
+     * or Stop from any surface, a closed session and a new comparison all end it, so the next comparison's first
+     * Read fares asks Android for consent again and the screen-share chip goes away.
+     */
+    @Volatile
+    var endFareCapture: (() -> Unit)? = null
 }
 
 /** Opens a live ride app by its launch intent. Demo providers and ONDC have no app to open. */

@@ -100,6 +100,8 @@ fun TripInputScreen(
     onStartComparison: (TripPlan) -> Unit,
     onTryDemo: () -> Unit,
     modifier: Modifier = Modifier,
+    /** Sideloaded on Android 13+: the notification-access and overlay cards explain "Allow restricted settings". */
+    restrictedSettings: Boolean = false,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
@@ -174,7 +176,7 @@ fun TripInputScreen(
             HorizontalDivider()
             AppsSection(state, viewModel)
             VehiclesSection(state, viewModel)
-            CompareSection(state, viewModel, onFix)
+            CompareSection(state, viewModel, onFix, restrictedSettings)
         }
     }
 }
@@ -184,7 +186,7 @@ fun TripInputScreen(
 fun TripRoute(onStartComparison: (TripPlan) -> Unit, onTryDemo: () -> Unit, modifier: Modifier = Modifier) {
     val graph = RideMateApp.graph(LocalContext.current)
     val viewModel: TripViewModel = viewModel(factory = TripViewModel.factory(graph))
-    TripInputScreen(viewModel, onStartComparison, onTryDemo, modifier)
+    TripInputScreen(viewModel, onStartComparison, onTryDemo, modifier, restrictedSettings = graph.appShell.device.restrictedSettingsPossible)
 }
 
 private fun startSafely(context: Context, intent: Intent): Boolean = try {
@@ -647,10 +649,10 @@ private fun VehiclesSection(state: TripUiState, vm: TripViewModel) {
 // ---------------------------------------------------------------------------------------------------------------
 
 @Composable
-private fun CompareSection(state: TripUiState, vm: TripViewModel, onFix: (FixAction) -> Unit) {
+private fun CompareSection(state: TripUiState, vm: TripViewModel, onFix: (FixAction) -> Unit, restrictedSettings: Boolean) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         state.report?.let { report ->
-            report.issues.forEach { PrecheckCard(it, onFix) }
+            report.issues.forEach { PrecheckCard(it, onFix, restrictedSettings = restrictedSettings) }
             if (report.canProceed) {
                 OutlinedButton(onClick = vm::continueAnyway, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
                     Text(stringResource(R.string.trip_continue_anyway))

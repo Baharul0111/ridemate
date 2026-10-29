@@ -78,7 +78,13 @@
     <string name="dev_budget_not_owner">The server shows the budget only to owner accounts. Sign in with the owner\'s Google account.</string>
     <string name="dev_budget_of">%1$s of %2$s (%3$d%%)</string>
     <string name="dev_budget_unknown">Not reported</string>
-    <string name="dev_budget_ai">AI spend</string>
+    <string name="dev_budget_ai">AI used (spent + reserved) of limit</string>
+    <string name="dev_budget_ai_reserved">AI reserved (calls running)</string>
+    <string name="dev_budget_credit_left">Modal credit left</string>
+    <!-- %1$s: dollars left; %2$s: the whole credit -->
+    <string name="dev_budget_left_of">%1$s of %2$s</string>
+    <!-- %1$s: sub-budget name as the server sends it (app, judging, evals, probes, demo) -->
+    <string name="dev_budget_sub">AI part: %1$s</string>
     <string name="dev_budget_compute">Server compute spend</string>
     <string name="dev_budget_today">Today (pacing cap)</string>
     <string name="dev_budget_horizon">Budget horizon ends</string>

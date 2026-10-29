@@ -30,6 +30,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -75,7 +76,11 @@ fun GuardianSheetRoute(api: GuardianSessionApi, cancelSteps: CancelStepsSource, 
 fun rememberGuardianPresenter(cancelSteps: CancelStepsSource): GuardianPresenter {
     val context = LocalContext.current
     val configuration = LocalConfiguration.current
-    return remember(context, configuration, cancelSteps) { GuardianPresenter(GuardianText(context), cancelSteps) }
+    return remember(context, configuration, cancelSteps) {
+        // The mock ONDC seller is named as such on the guardian screen too (goal 17).
+        val ondcDemo = { runCatching { app.ridemate.RideMateApp.graph(context).ondcClient.view.value.demoSeller }.getOrDefault(false) }
+        GuardianPresenter(GuardianText(context, ondcDemo), cancelSteps)
+    }
 }
 
 /**
@@ -238,7 +243,7 @@ private fun SectionHeader(title: String) {
 @Composable
 private fun LegRow(leg: LegUi, text: GuardianText, onAction: (ActionTarget) -> Unit) {
     val name = text.provider(leg.provider)
-    val status = text.state(leg.state, leg.provider)
+    val status = text.state(leg.state, leg.provider, leg.followUpPending)
     val proven = leg.state == RideState.CANCEL_CONFIRMED
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Row(
@@ -269,13 +274,26 @@ private fun LegRow(leg: LegUi, text: GuardianText, onAction: (ActionTarget) -> U
     }
 }
 
-/** The opt-in "Keep searching" (off by default), with its fee and driver-harm warning. */
+/**
+ * The opt-in "Keep searching" (off by default), with its fee and driver-harm warning. Turning it on asks first, with
+ * the same "Play fair with drivers" confirmation as Settings (goal 16); turning it off needs none.
+ */
 @Composable
 private fun KeepSearchingRow(on: Boolean, text: GuardianText, onAction: (ActionTarget) -> Unit) {
+    var confirming by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
+    if (confirming) {
+        app.ridemate.settings.KeepSearchingWarning(
+            onConfirm = {
+                confirming = false
+                onAction(SessionOp(SessionOpKind.TOGGLE_KEEP_SEARCHING))
+            },
+            onDismiss = { confirming = false },
+        )
+    }
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         val label = text.sessionAction(SessionOpKind.TOGGLE_KEEP_SEARCHING, keepSearchingOn = on)
         OutlinedButton(
-            onClick = { onAction(SessionOp(SessionOpKind.TOGGLE_KEEP_SEARCHING)) },
+            onClick = { if (on) onAction(SessionOp(SessionOpKind.TOGGLE_KEEP_SEARCHING)) else confirming = true },
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(min = MinTouch)

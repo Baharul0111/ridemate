@@ -105,6 +105,20 @@ class GuardianScreenTest {
         show(GuardianUiState(sessionId = "s", legs = listOf(LegUi("s:ola", Provider.OLA, RideState.QUOTED, 0, LegRole.NONE, false, false, false))))
         compose.onNodeWithText("Keep searching: off").assertHeightIsAtLeast(48.dp).performClick()
         compose.onNodeWithText(context.getString(app.ridemate.R.string.guardian_keep_searching_warning)).assertIsDisplayed()
+        // Turning it on asks first, with the same fair-play confirmation as Settings (goal 16).
+        assertEquals(emptyList<ActionTarget>(), taps)
+        compose.onNodeWithText(context.getString(app.ridemate.R.string.set_keep_searching_warning_title)).assertIsDisplayed()
+        compose.onNodeWithText(context.getString(app.ridemate.R.string.set_cancel)).performClick()
+        assertEquals(emptyList<ActionTarget>(), taps)
+        compose.onNodeWithText("Keep searching: off").performClick()
+        compose.onNodeWithText(context.getString(app.ridemate.R.string.set_keep_searching_confirm)).performClick()
+        assertEquals(listOf<ActionTarget>(SessionOp(SessionOpKind.TOGGLE_KEEP_SEARCHING)), taps)
+    }
+
+    @Test
+    fun `turning keep searching off needs no confirmation`() {
+        show(GuardianUiState(sessionId = "s", keepSearching = true, legs = listOf(LegUi("s:ola", Provider.OLA, RideState.QUOTED, 0, LegRole.NONE, false, false, false))))
+        compose.onNodeWithText("Keep searching: on").performClick()
         assertEquals(listOf<ActionTarget>(SessionOp(SessionOpKind.TOGGLE_KEEP_SEARCHING)), taps)
     }
 

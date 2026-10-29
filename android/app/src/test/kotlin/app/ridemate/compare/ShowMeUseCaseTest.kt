@@ -173,7 +173,7 @@ class ShowMeUseCaseTest {
     fun `AI paused says when Show me is back, other failures say to follow the card`() = runBlocking {
         api.pointResult = { ApiResult.AiPaused("ai_paused", "21:05", null) }
         assertEquals(ShowMeResult.Unavailable("21:05"), useCase().show(request()))
-        assertTrue(lastStatus().text, lastStatus().text.contains("9:05 pm (IST)"))
+        assertTrue(lastStatus().text, lastStatus().text.contains("9:05 PM (IST)"))
 
         api.pointResult = { ApiResult.Offline }
         assertEquals(ShowMeResult.Unavailable(), useCase().show(request()))

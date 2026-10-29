@@ -59,12 +59,6 @@ enum class PrecheckKind {
 
     /** Location is not allowed: the pickup is the address the user typed. */
     LOCATION_DENIED,
-
-    /** Later in the session: a fare read found no prices on the screen. */
-    NO_FARES_FOUND,
-
-    /** Later in the session: the open network returned no quotes. */
-    NO_ONDC_RESULTS,
 }
 
 /** What a fix-it card's button does. Settings actions have an intent ([FixIntents]); the rest are in-app. */
@@ -75,11 +69,11 @@ enum class FixAction {
     OPEN_NOTIFICATION_SETTINGS,
     OPEN_INTERNET_SETTINGS,
     REQUEST_LOCATION,
+
+    /** App info, where a sideloaded app's "Allow restricted settings" is (Android 13+). */
+    OPEN_APP_INFO,
     TRY_DEMO,
     CHOOSE_APPS,
-    RETRY_READ,
-    TYPE_PRICE,
-    CONTINUE_WITHOUT_ONDC,
 }
 
 data class PrecheckIssue(val kind: PrecheckKind, val severity: IssueSeverity, val fixes: List<FixAction>)
@@ -112,6 +106,12 @@ interface PrecheckProbes {
     fun overlayAllowed(): Boolean
     fun batteryExempt(): Boolean
     fun notificationsAllowed(): Boolean
+
+    /**
+     * The guardian's own channels (questions, loud alerts, reminders) are not switched off one by one: with any of them
+     * blocked, a "Cancel the others?" sheet or a still-live alert would never be seen outside RideMate.
+     */
+    fun guardianChannelsAllowed(): Boolean = true
     fun online(): Boolean
     fun locationAllowed(): Boolean
     fun installedRideApps(): Set<Provider>
@@ -126,14 +126,15 @@ interface PrecheckProbes {
  * | RideWatch blind (access off, or no ping answer within [pingTimeoutMs]) | blocking | notification access |
  * | no supported app installed | blocking | Try the demo |
  * | no app selected | blocking | choose apps |
- * | notifications off | blocking when the overlay is also off (nothing could remind the user), else warning | notification settings |
+ * | notifications off, or a guardian channel blocked | blocking (warning in the demo): sheets, alerts and reminders reach the user only as notifications | notification settings |
  * | overlay off | warning | overlay settings |
  * | battery optimised | warning | battery exemption |
  * | offline | warning (info in the demo) | internet settings |
  * | location denied | info | allow location |
  *
- * The demo needs no ride app, RideWatch or location. [noFaresFound] / [noOndcResults] are the later outcomes the
- * comparison reports with the same cards. The check never hangs: the ping is the only wait and it is time-limited.
+ * The demo needs no ride app, RideWatch or location. Later outcomes (no prices on a screen, no network quotes) are
+ * shown where they happen: the bubble's status line and the open-network panel. The check never hangs: the ping is
+ * the only wait and it is time-limited.
  */
 class PreSessionCheck(
     private val probes: PrecheckProbes,
@@ -158,7 +159,9 @@ class PreSessionCheck(
         }
 
         if (!snapshot.notifications) {
-            val severity = if (!snapshot.overlay && !request.demo) IssueSeverity.BLOCKING else IssueSeverity.WARNING
+            // A live comparison's questions, driver sheets, loud alerts and reminders reach the user only as
+            // notifications (the bubble shows the cancel guide, nothing else): it can't start without them.
+            val severity = if (!request.demo) IssueSeverity.BLOCKING else IssueSeverity.WARNING
             issues += PrecheckIssue(PrecheckKind.NOTIFICATIONS_OFF, severity, listOf(FixAction.OPEN_NOTIFICATION_SETTINGS))
         }
         if (!snapshot.overlay && !request.demo) {
@@ -217,7 +220,7 @@ class PreSessionCheck(
                 listenerEnabled = !demo && safe { p.listenerEnabled() },
                 overlay = safe { p.overlayAllowed() },
                 battery = safe { p.batteryExempt() },
-                notifications = safe { p.notificationsAllowed() },
+                notifications = safe { p.notificationsAllowed() } && (demo || safe { p.guardianChannelsAllowed() }),
                 online = safe { p.online() },
                 location = safe { p.locationAllowed() },
                 installed = if (demo) emptySet() else runCatching { p.installedRideApps() }.getOrDefault(emptySet()),
@@ -234,13 +237,5 @@ class PreSessionCheck(
     companion object {
         /** How long RideWatch may take to answer before it counts as not responding. */
         const val PING_TIMEOUT_MS: Long = 2_000
-
-        /** Reported by the comparison when a fare read found no prices. */
-        fun noFaresFound(): PrecheckIssue =
-            PrecheckIssue(PrecheckKind.NO_FARES_FOUND, IssueSeverity.WARNING, listOf(FixAction.RETRY_READ, FixAction.TYPE_PRICE))
-
-        /** Reported by the comparison when the open network returned no quotes. */
-        fun noOndcResults(): PrecheckIssue =
-            PrecheckIssue(PrecheckKind.NO_ONDC_RESULTS, IssueSeverity.WARNING, listOf(FixAction.CONTINUE_WITHOUT_ONDC))
     }
 }

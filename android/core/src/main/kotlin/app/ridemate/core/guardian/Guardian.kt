@@ -200,15 +200,23 @@ class Guardian(
         distanceMeters: Int?,
         tapId: TapId,
         frameAtElapsedMs: Long,
+        /**
+         * The hash of the number plate on the same verified frame (the masker's, never the plate itself), for
+         * same-driver detection; it only fills a plate the leg's driver does not have yet.
+         */
+        plateHash: String? = null,
     ): List<GuardianEffect> = step {
         val rec = leg(legId) ?: return@step
         if (!acceptFrame(rec, tapId, frameAtElapsedMs)) return@step
         val event = if (rec.leg.underlyingState in LegState.DRIVER_STATES) {
+            if (plateHash != null && rec.leg.driver.plateHash == null) {
+                rec.leg = rec.leg.copy(driver = rec.leg.driver.copy(plateHash = plateHash))
+            }
             DriverData(etaMin, distanceMeters, EtaSource.VERIFIED)
         } else {
             ProviderUpdate(
                 NotificationEvent.ASSIGNED, SignalSource.SCREEN_CHECK, etaMin = etaMin, distanceMeters = distanceMeters,
-                postTimeWallMs = now().wallMs,
+                postTimeWallMs = now().wallMs, plateHash = plateHash,
             )
         }
         apply(rec, event)

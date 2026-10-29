@@ -155,6 +155,37 @@ data class ConfigCheckBudget(
     @SerialName("day_cap_usd") val dayCapUsd: Double? = null,
     @SerialName("day_spent_usd") val daySpentUsd: Double? = null,
     @SerialName("horizon_end") val horizonEnd: String? = null,
+    /** AI spend held for calls still running (counted against the limit until they settle). */
+    @SerialName("ai_reserved_usd") val aiReservedUsd: Double? = null,
+    /** The AI limit in force now: the AI budget, less any compute overrun past the margin. */
+    @SerialName("ai_limit_usd") val aiLimitUsd: Double? = null,
+    @SerialName("margin_usd") val marginUsd: Double? = null,
+    /** The whole Modal credit (AI + compute + margin). */
+    @SerialName("credit_usd") val creditUsd: Double? = null,
+    @SerialName("sub_budgets") val subBudgets: Map<String, ConfigCheckSubBudget> = emptyMap(),
+) {
+    /** AI spent plus reserved: what counts against [aiLimitUsd]. */
+    val aiUsedUsd: Double? get() = aiSpentUsd?.let { it + (aiReservedUsd ?: 0.0) }
+
+    /** The credit total: as reported, else AI + compute budgets + margin. */
+    val creditTotalUsd: Double?
+        get() = creditUsd ?: if (aiBudgetUsd != null && computeBudgetUsd != null) aiBudgetUsd + computeBudgetUsd + (marginUsd ?: 0.0) else null
+
+    /** What is left of the credit: total − (AI spent + reserved + compute spent), never below zero. */
+    val creditLeftUsd: Double?
+        get() {
+            val total = creditTotalUsd ?: return null
+            val ai = aiUsedUsd ?: return null
+            val compute = computeSpentUsd ?: return null
+            return (total - ai - compute).coerceAtLeast(0.0)
+        }
+}
+
+/** One part of the AI budget (app, judging, evals, probes, demo) in the owner view. */
+@Serializable
+data class ConfigCheckSubBudget(
+    @SerialName("spent_usd") val spentUsd: Double? = null,
+    @SerialName("budget_usd") val budgetUsd: Double? = null,
 )
 
 /** `GET /v1/config-check`. */

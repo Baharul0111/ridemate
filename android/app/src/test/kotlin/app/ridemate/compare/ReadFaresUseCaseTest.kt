@@ -192,7 +192,7 @@ class ReadFaresUseCaseTest {
         assertEquals(ManualReason.AI_PAUSED, result.reason)
         assertEquals("13:30", result.resumeAtIst)
         assertEquals(listOf(VehicleClass.BIKE, VehicleClass.AUTO, VehicleClass.CAB_ECONOMY), result.suggestedClasses)
-        assertTrue(FareReadingMessages.manualText(context, result).contains("AI reading resumes at 1:30 pm (IST)"))
+        assertTrue(FareReadingMessages.manualText(context, result).contains("AI reading resumes at 1:30 PM (IST)"))
         assertTrue(quotes("l1").isEmpty())
         assertEquals(RideState.OPENED, legState("l1"))
         assertFramesReleased()

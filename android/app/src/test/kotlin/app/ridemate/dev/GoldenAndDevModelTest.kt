@@ -9,6 +9,7 @@ import app.ridemate.data.RecorderPostEntity
 import app.ridemate.net.ApiResult
 import app.ridemate.net.ConfigCheckBudget
 import app.ridemate.net.ConfigCheckResponse
+import app.ridemate.net.ConfigCheckSubBudget
 import app.ridemate.testing.FakeClock
 import app.ridemate.testing.FakePushTokens
 import app.ridemate.testing.ShellFakeApi
@@ -207,8 +208,24 @@ class GoldenAndDevModelTest {
         assertEquals(BudgetStatus.Loaded(api.configCheckResult.getOrNull()!!), dev.state.value.budget)
         val context = androidx.test.core.app.ApplicationProvider.getApplicationContext<android.content.Context>()
         val lines = BudgetLines.lines(context, (dev.state.value.budget as BudgetStatus.Loaded).check).toMap()
-        assertEquals("$1.23 of $80.00 (1%)", lines["AI spend"])
+        assertEquals("$1.23 of $80.00 (1%)", lines["AI used (spent + reserved) of limit"])
         assertEquals("$0.10 of $1.30 (7%)", lines["Today (pacing cap)"])
+        // Without credit fields the credit left can't be worked out from AI + compute budgets alone: margin is 0.
+        assertEquals("$90.37 of $92.00", lines["Modal credit left"])
+
+        // The full owner view: reservations count against the live (shrunken) AI limit; what is left of the credit.
+        val full = budget.copy(
+            aiReservedUsd = 0.77, aiLimitUsd = 75.0, marginUsd = 8.0, creditUsd = 100.0,
+            subBudgets = mapOf("judging" to ConfigCheckSubBudget(2.0, 15.0), "app" to ConfigCheckSubBudget(0.5, 40.0)),
+        )
+        val fullLines = BudgetLines.lines(context, ConfigCheckResponse(aiEnabled = true, budget = full))
+        val byLabel = fullLines.toMap()
+        assertEquals("$2.00 of $75.00 (2%)", byLabel["AI used (spent + reserved) of limit"])
+        assertEquals("$0.77", byLabel["AI reserved (calls running)"])
+        assertEquals("$97.60 of $100.00", byLabel["Modal credit left"])
+        assertEquals("$2.00 of $15.00 (13%)", byLabel["AI part: judging"])
+        assertEquals("$0.50 of $40.00 (1%)", byLabel["AI part: app"])
+        assertEquals("Modal credit left", fullLines.first().first)
         assertEquals("26 Jan 2027", lines["Budget horizon ends"])
         assertEquals("Normal", lines["Cap profile"])
         assertEquals("On", lines["AI reading"])

@@ -17,8 +17,6 @@ object PrecheckMessages {
         PrecheckKind.BATTERY_RESTRICTED -> R.string.precheck_battery_title
         PrecheckKind.OFFLINE -> R.string.precheck_offline_title
         PrecheckKind.LOCATION_DENIED -> R.string.precheck_location_title
-        PrecheckKind.NO_FARES_FOUND -> R.string.precheck_no_fares_title
-        PrecheckKind.NO_ONDC_RESULTS -> R.string.precheck_no_ondc_title
     }
 
     @StringRes
@@ -32,8 +30,6 @@ object PrecheckMessages {
         PrecheckKind.BATTERY_RESTRICTED -> R.string.precheck_battery_body
         PrecheckKind.OFFLINE -> R.string.precheck_offline_body
         PrecheckKind.LOCATION_DENIED -> R.string.precheck_location_body
-        PrecheckKind.NO_FARES_FOUND -> R.string.precheck_no_fares_body
-        PrecheckKind.NO_ONDC_RESULTS -> R.string.precheck_no_ondc_body
     }
 
     @StringRes
@@ -44,11 +40,9 @@ object PrecheckMessages {
         FixAction.OPEN_NOTIFICATION_SETTINGS -> R.string.precheck_fix_notifications
         FixAction.OPEN_INTERNET_SETTINGS -> R.string.precheck_fix_internet
         FixAction.REQUEST_LOCATION -> R.string.precheck_fix_location
+        FixAction.OPEN_APP_INFO -> R.string.onb_restricted_open_app_info
         FixAction.TRY_DEMO -> R.string.precheck_fix_demo
         FixAction.CHOOSE_APPS -> R.string.precheck_fix_choose_apps
-        FixAction.RETRY_READ -> R.string.precheck_fix_retry_read
-        FixAction.TYPE_PRICE -> R.string.precheck_fix_type_price
-        FixAction.CONTINUE_WITHOUT_ONDC -> R.string.precheck_fix_without_ondc
     }
 
     /** The severity in words, so it is never shown by colour alone (goal 27). */
@@ -58,4 +52,8 @@ object PrecheckMessages {
         IssueSeverity.WARNING -> R.string.precheck_severity_warning
         IssueSeverity.INFO -> R.string.precheck_severity_info
     }
+
+    /** Kinds whose system switch Android 13+ greys out for a sideloaded app until "Allow restricted settings". */
+    val RESTRICTED_SWITCHES: Set<PrecheckKind> =
+        setOf(PrecheckKind.LISTENER_OFF, PrecheckKind.LISTENER_NOT_RESPONDING, PrecheckKind.OVERLAY_OFF)
 }

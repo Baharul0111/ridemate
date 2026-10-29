@@ -3,7 +3,7 @@ package app.ridemate.privacy
 import android.content.Context
 import androidx.annotation.StringRes
 import app.ridemate.R
-import app.ridemate.util.Ist
+import app.ridemate.ui.UiFormat
 import java.util.Locale
 
 /** Wording for the My data and Erase screens (strings_platform.xml). */
@@ -32,10 +32,10 @@ object PrivacyMessages {
                 SignInKind.SIGNED_OUT -> context.getString(R.string.platform_my_data_signed_out)
             },
         )
-        summary.lastSessionAtUtc?.let { add(context.getString(R.string.platform_my_data_last_session, Ist.dateTime(it, locale))) }
+        summary.lastSessionAtUtc?.let { add(context.getString(R.string.platform_my_data_last_session, UiFormat.dateTimeIst(it, locale))) }
         val config = summary.remoteConfig
         if (config.remoteFingerprint != null && config.lastFetchUtcMs != null) {
-            add(context.getString(R.string.platform_my_data_config, config.remoteFingerprint, Ist.dateTime(config.lastFetchUtcMs, locale)))
+            add(context.getString(R.string.platform_my_data_config, config.remoteFingerprint, UiFormat.dateTimeIst(config.lastFetchUtcMs, locale)))
         } else {
             add(context.getString(R.string.platform_my_data_config_bundled))
         }
