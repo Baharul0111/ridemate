@@ -158,7 +158,7 @@ RIDEMATE_KEYSTORE_PASSWORD=… tools/release.sh
 | Signed APK | `dist/RideMate-1.0.0-hackathon.apk` (~55 MB, built from commit 6515190, installed on your phone), SHA-256 `0d7aa0ba611522e1864b021bea4df9ddd304c3e887e9cc2c826172f526876e47`, certificate verified, not debuggable, no AccessibilityService. **Not published** (waits for your go-ahead) |
 | GitHub | `Baharul0111/ridemate` main pushed (green commit `a658b4e` and later docs); `Baharul0111/ridemate-golden` private golden set pushed |
 | Modal spend | **$0.23 of $100** (AI $0.21, compute $0.01), all through the meter |
-| Not done in time | Gradle dependency-verification file (`tools/update_dependency_verification.sh` — run it once, commit `android/gradle/verification-metadata.xml`; until then the Android CI job may fail early); a few minor redesign items noted by the agents (restricted-settings guide still a card, under-18 screen paragraph, active-ride card timeline) |
+| Not done in time | (dependency verification: done 29 Oct 21:59 — 770 components, strict check passes); a few minor redesign items noted by the agents (restricted-settings guide still a card, under-18 screen paragraph, active-ride card timeline) |
 
 ## 10. Ready for normal people? (status 29 Oct 2026, evening)
 **What already works for any user today** (signed APK in `dist/`, backend live on Modal):
