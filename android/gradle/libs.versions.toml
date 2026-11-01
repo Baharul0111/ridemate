@@ -23,7 +23,7 @@ playLocation = "21.3.0"
 # MapLibre Native (BSD-2-Clause): free, keyless vector maps for the pin picker; tiles from OpenFreeMap (architecture §4.2).
 maplibre = "13.7.1"
 junit = "4.13.2"
-robolectric = "4.14.1"
+robolectric = "4.17"
 androidxTestCore = "1.6.1"
 androidxTestRunner = "1.6.2"
 androidxTestExtJunit = "1.2.1"
