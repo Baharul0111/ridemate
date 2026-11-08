@@ -9,7 +9,7 @@ plugins {
     alias(libs.plugins.firebase.crashlytics) apply false
     alias(libs.plugins.room) apply false
     // Third-party licence report for what ships in the APK (tools/license_report.py, license-report.yml).
-    id("com.github.jk1.dependency-license-report") version "3.1.4" apply false
+    id("com.github.jk1.dependency-license-report") version "3.1.5" apply false
 }
 
 // Licence report: applied to :app only, over the release runtime classpath (what the APK actually contains).
